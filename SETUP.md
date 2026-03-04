@@ -74,7 +74,9 @@ Run scripts in this order from RStudio (with the `.Rproj` open):
 |------|--------|--------|-------|
 | 1 | `R/01_data_preparation.R` | `data_processed/heapo/heapo_dataset.rds/.csv` | Annual dataset, 956 obs. Optional if only daily data is needed. |
 | 2 | `R/02_data_preparation_daily.R` | `data_processed/heapo/heapo_dataset_daily.rds/.csv` | Daily dataset, ~1.4M obs. Main dataset for modelling. |
-| 3 | Knit `R/03_data_quality_report.Rmd` | HTML or PDF report | Requires both datasets from steps 1 & 2. |
+| 3 | Knit `R/03_data_quality_report.Rmd` | HTML report | Data quality and suitability report. Requires both datasets from steps 1 & 2. |
+| 4 | Knit `R/04_data_filtration_EDA.Rmd` | `data_processed/heapo/heapo_modelling.rds/.csv` + HTML report | Filters daily dataset to modelling subset (<=100k rows, 2022-2024), derives response variables, runs full EDA. Requires step 2. |
+| 5 | Knit `R/04_1_EDA_short.Rmd` | HTML report | Condensed 2-page EDA summary. Requires step 4. |
 
 > **Note:** Step 2 reads ~1,400 individual CSV files and may take several minutes to run.
 
@@ -91,7 +93,9 @@ HSLU_AML_01/
 │   ├── 01_data_preparation.R   # Annual dataset (956 obs x 22 vars)
 │   ├── 02_data_preparation_daily.R    # Daily dataset (~1.4M obs x 25 vars)
 │   ├── 02_data_preparation_daily.Rmd  # Daily dataset – documented version
-│   └── 03_data_quality_report.Rmd     # Data quality & suitability report
+│   ├── 03_data_quality_report.Rmd     # Data quality & suitability report
+│   ├── 04_data_filtration_EDA.Rmd     # Filtration to modelling subset + full EDA
+│   └── 04_1_EDA_short.Rmd            # Condensed 2-page EDA summary
 ├── data_raw/
 │   └── heapo_data/             # Raw HEAPO data (not tracked by Git)
 ├── data_processed/
