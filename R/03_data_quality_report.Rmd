@@ -3,9 +3,6 @@ title: "HEAPO - Data Quality & Suitability Report"
 author: ''
 date: "`r Sys.Date()`"
 output:
-  pdf_document:
-    toc: true
-    extra_dependencies: ["float"]
   html_document:
     toc: true
     toc_float:
@@ -14,6 +11,9 @@ output:
     theme: flatly
     df_print: paged
     number_sections: true
+  pdf_document:
+    toc: true
+    extra_dependencies: ["float"]
 ---
 
 ```{r setup, include=FALSE}
@@ -24,6 +24,7 @@ knitr::opts_chunk$set(
   fig.width  = 10,
   fig.height = 5
 )
+knitr::opts_knit$set(root.dir = normalizePath(".."))
 
 library(dplyr)
 library(tidyr)
@@ -33,12 +34,9 @@ library(knitr)
 library(kableExtra)
 library(scales)
 
-# Paths relative to project root – open HSLU_AML_01.Rproj in RStudio
+# Paths relative to project root
 daily_path  <- "data_processed/heapo/heapo_dataset_daily.rds"
 annual_path <- "data_processed/heapo/heapo_dataset.rds"
-
-heapo_daily  <- readRDS(daily_path)
-heapo_annual <- readRDS(annual_path)
 
 # Format-aware table helper (works for both HTML and PDF)
 styled_table <- function(df, caption = "") {
@@ -54,6 +52,12 @@ styled_table <- function(df, caption = "") {
                     full_width = FALSE)
   }
 }
+```
+
+```{r load-data, include=FALSE}
+# root.dir is now active – paths resolve from project root
+heapo_daily  <- readRDS(daily_path)
+heapo_annual <- readRDS(annual_path)
 ```
 
 ---
