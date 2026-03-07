@@ -1,0 +1,121 @@
+---
+title: "HEAPO – Exploratory Data Analysis"
+author: ""
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: false
+    code_folding: hide
+    theme: flatly
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      fig.width = 9, fig.height = 3.5)
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(lubridate)
+library(knitr)
+library(kableExtra)
+library(scales)
+```
+
+```{r load-data, include=FALSE}
+df <- readRDS("data_processed/heapo/heapo_modelling.rds")
+```
+
+The modelling dataset contains **`r comma(nrow(df))`** daily observations from **`r n_distinct(df$Household_ID)`** households in the canton of Zurich, covering 2022-01-01 to 2024-02-29.
+
+---
+
+## Response Variable
+
+`kWh_total` measures total daily household electricity consumption. Because it is an amount variable, it is right-skewed and must be log-transformed for use in Linear Models.
+
+```{r response, fig.height=3}
+df %>%
+  mutate(`log(kWh_total)` = log(kWh_total)) %>%
+  pivot_longer(cols = c(kWh_total, `log(kWh_total)`),
+               names_to = "Transformation", values_to = "value") %>%
+  ggplot(aes(x = value)) +
+  geom_histogram(bins = 60, fill = "steelblue", color = "white") +
+  facet_wrap(~ Transformation, scales = "free") +
+  labs(x = NULL, y = "Count") +
+  theme_minimal()
+```
+
+Log-transformation yields an approximately normal distribution, confirming the log-scale is appropriate for LM and GAM.
+
+---
+
+## Seasonal Pattern
+
+```{r seasonal, fig.height=3.5}
+df %>%
+  mutate(Month = month(date, label = TRUE, abbr = TRUE)) %>%
+  ggplot(aes(x = Month, y = kWh_total)) +
+  geom_boxplot(fill = "steelblue", alpha = 0.7, outlier.size = 0.2) +
+  scale_y_continuous(labels = comma) +
+  labs(title = "Daily Consumption by Month",
+       x = NULL, y = "kWh / day") +
+  theme_minimal()
+```
+
+Consumption in winter months (December to February) is roughly 3 to 5 times higher than in summer (June to August), driven by heat pump operation. The wide interquartile range in winter reflects differences in building size, insulation, and heat pump type across households.
+
+---
+
+## Key Predictor: Heating Degree Days
+
+**Heating Degree Days (HDD)** quantify daily heating demand as the temperature shortfall below a base temperature of 12°C (Swiss SIA norm). A day averaging 2°C contributes 10 HDD; days above 12°C contribute 0. HDD is a more direct proxy for heat pump workload than raw temperature.
+
+```{r hdd, fig.height=3.5}
+df %>%
+  slice_sample(n = 15000) %>%
+  ggplot(aes(x = heating_degree_days, y = kWh_total)) +
+  geom_point(alpha = 0.08, size = 0.5, color = "steelblue") +
+  geom_smooth(method = "lm", color = "tomato", se = FALSE, linewidth = 1) +
+  scale_y_continuous(labels = comma) +
+  labs(title = "Heating Degree Days vs. Daily Consumption",
+       subtitle = "Random subsample of 15,000 observations",
+       x = "Heating Degree Days (HDD)", y = "kWh / day") +
+  theme_minimal()
+```
+
+The relationship is strongly linear and positive: HDD will be the dominant predictor across all models.
+
+---
+
+## Predictor Overview
+
+```{r predictor-table}
+tibble(
+  Variable            = c("heating_degree_days", "temp_avg", "living_area",
+                          "building_type", "heatpump_type", "has_floor_heating",
+                          "n_residents", "is_weekend"),
+  Type                = c("Continuous", "Continuous", "Continuous",
+                          "Categorical (>2)", "Categorical (2)", "Binary",
+                          "Count", "Binary"),
+  `Expected effect`   = c("Strong positive (more HDD = more heating)",
+                          "Strong negative (colder = more heating)",
+                          "Positive (larger homes use more energy)",
+                          "Varies by insulation and building era",
+                          "Air-source less efficient than ground-source at low temps",
+                          "Negative (lower supply temp improves heat pump COP)",
+                          "Positive (more occupants = more electricity use)",
+                          "Slight positive (occupants home more on weekends)")
+) %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"), full_width = TRUE,
+                font_size = 13)
+```
+
+**COP (Coefficient of Performance):** the ratio of heat delivered to electricity consumed. A COP of 3 means 3 kWh of heat per 1 kWh of electricity. Higher supply temperatures (radiators: 60-80°C) reduce COP; lower supply temperatures (floor heating: 30-40°C) increase it.
+
+---
+
+*Report generated on `r Sys.Date()` using R `r R.version$major`.`r R.version$minor`.*

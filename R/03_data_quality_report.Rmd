@@ -1,0 +1,622 @@
+---
+title: "HEAPO - Data Quality & Suitability Report"
+author: ''
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+    code_folding: hide
+    theme: flatly
+    df_print: paged
+    number_sections: true
+  pdf_document:
+    toc: true
+    extra_dependencies: ["float"]
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo       = !knitr::is_latex_output(),  # FALSE for PDF, TRUE for HTML
+  message    = FALSE,
+  warning    = FALSE,
+  fig.width  = 10,
+  fig.height = 5
+)
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(lubridate)
+library(knitr)
+library(kableExtra)
+library(scales)
+
+# Paths relative to project root
+daily_path  <- "data_processed/heapo/heapo_dataset_daily.rds"
+annual_path <- "data_processed/heapo/heapo_dataset.rds"
+
+# Format-aware table helper (works for both HTML and PDF)
+styled_table <- function(df, caption = "") {
+  if (knitr::is_latex_output()) {
+    df %>%
+      kable(caption = caption, format = "latex", booktabs = TRUE) %>%
+      kable_styling(latex_options = c("striped", "HOLD_position", "scale_down"),
+                    full_width = FALSE)
+  } else {
+    df %>%
+      kable(caption = caption) %>%
+      kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                    full_width = FALSE)
+  }
+}
+```
+
+```{r load-data, include=FALSE}
+# root.dir is now active – paths resolve from project root
+heapo_daily  <- readRDS(daily_path)
+heapo_annual <- readRDS(annual_path)
+```
+
+---
+
+# Dataset Overview
+
+## Dimensions & Basic Info
+
+```{r overview-basic}
+tibble(
+  Dataset      = c("Daily", "Annual"),
+  Rows         = c(nrow(heapo_daily), nrow(heapo_annual)),
+  Columns      = c(ncol(heapo_daily), ncol(heapo_annual)),
+  Households   = c(n_distinct(heapo_daily$Household_ID),
+                   n_distinct(heapo_annual$Household_ID)),
+  `Date range` = c(
+    paste(min(heapo_daily$date), "to", max(heapo_daily$date)),
+    "aggregated (annual median)"
+  )
+) %>% styled_table("Dataset dimensions")
+```
+
+## Variable Overview (Daily Dataset)
+
+```{r overview-vars}
+tibble(
+  Variable = names(heapo_daily),
+  Type     = sapply(heapo_daily, function(x) class(x)[1]),
+  Role     = c(
+    "ID", "Time", "Time", "Time", "Time", "Time (binary)",
+    "Response (continuous)", "Response (continuous)", "Response (continuous)",
+    "Response (continuous)", "Response (derived)",
+    "Predictor (weather)", "Predictor (weather)", "Predictor (weather)",
+    "Predictor (weather)", "Predictor (weather)", "Predictor (weather)",
+    "Predictor (weather)", "Predictor (weather)", "Predictor (weather)",
+    "Predictor (categorical)", "Predictor (categorical)",
+    "Predictor (categorical)", "Predictor (categorical)",
+    "Predictor (continuous)", "Predictor (count)",
+    "Predictor (binary)", "Predictor (binary)", "Predictor (binary)",
+    "Predictor (binary)", "Predictor (binary)"
+  )
+) %>% styled_table("Variable roles and types")
+```
+
+## First Rows
+
+```{r overview-head}
+head(heapo_daily, 5)
+```
+
+---
+
+# Missing Data Analysis
+
+## Explanation: Why Are Some Variables Mostly NA?
+
+The high NA rates for certain variables are **structural and expected** -- they are not the result of a merge error. According to the HEAPO dataset paper (Brudermueller et al., 2025):
+
+| Variable | NA rate | Reason |
+|---|---|---|
+| kWh\_heatpump, kWh\_other | ~97% | Only available for households with a separate smart meter for the heat pump. |
+| kWh\_returned | ~75% | Only available for households with a PV system (~25% of households). |
+| sunshine\_hours | ~8% | Not all 8 weather stations measure sunshine duration. |
+| precipitation | ~0.2% | Minor gaps in weather station data. |
+
+**Implication for modelling:** `kWh_total` is the primary response variable. Since heat pumps are the dominant electricity consumer, `kWh_total` serves as a valid proxy for heat pump energy consumption.
+
+## NA Count per Variable
+
+```{r missing-table}
+na_summary <- heapo_daily %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(everything(), names_to = "Variable", values_to = "NA count") %>%
+  mutate(
+    `NA pct` = round(`NA count` / nrow(heapo_daily) * 100, 2),
+    `Has NAs` = ifelse(`NA count` > 0, "Yes", "No")
+  ) %>%
+  arrange(desc(`NA count`))
+
+na_summary %>% styled_table("Missing values per variable")
+```
+
+## NA Overview Plot
+
+```{r missing-plot, fig.height=6}
+na_summary %>%
+  filter(`NA count` > 0) %>%
+  mutate(Variable = reorder(Variable, `NA pct`)) %>%
+  ggplot(aes(x = Variable, y = `NA pct`, fill = `NA pct`)) +
+  geom_col() +
+  geom_text(aes(label = paste0(`NA pct`, "%")), hjust = -0.1, size = 3.5) +
+  coord_flip() +
+  scale_fill_gradient(low = "gold", high = "tomato") +
+  scale_y_continuous(limits = c(0, 100), labels = percent_format(scale = 1)) +
+  labs(title = "Missing Values per Variable",
+       x = NULL, y = "% Missing") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+## NA Pattern: Structural or Random?
+
+**What we want to know:** Is the missingness in `kWh_heatpump` random (a data quality problem) or structural (the household simply has no sub-meter)?
+
+**What to look for:** If a household is either always missing or never missing across its entire observation period, the missingness is structural -- the sub-meter is either installed or it is not. Random missingness would show a mix within the same household over time.
+
+```{r missing-time}
+missing_per_hh <- heapo_daily %>%
+  group_by(Household_ID) %>%
+  summarise(pct_missing = mean(is.na(kWh_heatpump)) * 100, .groups = "drop") %>%
+  mutate(Category = case_when(
+    pct_missing == 100 ~ "Always missing (no sub-meter)",
+    pct_missing == 0   ~ "Never missing (has sub-meter)",
+    TRUE               ~ "Partially missing (unusual)"
+  ))
+
+missing_per_hh %>%
+  count(Category) %>%
+  mutate(Percent = round(n / sum(n) * 100, 1)) %>%
+  rename(`N households` = n) %>%
+  styled_table("kWh heatpump: missingness pattern per household")
+```
+
+```{r missing-time-plot, fig.height=3}
+missing_per_hh %>%
+  count(Category) %>%
+  ggplot(aes(x = reorder(Category, n), y = n, fill = Category)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = n), hjust = -0.2) +
+  coord_flip() +
+  scale_fill_manual(values = c(
+    "Always missing (no sub-meter)"  = "tomato",
+    "Never missing (has sub-meter)"  = "steelblue",
+    "Partially missing (unusual)"    = "orange"
+  )) +
+  labs(title = "Is kWh heatpump missingness structural or random?",
+       x = NULL, y = "Number of households") +
+  theme_minimal()
+```
+
+> **Conclusion:** Almost all households fall into one of the two extreme categories -- either always missing or never missing. This confirms that the ~97% NA rate is **structural** (no sub-meter installed), not a data quality problem. Any households in the "Partially missing" category would warrant further investigation.
+
+---
+
+# Variable-Level Analysis
+
+## Summary Statistics
+
+```{r cont-summary}
+cont_vars <- c("kWh_total", "kWh_heatpump", "kWh_other", "kWh_returned",
+               "kWh_per_m2", "temp_avg", "temp_min", "temp_max", "temp_range",
+               "heating_degree_days", "cooling_degree_days",
+               "humidity_avg", "precipitation", "sunshine_hours", "living_area")
+
+heapo_daily %>%
+  select(all_of(cont_vars)) %>%
+  summarise(across(everything(), list(
+    Min    = ~ round(min(.,  na.rm = TRUE), 2),
+    Median = ~ round(median(., na.rm = TRUE), 2),
+    Mean   = ~ round(mean(.,  na.rm = TRUE), 2),
+    Max    = ~ round(max(.,  na.rm = TRUE), 2),
+    SD     = ~ round(sd(.,   na.rm = TRUE), 2)
+  ))) %>%
+  pivot_longer(everything(),
+               names_to  = c("Variable", "Statistic"),
+               names_sep = "_(?=[^_]+$)") %>%
+  pivot_wider(names_from = Statistic, values_from = value) %>%
+  styled_table("Summary statistics: continuous variables")
+```
+
+## Categorical Variables
+
+```{r cat-vars, results='asis'}
+cat_vars <- c("building_type", "heatpump_type", "weather_region", "group")
+
+for (v in cat_vars) {
+  freq_tbl <- heapo_daily %>%
+    count(.data[[v]], name = "Count") %>%
+    mutate(Percent = round(Count / sum(Count) * 100, 1)) %>%
+    rename(Level = 1)
+
+  # Replace underscores in caption to avoid LaTeX math mode issues
+  caption <- paste("Frequency table:", gsub("_", " ", v))
+  print(styled_table(freq_tbl, caption = caption))
+  cat("\n\n")
+}
+```
+
+## Binary Variables
+
+```{r binary-vars}
+bin_vars <- c("has_floor_heating", "has_radiator", "has_dryer",
+              "has_freezer", "has_electric_vehicle", "is_weekend")
+
+heapo_daily %>%
+  select(Household_ID, all_of(bin_vars)) %>%
+  distinct(Household_ID, .keep_all = TRUE) %>%
+  summarise(across(all_of(bin_vars), ~ round(mean(., na.rm = TRUE) * 100, 1))) %>%
+  pivot_longer(everything(),
+               names_to  = "Variable",
+               values_to = "Proportion = 1 (household level, %)") %>%
+  styled_table("Binary variables: proportion of households with value = 1")
+```
+
+## Count Variable: n\_residents
+
+```{r count-var}
+heapo_daily %>%
+  distinct(Household_ID, n_residents) %>%
+  count(n_residents) %>%
+  rename(`N residents` = n_residents, `N households` = n) %>%
+  styled_table("Distribution of residents per household")
+```
+
+---
+
+# Plausibility Checks
+
+## Negative or Zero Consumption
+
+```{r plausibility-neg}
+tibble(
+  Check = c("kWh total < 0", "kWh total == 0",
+            "kWh heatpump < 0", "kWh other < 0", "kWh returned < 0"),
+  Count = c(
+    sum(heapo_daily$kWh_total < 0,    na.rm = TRUE),
+    sum(heapo_daily$kWh_total == 0,   na.rm = TRUE),
+    sum(heapo_daily$kWh_heatpump < 0, na.rm = TRUE),
+    sum(heapo_daily$kWh_other < 0,    na.rm = TRUE),
+    sum(heapo_daily$kWh_returned < 0, na.rm = TRUE)
+  ),
+  `Pct of rows` = round(c(
+    mean(heapo_daily$kWh_total < 0,    na.rm = TRUE),
+    mean(heapo_daily$kWh_total == 0,   na.rm = TRUE),
+    mean(heapo_daily$kWh_heatpump < 0, na.rm = TRUE),
+    mean(heapo_daily$kWh_other < 0,    na.rm = TRUE),
+    mean(heapo_daily$kWh_returned < 0, na.rm = TRUE)
+  ) * 100, 3)
+) %>% styled_table("Plausibility: consumption values")
+```
+
+## Implausible Living Area
+
+```{r plausibility-area}
+tibble(
+  Check = c("living area < 20 m2", "living area > 600 m2", "living area is NA"),
+  Count = c(
+    sum(heapo_daily$living_area < 20,  na.rm = TRUE),
+    sum(heapo_daily$living_area > 600, na.rm = TRUE),
+    sum(is.na(heapo_daily$living_area))
+  )
+) %>% styled_table("Plausibility: living area")
+```
+
+## Implausible Temperature Values
+
+```{r plausibility-temp}
+tibble(
+  Check = c("temp avg < -30 deg C", "temp avg > 45 deg C"),
+  Count = c(
+    sum(heapo_daily$temp_avg < -30, na.rm = TRUE),
+    sum(heapo_daily$temp_avg > 45,  na.rm = TRUE)
+  )
+) %>% styled_table("Plausibility: temperature")
+```
+
+## Duplicate Rows (Household x Date)
+
+```{r plausibility-dupes}
+n_dupes <- heapo_daily %>%
+  count(Household_ID, date) %>%
+  filter(n > 1) %>%
+  nrow()
+
+cat("Duplicate Household x Date combinations:", n_dupes)
+```
+
+---
+
+# Temporal Coverage
+
+## Days per Household
+
+```{r temporal-days, fig.height=4}
+days_per_hh <- heapo_daily %>%
+  group_by(Household_ID) %>%
+  summarise(n_days = n(), .groups = "drop")
+
+summary(days_per_hh$n_days) %>%
+  as.list() %>%
+  as_tibble() %>%
+  styled_table("Days available per household")
+
+ggplot(days_per_hh, aes(x = n_days)) +
+  geom_histogram(bins = 50, fill = "steelblue", color = "white") +
+  labs(title = "Distribution: Number of Days per Household",
+       x = "Days with data", y = "Number of households") +
+  theme_minimal()
+```
+
+## Household Coverage over Time
+
+```{r temporal-coverage, fig.height=4}
+heapo_daily %>%
+  group_by(date) %>%
+  summarise(n_households = n_distinct(Household_ID), .groups = "drop") %>%
+  ggplot(aes(x = date, y = n_households)) +
+  geom_area(fill = "steelblue", alpha = 0.6) +
+  labs(title = "Number of Households with Data per Day",
+       x = "Date", y = "Households") +
+  scale_y_continuous(labels = comma) +
+  theme_minimal()
+```
+
+## Data Gaps per Household
+
+**What we want to know:** Do households have complete data coverage, or are there gaps (missing months/periods)?
+
+**What to look for:** Households that start late, end early, or have interruptions in their data. A household with only 1-2 years of data contributes less information than one with 5+ years. Many short-coverage households could bias the analysis.
+
+```{r temporal-gaps, fig.height=4}
+total_days_possible <- as.numeric(max(heapo_daily$date) - min(heapo_daily$date))
+
+days_per_hh <- days_per_hh %>%
+  mutate(
+    coverage_pct = round(n_days / total_days_possible * 100, 1),
+    Coverage     = case_when(
+      coverage_pct >= 75 ~ "High (>=75%)",
+      coverage_pct >= 40 ~ "Medium (40-75%)",
+      TRUE               ~ "Low (<40%)"
+    )
+  )
+
+days_per_hh %>%
+  count(Coverage) %>%
+  mutate(Percent = round(n / sum(n) * 100, 1)) %>%
+  rename(`N households` = n) %>%
+  styled_table("Data coverage categories across households")
+```
+
+```{r temporal-gaps-plot, fig.height=3}
+ggplot(days_per_hh, aes(x = coverage_pct, fill = Coverage)) +
+  geom_histogram(bins = 40, color = "white") +
+  scale_fill_manual(values = c(
+    "High (>=75%)"    = "steelblue",
+    "Medium (40-75%)" = "orange",
+    "Low (<40%)"      = "tomato"
+  ), name = "Coverage") +
+  labs(title = "Data Coverage per Household (% of total observation period)",
+       x = "Coverage (%)", y = "Number of households") +
+  theme_minimal()
+```
+
+> **Conclusion:** Households cluster into distinct coverage groups. Households with **high coverage (>=75%)** are ideal for modelling as they represent stable, long-term data. Households with **low coverage (<40%)** may reflect late onboarding or early dropout and could introduce bias -- consider filtering these out or treating them separately in the analysis.
+
+## Complete Coverage Analysis: Full Period vs. From 2022
+
+Since the daily dataset contains too many observations for certain modelling methods (NN, SVM require at most ~100,000 rows), we need to define a usable subset. A key question is: how many households have **complete and uninterrupted data** over a given time window?
+
+**What we want to know:** How many households can we include while staying under 100,000 observations, without introducing gaps or bias from incomplete coverage?
+
+```{r coverage-analysis}
+start_2022 <- as.Date("2022-01-01")
+days_full  <- as.numeric(max(heapo_daily$date) - min(heapo_daily$date))
+days_2022  <- as.numeric(max(heapo_daily$date) - start_2022)
+
+# Full period coverage per household
+cov_full <- heapo_daily %>%
+  group_by(Household_ID) %>%
+  summarise(n_days = n(), .groups = "drop") %>%
+  mutate(coverage_pct = n_days / days_full * 100)
+
+# From 2022 coverage per household
+cov_2022 <- heapo_daily %>%
+  filter(date >= start_2022) %>%
+  group_by(Household_ID) %>%
+  summarise(n_days = n(), .groups = "drop") %>%
+  mutate(coverage_pct = n_days / days_2022 * 100)
+
+tibble(
+  `Time window`              = c("Full period (2019-2024)", "From 2022 (2022-2024)"),
+  `Total days in window`     = c(days_full, days_2022),
+  `Complete (100%)`          = c(
+    sum(cov_full$coverage_pct >= 99.5),
+    sum(cov_2022$coverage_pct >= 99.5)
+  ),
+  `Near-complete (>=95%)`    = c(
+    sum(cov_full$coverage_pct >= 95),
+    sum(cov_2022$coverage_pct >= 95)
+  ),
+  `Near-complete (>=90%)`    = c(
+    sum(cov_full$coverage_pct >= 90),
+    sum(cov_2022$coverage_pct >= 90)
+  )
+) %>% styled_table("Households with complete coverage per time window")
+```
+
+> **Finding:** Only 17 households have complete data over the full period (2019-2024), making it unsuitable as a basis for a consistent subset. From 2022 onwards, 339 households have complete data and 403 have near-complete coverage (>=95%).
+
+## Recommended Subset for Modelling (Daily Dataset)
+
+Given the 100,000 observation limit required for methods such as Neural Networks and SVMs, the recommended subset is defined as follows:
+
+- **Time window:** 2022-01-01 to 2024-02-29
+- **Household selection:** Randomly sample from households with >=95% coverage in this window
+- **Maximum households:** 126 (stays within the 100,000 row limit)
+
+```{r subset-recommendation}
+complete_2022 <- cov_2022 %>%
+  filter(coverage_pct >= 95) %>%
+  arrange(desc(n_days))
+
+cumulative_rows <- cumsum(complete_2022$n_days)
+max_hh <- sum(cumulative_rows <= 100000)
+actual_rows <- cumulative_rows[max_hh]
+
+tibble(
+  Parameter = c(
+    "Time window",
+    "Min. coverage threshold",
+    "Eligible households",
+    "Selected households (random sample)",
+    "Resulting observations",
+    "Avg. days per household"
+  ),
+  Value = c(
+    "2022-01-01 to 2024-02-29",
+    ">=95% of days in window",
+    as.character(nrow(complete_2022)),
+    as.character(max_hh),
+    as.character(actual_rows),
+    as.character(round(mean(complete_2022$n_days[1:max_hh])))
+  )
+) %>% styled_table("Recommended daily subset for modelling")
+```
+
+> **Conclusion:** A random sample of **126 households** with near-complete coverage from 2022 onwards yields **~99,414 observations** -- within the 100,000 row limit. This subset covers two full years including all seasons, ensuring seasonal patterns (winter heating peaks, summer lows) are fully represented. The random sampling from 403 eligible households avoids selection bias.
+
+---
+
+# Suitability Assessment & Summary
+
+This chapter summarises the key findings from the previous chapters. It is intended as a standalone reference -- the reader does not need to read the full report to understand the dataset's quality and suitability.
+
+The analysis is based exclusively on the **daily dataset** (`heapo_dataset_daily.rds`).
+
+---
+
+## Executive Summary
+
+```{r exec-summary}
+n_daily <- nrow(heapo_daily)
+
+tibble(
+  Topic = c(
+    "Dataset",
+    "Observations (full daily)",
+    "Households",
+    "Time period",
+    "Variables",
+    "Primary response variable",
+    "Missing data: kWh heatpump",
+    "Missing data: kWh returned",
+    "Missing data: sunshine hours",
+    "Duplicate rows",
+    "Recommended subset",
+    "Subset: households",
+    "Subset: observations",
+    "Subset: time window"
+  ),
+  Finding = c(
+    "HEAPO daily smart meter data (Brudermueller et al., 2025)",
+    comma(n_daily),
+    as.character(n_distinct(heapo_daily$Household_ID)),
+    paste(as.character(min(heapo_daily$date)), "to", as.character(max(heapo_daily$date))),
+    as.character(ncol(heapo_daily)),
+    "kWh total (total daily electricity consumption)",
+    "~97%: structural -- no sub-meter installed (not a data error)",
+    "~75%: structural -- only households with PV system",
+    "~8%: not all weather stations measure sunshine",
+    "None detected",
+    "126 randomly sampled households from 2022 onwards (>=95% coverage)",
+    "126 (sampled from 403 eligible)",
+    "~99,414",
+    "2022-01-01 to 2024-02-29"
+  )
+) %>% styled_table("Executive summary: data quality and subset recommendation")
+```
+
+---
+
+## Course Requirements Checklist
+
+```{r suitability-check}
+tibble(
+  Requirement = c(
+    "N in [1000, 100000]",
+    "10-20 predictors",
+    "Continuous variables",
+    "Categorical variable with >2 levels",
+    "Count variable",
+    "Binary variables",
+    "Response for LM (continuous)",
+    "Response for GLM Poisson (count)",
+    "Response for GLM Binomial (binary)",
+    "Response for GAM / NN / SVM"
+  ),
+  `Daily dataset (subset)` = c(
+    "OK: 99,414 rows (126 households, 2022-2024)",
+    paste0("OK: ~", ncol(heapo_daily) - 6, " predictors (excl. time vars)"),
+    "OK: kWh total, temp avg, living area, ...",
+    "OK: weather region (8 levels), building type",
+    "OK: n residents",
+    "OK: has floor heating, has radiator, has dryer, ...",
+    "OK: log(kWh total) -- amount variable, log-transform required",
+    "OK: n residents -- non-negative integer count",
+    "OK: high consumption (kWh total > median) -- binary 0/1",
+    "OK: kWh total or high consumption"
+  )
+) %>% styled_table("Course requirements checklist: daily dataset")
+```
+
+---
+
+## Recommended Response Variables per Method
+
+```{r suitability-responses}
+tibble(
+  Method = c("Linear Model (LM)", "GLM Poisson",
+             "GLM Binomial", "GAM", "Neural Network", "SVM"),
+  `Response variable` = c(
+    "log(kWh total)",
+    "n residents",
+    "high consumption (kWh total > median, binary 0/1)",
+    "kWh total",
+    "kWh total or high consumption",
+    "kWh total or high consumption"
+  ),
+  Note = c(
+    "kWh total is an amount variable -- log-transform is mandatory",
+    "n residents is static per household -- repeated for each day",
+    "Derive binary variable: 1 if above daily median, 0 otherwise",
+    "Captures non-linear seasonal effects of temperature",
+    "Use recommended subset of 126 households (~99k rows)",
+    "Use recommended subset of 126 households (~99k rows)"
+  )
+) %>% styled_table("Recommended response variables per modelling method")
+```
+
+---
+
+## Why kWh\_total Works as a Response Variable
+
+Although most households have no separate heat pump meter, `kWh_total` is a valid response variable for three reasons:
+
+1. **Heat pumps dominate consumption:** In Swiss households with heat pumps as primary heating, the heat pump accounts for 50-80% of total electricity use. Variation in `kWh_total` is therefore largely driven by heat pump behaviour.
+2. **Predictors explain heating demand:** Variables such as `heating_degree_days`, `living_area`, `heatpump_type`, and `has_floor_heating` directly capture factors that drive heat pump operation.
+3. **Validation is possible:** For the ~2.5% of households with sub-metering available, `kWh_heatpump` can be used to verify that model results correctly attribute variation to heat pump consumption.
+
+---
+
+*Report generated on `r Sys.Date()` using R `r R.version$major`.`r R.version$minor`.*
