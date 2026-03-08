@@ -18,10 +18,10 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
-  echo       = !knitr::is_latex_output(),  # FALSE for PDF, TRUE for HTML
-  message    = FALSE,
-  warning    = FALSE,
-  fig.width  = 10,
+  echo = !knitr::is_latex_output(), # FALSE for PDF, TRUE for HTML
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 10,
   fig.height = 5
 )
 knitr::opts_knit$set(root.dir = normalizePath(".."))
@@ -35,7 +35,7 @@ library(kableExtra)
 library(scales)
 
 # Paths relative to project root
-daily_path  <- "data_processed/heapo/heapo_dataset_daily.rds"
+daily_path <- "data_processed/heapo/heapo_dataset_daily.rds"
 annual_path <- "data_processed/heapo/heapo_dataset.rds"
 
 # Format-aware table helper (works for both HTML and PDF)
@@ -43,20 +43,24 @@ styled_table <- function(df, caption = "") {
   if (knitr::is_latex_output()) {
     df %>%
       kable(caption = caption, format = "latex", booktabs = TRUE) %>%
-      kable_styling(latex_options = c("striped", "HOLD_position", "scale_down"),
-                    full_width = FALSE)
+      kable_styling(
+        latex_options = c("striped", "HOLD_position", "scale_down"),
+        full_width = FALSE
+      )
   } else {
     df %>%
       kable(caption = caption) %>%
-      kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
-                    full_width = FALSE)
+      kable_styling(
+        bootstrap_options = c("striped", "hover", "condensed"),
+        full_width = FALSE
+      )
   }
 }
 ```
 
 ```{r load-data, include=FALSE}
 # root.dir is now active – paths resolve from project root
-heapo_daily  <- readRDS(daily_path)
+heapo_daily <- readRDS(daily_path)
 heapo_annual <- readRDS(annual_path)
 ```
 
@@ -68,16 +72,19 @@ heapo_annual <- readRDS(annual_path)
 
 ```{r overview-basic}
 tibble(
-  Dataset      = c("Daily", "Annual"),
-  Rows         = c(nrow(heapo_daily), nrow(heapo_annual)),
-  Columns      = c(ncol(heapo_daily), ncol(heapo_annual)),
-  Households   = c(n_distinct(heapo_daily$Household_ID),
-                   n_distinct(heapo_annual$Household_ID)),
+  Dataset = c("Daily", "Annual"),
+  Rows = c(nrow(heapo_daily), nrow(heapo_annual)),
+  Columns = c(ncol(heapo_daily), ncol(heapo_annual)),
+  Households = c(
+    n_distinct(heapo_daily$Household_ID),
+    n_distinct(heapo_annual$Household_ID)
+  ),
   `Date range` = c(
     paste(min(heapo_daily$date), "to", max(heapo_daily$date)),
     "aggregated (annual median)"
   )
-) %>% styled_table("Dataset dimensions")
+) %>%
+  styled_table("Dataset dimensions")
 ```
 
 ## Variable Overview (Daily Dataset)
@@ -85,21 +92,42 @@ tibble(
 ```{r overview-vars}
 tibble(
   Variable = names(heapo_daily),
-  Type     = sapply(heapo_daily, function(x) class(x)[1]),
-  Role     = c(
-    "ID", "Time", "Time", "Time", "Time", "Time (binary)",
-    "Response (continuous)", "Response (continuous)", "Response (continuous)",
-    "Response (continuous)", "Response (derived)",
-    "Predictor (weather)", "Predictor (weather)", "Predictor (weather)",
-    "Predictor (weather)", "Predictor (weather)", "Predictor (weather)",
-    "Predictor (weather)", "Predictor (weather)", "Predictor (weather)",
-    "Predictor (categorical)", "Predictor (categorical)",
-    "Predictor (categorical)", "Predictor (categorical)",
-    "Predictor (continuous)", "Predictor (count)",
-    "Predictor (binary)", "Predictor (binary)", "Predictor (binary)",
-    "Predictor (binary)", "Predictor (binary)"
+  Type = sapply(heapo_daily, function(x) class(x)[1]),
+  Role = c(
+    "ID",
+    "Time",
+    "Time",
+    "Time",
+    "Time",
+    "Time (binary)",
+    "Response (continuous)",
+    "Response (continuous)",
+    "Response (continuous)",
+    "Response (continuous)",
+    "Response (derived)",
+    "Predictor (weather)",
+    "Predictor (weather)",
+    "Predictor (weather)",
+    "Predictor (weather)",
+    "Predictor (weather)",
+    "Predictor (weather)",
+    "Predictor (weather)",
+    "Predictor (weather)",
+    "Predictor (weather)",
+    "Predictor (categorical)",
+    "Predictor (categorical)",
+    "Predictor (categorical)",
+    "Predictor (categorical)",
+    "Predictor (continuous)",
+    "Predictor (count)",
+    "Predictor (binary)",
+    "Predictor (binary)",
+    "Predictor (binary)",
+    "Predictor (binary)",
+    "Predictor (binary)"
   )
-) %>% styled_table("Variable roles and types")
+) %>%
+  styled_table("Variable roles and types")
 ```
 
 ## First Rows
@@ -152,8 +180,7 @@ na_summary %>%
   coord_flip() +
   scale_fill_gradient(low = "gold", high = "tomato") +
   scale_y_continuous(limits = c(0, 100), labels = percent_format(scale = 1)) +
-  labs(title = "Missing Values per Variable",
-       x = NULL, y = "% Missing") +
+  labs(title = "Missing Values per Variable", x = NULL, y = "% Missing") +
   theme_minimal() +
   theme(legend.position = "none")
 ```
@@ -168,11 +195,13 @@ na_summary %>%
 missing_per_hh <- heapo_daily %>%
   group_by(Household_ID) %>%
   summarise(pct_missing = mean(is.na(kWh_heatpump)) * 100, .groups = "drop") %>%
-  mutate(Category = case_when(
-    pct_missing == 100 ~ "Always missing (no sub-meter)",
-    pct_missing == 0   ~ "Never missing (has sub-meter)",
-    TRUE               ~ "Partially missing (unusual)"
-  ))
+  mutate(
+    Category = case_when(
+      pct_missing == 100 ~ "Always missing (no sub-meter)",
+      pct_missing == 0 ~ "Never missing (has sub-meter)",
+      TRUE ~ "Partially missing (unusual)"
+    )
+  )
 
 missing_per_hh %>%
   count(Category) %>%
@@ -188,13 +217,18 @@ missing_per_hh %>%
   geom_col(show.legend = FALSE) +
   geom_text(aes(label = n), hjust = -0.2) +
   coord_flip() +
-  scale_fill_manual(values = c(
-    "Always missing (no sub-meter)"  = "tomato",
-    "Never missing (has sub-meter)"  = "steelblue",
-    "Partially missing (unusual)"    = "orange"
-  )) +
-  labs(title = "Is kWh heatpump missingness structural or random?",
-       x = NULL, y = "Number of households") +
+  scale_fill_manual(
+    values = c(
+      "Always missing (no sub-meter)" = "tomato",
+      "Never missing (has sub-meter)" = "steelblue",
+      "Partially missing (unusual)" = "orange"
+    )
+  ) +
+  labs(
+    title = "Is kWh heatpump missingness structural or random?",
+    x = NULL,
+    y = "Number of households"
+  ) +
   theme_minimal()
 ```
 
@@ -207,23 +241,41 @@ missing_per_hh %>%
 ## Summary Statistics
 
 ```{r cont-summary}
-cont_vars <- c("kWh_total", "kWh_heatpump", "kWh_other", "kWh_returned",
-               "kWh_per_m2", "temp_avg", "temp_min", "temp_max", "temp_range",
-               "heating_degree_days", "cooling_degree_days",
-               "humidity_avg", "precipitation", "sunshine_hours", "living_area")
+cont_vars <- c(
+  "kWh_total",
+  "kWh_heatpump",
+  "kWh_other",
+  "kWh_returned",
+  "kWh_per_m2",
+  "temp_avg",
+  "temp_min",
+  "temp_max",
+  "temp_range",
+  "heating_degree_days",
+  "cooling_degree_days",
+  "humidity_avg",
+  "precipitation",
+  "sunshine_hours",
+  "living_area"
+)
 
 heapo_daily %>%
   select(all_of(cont_vars)) %>%
-  summarise(across(everything(), list(
-    Min    = ~ round(min(.,  na.rm = TRUE), 2),
-    Median = ~ round(median(., na.rm = TRUE), 2),
-    Mean   = ~ round(mean(.,  na.rm = TRUE), 2),
-    Max    = ~ round(max(.,  na.rm = TRUE), 2),
-    SD     = ~ round(sd(.,   na.rm = TRUE), 2)
-  ))) %>%
-  pivot_longer(everything(),
-               names_to  = c("Variable", "Statistic"),
-               names_sep = "_(?=[^_]+$)") %>%
+  summarise(across(
+    everything(),
+    list(
+      Min = ~ round(min(., na.rm = TRUE), 2),
+      Median = ~ round(median(., na.rm = TRUE), 2),
+      Mean = ~ round(mean(., na.rm = TRUE), 2),
+      Max = ~ round(max(., na.rm = TRUE), 2),
+      SD = ~ round(sd(., na.rm = TRUE), 2)
+    )
+  )) %>%
+  pivot_longer(
+    everything(),
+    names_to = c("Variable", "Statistic"),
+    names_sep = "_(?=[^_]+$)"
+  ) %>%
   pivot_wider(names_from = Statistic, values_from = value) %>%
   styled_table("Summary statistics: continuous variables")
 ```
@@ -249,16 +301,27 @@ for (v in cat_vars) {
 ## Binary Variables
 
 ```{r binary-vars}
-bin_vars <- c("has_floor_heating", "has_radiator", "has_dryer",
-              "has_freezer", "has_electric_vehicle", "is_weekend")
+bin_vars <- c(
+  "has_floor_heating",
+  "has_radiator",
+  "has_dryer",
+  "has_freezer",
+  "has_electric_vehicle",
+  "is_weekend"
+)
 
 heapo_daily %>%
   select(Household_ID, all_of(bin_vars)) %>%
   distinct(Household_ID, .keep_all = TRUE) %>%
-  summarise(across(all_of(bin_vars), ~ round(mean(., na.rm = TRUE) * 100, 1))) %>%
-  pivot_longer(everything(),
-               names_to  = "Variable",
-               values_to = "Proportion = 1 (household level, %)") %>%
+  summarise(across(
+    all_of(bin_vars),
+    ~ round(mean(., na.rm = TRUE) * 100, 1)
+  )) %>%
+  pivot_longer(
+    everything(),
+    names_to = "Variable",
+    values_to = "Proportion = 1 (household level, %)"
+  ) %>%
   styled_table("Binary variables: proportion of households with value = 1")
 ```
 
@@ -280,23 +343,33 @@ heapo_daily %>%
 
 ```{r plausibility-neg}
 tibble(
-  Check = c("kWh total < 0", "kWh total == 0",
-            "kWh heatpump < 0", "kWh other < 0", "kWh returned < 0"),
+  Check = c(
+    "kWh total < 0",
+    "kWh total == 0",
+    "kWh heatpump < 0",
+    "kWh other < 0",
+    "kWh returned < 0"
+  ),
   Count = c(
-    sum(heapo_daily$kWh_total < 0,    na.rm = TRUE),
-    sum(heapo_daily$kWh_total == 0,   na.rm = TRUE),
+    sum(heapo_daily$kWh_total < 0, na.rm = TRUE),
+    sum(heapo_daily$kWh_total == 0, na.rm = TRUE),
     sum(heapo_daily$kWh_heatpump < 0, na.rm = TRUE),
-    sum(heapo_daily$kWh_other < 0,    na.rm = TRUE),
+    sum(heapo_daily$kWh_other < 0, na.rm = TRUE),
     sum(heapo_daily$kWh_returned < 0, na.rm = TRUE)
   ),
-  `Pct of rows` = round(c(
-    mean(heapo_daily$kWh_total < 0,    na.rm = TRUE),
-    mean(heapo_daily$kWh_total == 0,   na.rm = TRUE),
-    mean(heapo_daily$kWh_heatpump < 0, na.rm = TRUE),
-    mean(heapo_daily$kWh_other < 0,    na.rm = TRUE),
-    mean(heapo_daily$kWh_returned < 0, na.rm = TRUE)
-  ) * 100, 3)
-) %>% styled_table("Plausibility: consumption values")
+  `Pct of rows` = round(
+    c(
+      mean(heapo_daily$kWh_total < 0, na.rm = TRUE),
+      mean(heapo_daily$kWh_total == 0, na.rm = TRUE),
+      mean(heapo_daily$kWh_heatpump < 0, na.rm = TRUE),
+      mean(heapo_daily$kWh_other < 0, na.rm = TRUE),
+      mean(heapo_daily$kWh_returned < 0, na.rm = TRUE)
+    ) *
+      100,
+    3
+  )
+) %>%
+  styled_table("Plausibility: consumption values")
 ```
 
 ## Implausible Living Area
@@ -305,11 +378,12 @@ tibble(
 tibble(
   Check = c("living area < 20 m2", "living area > 600 m2", "living area is NA"),
   Count = c(
-    sum(heapo_daily$living_area < 20,  na.rm = TRUE),
+    sum(heapo_daily$living_area < 20, na.rm = TRUE),
     sum(heapo_daily$living_area > 600, na.rm = TRUE),
     sum(is.na(heapo_daily$living_area))
   )
-) %>% styled_table("Plausibility: living area")
+) %>%
+  styled_table("Plausibility: living area")
 ```
 
 ## Implausible Temperature Values
@@ -319,9 +393,10 @@ tibble(
   Check = c("temp avg < -30 deg C", "temp avg > 45 deg C"),
   Count = c(
     sum(heapo_daily$temp_avg < -30, na.rm = TRUE),
-    sum(heapo_daily$temp_avg > 45,  na.rm = TRUE)
+    sum(heapo_daily$temp_avg > 45, na.rm = TRUE)
   )
-) %>% styled_table("Plausibility: temperature")
+) %>%
+  styled_table("Plausibility: temperature")
 ```
 
 ## Duplicate Rows (Household x Date)
@@ -353,8 +428,11 @@ summary(days_per_hh$n_days) %>%
 
 ggplot(days_per_hh, aes(x = n_days)) +
   geom_histogram(bins = 50, fill = "steelblue", color = "white") +
-  labs(title = "Distribution: Number of Days per Household",
-       x = "Days with data", y = "Number of households") +
+  labs(
+    title = "Distribution: Number of Days per Household",
+    x = "Days with data",
+    y = "Number of households"
+  ) +
   theme_minimal()
 ```
 
@@ -366,8 +444,11 @@ heapo_daily %>%
   summarise(n_households = n_distinct(Household_ID), .groups = "drop") %>%
   ggplot(aes(x = date, y = n_households)) +
   geom_area(fill = "steelblue", alpha = 0.6) +
-  labs(title = "Number of Households with Data per Day",
-       x = "Date", y = "Households") +
+  labs(
+    title = "Number of Households with Data per Day",
+    x = "Date",
+    y = "Households"
+  ) +
   scale_y_continuous(labels = comma) +
   theme_minimal()
 ```
@@ -384,10 +465,10 @@ total_days_possible <- as.numeric(max(heapo_daily$date) - min(heapo_daily$date))
 days_per_hh <- days_per_hh %>%
   mutate(
     coverage_pct = round(n_days / total_days_possible * 100, 1),
-    Coverage     = case_when(
+    Coverage = case_when(
       coverage_pct >= 75 ~ "High (>=75%)",
       coverage_pct >= 40 ~ "Medium (40-75%)",
-      TRUE               ~ "Low (<40%)"
+      TRUE ~ "Low (<40%)"
     )
   )
 
@@ -401,13 +482,19 @@ days_per_hh %>%
 ```{r temporal-gaps-plot, fig.height=3}
 ggplot(days_per_hh, aes(x = coverage_pct, fill = Coverage)) +
   geom_histogram(bins = 40, color = "white") +
-  scale_fill_manual(values = c(
-    "High (>=75%)"    = "steelblue",
-    "Medium (40-75%)" = "orange",
-    "Low (<40%)"      = "tomato"
-  ), name = "Coverage") +
-  labs(title = "Data Coverage per Household (% of total observation period)",
-       x = "Coverage (%)", y = "Number of households") +
+  scale_fill_manual(
+    values = c(
+      "High (>=75%)" = "steelblue",
+      "Medium (40-75%)" = "orange",
+      "Low (<40%)" = "tomato"
+    ),
+    name = "Coverage"
+  ) +
+  labs(
+    title = "Data Coverage per Household (% of total observation period)",
+    x = "Coverage (%)",
+    y = "Number of households"
+  ) +
   theme_minimal()
 ```
 
@@ -421,8 +508,8 @@ Since the daily dataset contains too many observations for certain modelling met
 
 ```{r coverage-analysis}
 start_2022 <- as.Date("2022-01-01")
-days_full  <- as.numeric(max(heapo_daily$date) - min(heapo_daily$date))
-days_2022  <- as.numeric(max(heapo_daily$date) - start_2022)
+days_full <- as.numeric(max(heapo_daily$date) - min(heapo_daily$date))
+days_2022 <- as.numeric(max(heapo_daily$date) - start_2022)
 
 # Full period coverage per household
 cov_full <- heapo_daily %>%
@@ -438,21 +525,22 @@ cov_2022 <- heapo_daily %>%
   mutate(coverage_pct = n_days / days_2022 * 100)
 
 tibble(
-  `Time window`              = c("Full period (2019-2024)", "From 2022 (2022-2024)"),
-  `Total days in window`     = c(days_full, days_2022),
-  `Complete (100%)`          = c(
+  `Time window` = c("Full period (2019-2024)", "From 2022 (2022-2024)"),
+  `Total days in window` = c(days_full, days_2022),
+  `Complete (100%)` = c(
     sum(cov_full$coverage_pct >= 99.5),
     sum(cov_2022$coverage_pct >= 99.5)
   ),
-  `Near-complete (>=95%)`    = c(
+  `Near-complete (>=95%)` = c(
     sum(cov_full$coverage_pct >= 95),
     sum(cov_2022$coverage_pct >= 95)
   ),
-  `Near-complete (>=90%)`    = c(
+  `Near-complete (>=90%)` = c(
     sum(cov_full$coverage_pct >= 90),
     sum(cov_2022$coverage_pct >= 90)
   )
-) %>% styled_table("Households with complete coverage per time window")
+) %>%
+  styled_table("Households with complete coverage per time window")
 ```
 
 > **Finding:** Only 17 households have complete data over the full period (2019-2024), making it unsuitable as a basis for a consistent subset. From 2022 onwards, 339 households have complete data and 403 have near-complete coverage (>=95%).
@@ -491,7 +579,8 @@ tibble(
     as.character(actual_rows),
     as.character(round(mean(complete_2022$n_days[1:max_hh])))
   )
-) %>% styled_table("Recommended daily subset for modelling")
+) %>%
+  styled_table("Recommended daily subset for modelling")
 ```
 
 > **Conclusion:** A random sample of **126 households** with near-complete coverage from 2022 onwards yields **~99,414 observations** -- within the 100,000 row limit. This subset covers two full years including all seasons, ensuring seasonal patterns (winter heating peaks, summer lows) are fully represented. The random sampling from 403 eligible households avoids selection bias.
@@ -532,7 +621,11 @@ tibble(
     "HEAPO daily smart meter data (Brudermueller et al., 2025)",
     comma(n_daily),
     as.character(n_distinct(heapo_daily$Household_ID)),
-    paste(as.character(min(heapo_daily$date)), "to", as.character(max(heapo_daily$date))),
+    paste(
+      as.character(min(heapo_daily$date)),
+      "to",
+      as.character(max(heapo_daily$date))
+    ),
     as.character(ncol(heapo_daily)),
     "kWh total (total daily electricity consumption)",
     "~97%: structural -- no sub-meter installed (not a data error)",
@@ -544,7 +637,8 @@ tibble(
     "~99,414",
     "2022-01-01 to 2024-02-29"
   )
-) %>% styled_table("Executive summary: data quality and subset recommendation")
+) %>%
+  styled_table("Executive summary: data quality and subset recommendation")
 ```
 
 ---
@@ -577,7 +671,8 @@ tibble(
     "OK: high consumption (kWh total > median) -- binary 0/1",
     "OK: kWh total or high consumption"
   )
-) %>% styled_table("Course requirements checklist: daily dataset")
+) %>%
+  styled_table("Course requirements checklist: daily dataset")
 ```
 
 ---
@@ -586,8 +681,14 @@ tibble(
 
 ```{r suitability-responses}
 tibble(
-  Method = c("Linear Model (LM)", "GLM Poisson",
-             "GLM Binomial", "GAM", "Neural Network", "SVM"),
+  Method = c(
+    "Linear Model (LM)",
+    "GLM Poisson",
+    "GLM Binomial",
+    "GAM",
+    "Neural Network",
+    "SVM"
+  ),
   `Response variable` = c(
     "log(kWh total)",
     "n residents",
@@ -604,7 +705,8 @@ tibble(
     "Use recommended subset of 126 households (~99k rows)",
     "Use recommended subset of 126 households (~99k rows)"
   )
-) %>% styled_table("Recommended response variables per modelling method")
+) %>%
+  styled_table("Recommended response variables per modelling method")
 ```
 
 ---

@@ -19,3 +19,9 @@ data_processed/heapo/*.csv
 
 # renv cache
 renv/cache/
+
+# rmarkdown cache
+R/02_data_preparation_daily_cache/
+R/02_data_preparation_daily_files/
+R/03_data_quality_report_files/
+R/04_data_filtration_EDA_files/

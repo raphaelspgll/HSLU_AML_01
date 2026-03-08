@@ -14,8 +14,13 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
-                      fig.width = 10, fig.height = 5)
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 10,
+  fig.height = 5
+)
 knitr::opts_knit$set(root.dir = normalizePath(".."))
 
 library(dplyr)
@@ -31,8 +36,10 @@ set.seed(42)
 styled_table <- function(df, caption = "") {
   df %>%
     kable(caption = caption) %>%
-    kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
-                  full_width = FALSE)
+    kable_styling(
+      bootstrap_options = c("striped", "hover", "condensed"),
+      full_width = FALSE
+    )
 }
 ```
 
@@ -56,7 +63,7 @@ The time window **2022-01-01 to 2024-02-29** was chosen because:
 
 ```{r filter-time}
 window_start <- as.Date("2022-01-01")
-window_end   <- as.Date("2024-02-29")
+window_end <- as.Date("2024-02-29")
 
 heapo_window <- heapo_daily %>%
   filter(date >= window_start, date <= window_end)
@@ -92,7 +99,7 @@ To stay within the 100,000 observation limit, eligible households are randomly s
 ```{r filter-sample}
 # Randomly shuffle eligible households, then take as many as fit under 100,000 rows
 sampled_ids <- eligible %>%
-  slice_sample(n = nrow(eligible)) %>%        # random shuffle
+  slice_sample(n = nrow(eligible)) %>% # random shuffle
   mutate(cumulative_rows = cumsum(n_days)) %>%
   filter(cumulative_rows <= 100000) %>%
   pull(Household_ID)
@@ -102,10 +109,14 @@ heapo_model <- heapo_window %>%
 
 cat("Selected households:", n_distinct(heapo_model$Household_ID), "\n")
 cat("Observations:       ", nrow(heapo_model), "\n")
-cat("Date range:         ",
-    as.character(min(heapo_model$date)), "to",
-    as.character(max(heapo_model$date)), "\n")
-stopifnot(nrow(heapo_model) <= 100000)  # hard check
+cat(
+  "Date range:         ",
+  as.character(min(heapo_model$date)),
+  "to",
+  as.character(max(heapo_model$date)),
+  "\n"
+)
+stopifnot(nrow(heapo_model) <= 100000) # hard check
 ```
 
 ## Step 4: Derive Response Variables
@@ -121,19 +132,28 @@ median_kWh <- median(heapo_model$kWh_total, na.rm = TRUE)
 heapo_model <- heapo_model %>%
   mutate(
     high_consumption = as.integer(kWh_total > median_kWh),
-    log_kWh_total    = log(kWh_total)
+    log_kWh_total = log(kWh_total)
   )
 
 cat("Median kWh_total used for threshold:", round(median_kWh, 3), "\n")
-cat("high_consumption = 1:", sum(heapo_model$high_consumption),
-    "(", round(mean(heapo_model$high_consumption) * 100, 1), "%)\n")
+cat(
+  "high_consumption = 1:",
+  sum(heapo_model$high_consumption),
+  "(",
+  round(mean(heapo_model$high_consumption) * 100, 1),
+  "%)\n"
+)
 ```
 
 ## Step 5: Save Final Modelling Dataset
 
 ```{r save}
 saveRDS(heapo_model, "data_processed/heapo/heapo_modelling.rds")
-write.csv(heapo_model, "data_processed/heapo/heapo_modelling.csv", row.names = FALSE)
+write.csv(
+  heapo_model,
+  "data_processed/heapo/heapo_modelling.csv",
+  row.names = FALSE
+)
 cat("Saved: data_processed/heapo/heapo_modelling.rds/.csv\n")
 ```
 
@@ -148,21 +168,22 @@ tibble(
     paste0("3 – Random sample (n = ", length(sampled_ids), ", max 100k rows)"),
     "Final modelling dataset"
   ),
-  Households    = c(
+  Households = c(
     n_distinct(heapo_daily$Household_ID),
     n_distinct(heapo_window$Household_ID),
     nrow(eligible),
     length(sampled_ids),
     n_distinct(heapo_model$Household_ID)
   ),
-  Observations  = c(
+  Observations = c(
     nrow(heapo_daily),
     nrow(heapo_window),
     NA,
     NA,
     nrow(heapo_model)
   )
-) %>% styled_table("Filtration steps overview")
+) %>%
+  styled_table("Filtration steps overview")
 ```
 
 ---
@@ -181,14 +202,22 @@ The EDA is performed on the **final modelling dataset** (`heapo_model`: `r n_dis
 ggplot(heapo_model, aes(x = kWh_total)) +
   geom_histogram(bins = 60, fill = "steelblue", color = "white") +
   scale_x_continuous(labels = comma) +
-  labs(title = "Distribution of kWh_total (raw)", x = "kWh per day", y = "Count") +
+  labs(
+    title = "Distribution of kWh_total (raw)",
+    x = "kWh per day",
+    y = "Count"
+  ) +
   theme_minimal()
 ```
 
 ```{r eda-response-dist-log, fig.height=4}
 ggplot(heapo_model, aes(x = log_kWh_total)) +
   geom_histogram(bins = 60, fill = "darkorange", color = "white") +
-  labs(title = "Distribution of log(kWh_total)", x = "log(kWh per day)", y = "Count") +
+  labs(
+    title = "Distribution of log(kWh_total)",
+    x = "log(kWh per day)",
+    y = "Count"
+  ) +
   theme_minimal()
 ```
 
@@ -199,13 +228,13 @@ ggplot(heapo_model, aes(x = log_kWh_total)) +
 ```{r eda-response-stats}
 heapo_model %>%
   summarise(
-    Min    = round(min(kWh_total), 2),
-    Q1     = round(quantile(kWh_total, 0.25), 2),
+    Min = round(min(kWh_total), 2),
+    Q1 = round(quantile(kWh_total, 0.25), 2),
     Median = round(median(kWh_total), 2),
-    Mean   = round(mean(kWh_total), 2),
-    Q3     = round(quantile(kWh_total, 0.75), 2),
-    Max    = round(max(kWh_total), 2),
-    SD     = round(sd(kWh_total), 2)
+    Mean = round(mean(kWh_total), 2),
+    Q3 = round(quantile(kWh_total, 0.75), 2),
+    Max = round(max(kWh_total), 2),
+    SD = round(sd(kWh_total), 2)
   ) %>%
   styled_table("Summary statistics: kWh_total")
 ```
@@ -222,9 +251,12 @@ heapo_model %>%
   ggplot(aes(x = month_label, y = kWh_total)) +
   geom_boxplot(fill = "steelblue", alpha = 0.7, outlier.size = 0.3) +
   scale_y_continuous(labels = comma) +
-  labs(title = "Daily kWh Consumption by Month",
-       subtitle = "Strong seasonal pattern: winter months dominate",
-       x = "Month", y = "kWh per day") +
+  labs(
+    title = "Daily kWh Consumption by Month",
+    subtitle = "Strong seasonal pattern: winter months dominate",
+    x = "Month",
+    y = "kWh per day"
+  ) +
   theme_minimal()
 ```
 
@@ -239,8 +271,11 @@ heapo_model %>%
   geom_boxplot(alpha = 0.7, show.legend = FALSE) +
   scale_fill_manual(values = c("Weekday" = "steelblue", "Weekend" = "tomato")) +
   scale_y_continuous(labels = comma) +
-  labs(title = "Daily Consumption: Weekday vs. Weekend",
-       x = NULL, y = "kWh per day") +
+  labs(
+    title = "Daily Consumption: Weekday vs. Weekend",
+    x = NULL,
+    y = "kWh per day"
+  ) +
   theme_minimal()
 ```
 
@@ -254,12 +289,20 @@ heapo_model %>%
   summarise(median_kWh = median(kWh_total), .groups = "drop") %>%
   ggplot(aes(x = date, y = median_kWh)) +
   geom_line(color = "steelblue", linewidth = 0.4, alpha = 0.8) +
-  geom_smooth(method = "loess", span = 0.1, color = "tomato",
-              linewidth = 1, se = FALSE) +
+  geom_smooth(
+    method = "loess",
+    span = 0.1,
+    color = "tomato",
+    linewidth = 1,
+    se = FALSE
+  ) +
   scale_y_continuous(labels = comma) +
-  labs(title = "Median Daily kWh Consumption Over Time",
-       subtitle = "Red line = LOESS smooth",
-       x = "Date", y = "Median kWh per day") +
+  labs(
+    title = "Median Daily kWh Consumption Over Time",
+    subtitle = "Red line = LOESS smooth",
+    x = "Date",
+    y = "Median kWh per day"
+  ) +
   theme_minimal()
 ```
 
@@ -273,14 +316,17 @@ heapo_model %>%
 
 ```{r eda-temp, fig.height=5}
 heapo_model %>%
-  sample_n(min(20000, nrow(.))) %>%   # subsample for plotting speed
+  sample_n(min(20000, nrow(.))) %>% # subsample for plotting speed
   ggplot(aes(x = temp_avg, y = kWh_total)) +
   geom_point(alpha = 0.08, size = 0.5, color = "steelblue") +
   geom_smooth(method = "loess", color = "tomato", se = FALSE, linewidth = 1) +
   scale_y_continuous(labels = comma) +
-  labs(title = "Average Temperature vs. Daily kWh Consumption",
-       subtitle = "Each point = one household-day (random subsample of 20k)",
-       x = "Temperature (°C)", y = "kWh per day") +
+  labs(
+    title = "Average Temperature vs. Daily kWh Consumption",
+    subtitle = "Each point = one household-day (random subsample of 20k)",
+    x = "Temperature (°C)",
+    y = "kWh per day"
+  ) +
   theme_minimal()
 ```
 
@@ -295,9 +341,12 @@ heapo_model %>%
   geom_point(alpha = 0.08, size = 0.5, color = "steelblue") +
   geom_smooth(method = "lm", color = "tomato", se = FALSE, linewidth = 1) +
   scale_y_continuous(labels = comma) +
-  labs(title = "Heating Degree Days vs. Daily kWh Consumption",
-       subtitle = "Heating Degree Days (HDD): 0 on days above the base temperature",
-       x = "Heating Degree Days", y = "kWh per day") +
+  labs(
+    title = "Heating Degree Days vs. Daily kWh Consumption",
+    subtitle = "Heating Degree Days (HDD): 0 on days above the base temperature",
+    x = "Heating Degree Days",
+    y = "kWh per day"
+  ) +
   theme_minimal()
 ```
 
@@ -314,8 +363,11 @@ heapo_model %>%
   ggplot(aes(x = building_type, y = kWh_total, fill = building_type)) +
   geom_boxplot(alpha = 0.7, show.legend = FALSE, outlier.size = 0.3) +
   scale_y_continuous(labels = comma) +
-  labs(title = "Daily Consumption by Building Type",
-       x = "Building Type", y = "kWh per day") +
+  labs(
+    title = "Daily Consumption by Building Type",
+    x = "Building Type",
+    y = "kWh per day"
+  ) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 25, hjust = 1))
 ```
@@ -329,8 +381,11 @@ heapo_model %>%
   ggplot(aes(x = heatpump_type, y = kWh_total, fill = heatpump_type)) +
   geom_boxplot(alpha = 0.7, show.legend = FALSE, outlier.size = 0.3) +
   scale_y_continuous(labels = comma) +
-  labs(title = "Daily Consumption by Heat Pump Type",
-       x = "Heat Pump Type", y = "kWh per day") +
+  labs(
+    title = "Daily Consumption by Heat Pump Type",
+    x = "Heat Pump Type",
+    y = "kWh per day"
+  ) +
   theme_minimal()
 ```
 
@@ -351,9 +406,12 @@ heapo_model %>%
   geom_point(alpha = 0.6, color = "steelblue") +
   geom_smooth(method = "lm", color = "tomato", se = TRUE, linewidth = 1) +
   scale_y_continuous(labels = comma) +
-  labs(title = "Living Area vs. Median Daily Consumption (per household)",
-       subtitle = "Each point = one household (median kWh across all its days)",
-       x = "Living Area (m²)", y = "Median kWh per day") +
+  labs(
+    title = "Living Area vs. Median Daily Consumption (per household)",
+    subtitle = "Each point = one household (median kWh across all its days)",
+    x = "Living Area (m²)",
+    y = "Median kWh per day"
+  ) +
   theme_minimal()
 ```
 
@@ -374,8 +432,11 @@ heapo_model %>%
   geom_text(aes(label = n), hjust = -0.2) +
   coord_flip() +
   scale_fill_gradient(low = "lightblue", high = "steelblue") +
-  labs(title = "Households per Weather Region (modelling subset)",
-       x = "Weather Region", y = "Number of households") +
+  labs(
+    title = "Households per Weather Region (modelling subset)",
+    x = "Weather Region",
+    y = "Number of households"
+  ) +
   theme_minimal()
 ```
 
@@ -384,8 +445,13 @@ heapo_model %>%
 ### Binary Predictors Overview
 
 ```{r eda-binary, fig.height=4}
-binary_vars <- c("has_floor_heating", "has_radiator", "has_dryer",
-                 "has_freezer", "has_electric_vehicle")
+binary_vars <- c(
+  "has_floor_heating",
+  "has_radiator",
+  "has_dryer",
+  "has_freezer",
+  "has_electric_vehicle"
+)
 
 heapo_model %>%
   distinct(Household_ID, .keep_all = TRUE) %>%
@@ -397,8 +463,11 @@ heapo_model %>%
   coord_flip() +
   scale_fill_gradient(low = "lightblue", high = "steelblue") +
   scale_y_continuous(limits = c(0, 100)) +
-  labs(title = "Binary Predictors: % of Households with Value = 1",
-       x = NULL, y = "% of households") +
+  labs(
+    title = "Binary Predictors: % of Households with Value = 1",
+    x = NULL,
+    y = "% of households"
+  ) +
   theme_minimal()
 ```
 
@@ -409,10 +478,19 @@ heapo_model %>%
 ## Correlation Analysis
 
 ```{r eda-corr, fig.height=7, fig.width=9}
-cont_vars <- c("kWh_total", "log_kWh_total", "temp_avg", "temp_range",
-               "heating_degree_days", "cooling_degree_days",
-               "humidity_avg", "precipitation", "sunshine_hours",
-               "living_area", "kWh_per_m2")
+cont_vars <- c(
+  "kWh_total",
+  "log_kWh_total",
+  "temp_avg",
+  "temp_range",
+  "heating_degree_days",
+  "cooling_degree_days",
+  "humidity_avg",
+  "precipitation",
+  "sunshine_hours",
+  "living_area",
+  "kWh_per_m2"
+)
 
 cor_matrix <- heapo_model %>%
   select(all_of(cont_vars)) %>%
@@ -427,10 +505,19 @@ cor_long <- cor_matrix %>%
 ggplot(cor_long, aes(x = Var1, y = Var2, fill = r)) +
   geom_tile(color = "white") +
   geom_text(aes(label = r), size = 2.8) +
-  scale_fill_gradient2(low = "tomato", mid = "white", high = "steelblue",
-                       midpoint = 0, limits = c(-1, 1), name = "r") +
-  labs(title = "Pearson Correlation Matrix: Continuous Variables",
-       x = NULL, y = NULL) +
+  scale_fill_gradient2(
+    low = "tomato",
+    mid = "white",
+    high = "steelblue",
+    midpoint = 0,
+    limits = c(-1, 1),
+    name = "r"
+  ) +
+  labs(
+    title = "Pearson Correlation Matrix: Continuous Variables",
+    x = NULL,
+    y = NULL
+  ) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 40, hjust = 1))
 ```
@@ -457,9 +544,12 @@ heapo_model %>%
   geom_hline(yintercept = 50, linetype = "dashed", color = "grey50") +
   scale_fill_gradient(low = "lightblue", high = "tomato") +
   scale_y_continuous(limits = c(0, 100), labels = function(x) paste0(x, "%")) +
-  labs(title = "% of Days with High Consumption (> overall median) by Month",
-       subtitle = "Dashed line = 50% (expected if threshold were month-specific)",
-       x = "Month", y = "% high consumption days") +
+  labs(
+    title = "% of Days with High Consumption (> overall median) by Month",
+    subtitle = "Dashed line = 50% (expected if threshold were month-specific)",
+    x = "Month",
+    y = "% high consumption days"
+  ) +
   theme_minimal()
 ```
 
@@ -489,13 +579,20 @@ tibble(
     comma(nrow(heapo_model)),
     "2022-01-01 to 2024-02-29",
     ">=95% data coverage in window",
-    paste0("Random sample of ", length(sampled_ids), " from ", nrow(eligible), " eligible (seed = 42, max 100k rows)"),
+    paste0(
+      "Random sample of ",
+      length(sampled_ids),
+      " from ",
+      nrow(eligible),
+      " eligible (seed = 42, max 100k rows)"
+    ),
     "log(kWh_total)",
     "high_consumption (kWh_total > global median)",
     "n_residents",
     "heating_degree_days, temp_avg, living_area, building_type, heatpump_type"
   )
-) %>% styled_table("Final modelling dataset: summary")
+) %>%
+  styled_table("Final modelling dataset: summary")
 ```
 
 ---
