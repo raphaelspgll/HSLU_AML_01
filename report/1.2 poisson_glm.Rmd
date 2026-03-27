@@ -1,0 +1,80 @@
+---
+title: "Poisson GLM"
+author: "Raphael Spagolla"
+date: "2026 03 04"
+output:
+  html_document:
+    df_print: paged
+  pdf_document:
+    latex_engine: xelatex
+    number_sections: true
+fontsize: 11pt
+geometry: margin=2.5cm
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE
+)
+```
+```{r}
+# 1) Paths
+path_rds <- "data_processed/heapo/heapo_modelling.rds"
+
+# 2) Load
+dat <- readRDS(path_rds)
+
+# 3) Quick check
+str(dat)
+dim(dat)
+names(dat)
+head(dat)
+```
+
+### Interpretation of the Count Response Variable
+
+The constructed response variable `n_high_days` represents the **number of days with high electricity consumption within a given month for each household**.
+
+More precisely:
+- `high_consumption = 1` if daily consumption exceeds the median
+- For each household–month, these are summed to obtain `n_high_days`
+
+Thus, the model explains the **frequency of high-consumption days per month**.
+
+An offset `log(n_days)` is included to account for different month lengths, so the model estimates a **daily rate**.
+
+```{r}
+# 4) Create period (month)
+dat <- dat %>%
+  mutate(year_month = format(date, "%Y-%m"))
+
+# 5) Aggregate to count per household-month
+dat_count <- dat %>%
+  group_by(Household_ID, year_month) %>%
+  summarise(
+    n_high_days = sum(high_consumption, na.rm = TRUE),
+    n_days = n(),
+    # optional: average predictors over period
+    heating_degree_days = mean(heating_degree_days, na.rm = TRUE),
+    temp_avg = mean(temp_avg, na.rm = TRUE),
+    living_area = first(living_area),
+    n_residents = first(n_residents),
+    building_type = first(building_type),
+    heatpump_type = first(heatpump_type),
+    .groups = "drop"
+  )
+
+# 6) Check
+head(dat_count)
+summary(dat_count$n_high_days)
+```
+
+
+
+
+
+
+
+
+
