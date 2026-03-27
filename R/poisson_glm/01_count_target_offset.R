@@ -1,3 +1,4 @@
+# R/poisson_glm/01_count_target_offset.R
 # (1) Create count target + offset dataset for Poisson GLM
 # Input : data_processed/heapo/heapo_modelling.rds
 # Output: data_processed/poisson/dat_count.rds
@@ -23,14 +24,15 @@ if (!file.exists(path_in)) stop("Input file not found: ", path_in)
 dat <- readRDS(path_in)
 
 # -----------------------------
-# Minimal validation
+# Minimal validation (all required predictors)
 # -----------------------------
 required_cols <- c(
   "Household_ID", "date", "high_consumption",
   "heating_degree_days", "temp_avg",
-  "living_area", "n_residents",
-  "building_type", "heatpump_type"
+  "living_area", "building_type", "heatpump_type",
+  "has_floor_heating", "n_residents", "is_weekend"
 )
+
 missing_cols <- setdiff(required_cols, names(dat))
 if (length(missing_cols) > 0) {
   stop("Missing required columns: ", paste(missing_cols, collapse = ", "))
@@ -41,8 +43,16 @@ if (!inherits(dat$date, "Date")) {
 }
 
 # high_consumption should be 0/1 (allow NA)
-bad_vals <- !is.na(dat$high_consumption) & !dat$high_consumption %in% c(0L, 1L)
-if (any(bad_vals)) stop("`high_consumption` contains values other than 0/1/NA.")
+bad_vals_y <- !is.na(dat$high_consumption) & !dat$high_consumption %in% c(0L, 1L)
+if (any(bad_vals_y)) stop("`high_consumption` contains values other than 0/1/NA.")
+
+# is_weekend should be 0/1 (allow NA)
+bad_vals_w <- !is.na(dat$is_weekend) & !dat$is_weekend %in% c(0L, 1L)
+if (any(bad_vals_w)) stop("`is_weekend` contains values other than 0/1/NA.")
+
+# has_floor_heating should be 0/1 (allow NA)
+bad_vals_f <- !is.na(dat$has_floor_heating) & !dat$has_floor_heating %in% c(0L, 1L)
+if (any(bad_vals_f)) stop("`has_floor_heating` contains values other than 0/1/NA.")
 
 # -----------------------------
 # Create year-month key
@@ -66,11 +76,16 @@ dat_count <- dat %>%
     heating_degree_days = mean(heating_degree_days, na.rm = TRUE),
     temp_avg            = mean(temp_avg, na.rm = TRUE),
     
+    # Weekend predictor at monthly level (share of weekend days observed)
+    # This keeps the variable interpretable in a monthly model.
+    share_weekend = mean(is_weekend, na.rm = TRUE),
+    
     # Household/static features (should be constant within household)
-    living_area   = first(living_area),
-    n_residents   = first(n_residents),
-    building_type = first(building_type),
-    heatpump_type = first(heatpump_type),
+    living_area       = first(living_area),
+    building_type     = first(building_type),
+    heatpump_type     = first(heatpump_type),
+    has_floor_heating = first(has_floor_heating),
+    n_residents       = first(n_residents),
     
     .groups = "drop"
   ) %>%
@@ -87,6 +102,9 @@ if (any(dat_count$n_high_days < 0)) stop("Found n_high_days < 0 (impossible).")
 if (any(dat_count$n_high_days > dat_count$n_days)) {
   stop("Found n_high_days > n_days. Check `high_consumption` coding and aggregation.")
 }
+if (any(is.na(dat_count$share_weekend))) {
+  stop("share_weekend has NA after aggregation. Check `is_weekend` values.")
+}
 
 # -----------------------------
 # Save
@@ -100,4 +118,7 @@ cat("\n[01] Saved:", path_out, "\n")
 cat("[01] Rows:", nrow(dat_count), "| Cols:", ncol(dat_count), "\n")
 cat("[01] n_high_days summary:\n")
 print(summary(dat_count$n_high_days))
-cat("[01] share of zeros:", mean(dat_count$n_high_days == 0), "\n\n")
+cat("[01] share of zeros:", mean(dat_count$n_high_days == 0), "\n")
+cat("[01] share_weekend summary:\n")
+print(summary(dat_count$share_weekend))
+cat("\n")
