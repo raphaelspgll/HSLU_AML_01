@@ -1,9 +1,11 @@
 ---
 title: "Household Energy Consumption Analysis"
-subtitle: "Applied Machine Learning and Predictive Modelling 1 – FS 2026"
 author: "Tharrmeehan Krishnathasan, Raphaël Spagolla, Emanuel Lemma"
 date: "`r Sys.Date()`"
 output:
+  pdf_document:
+    toc: true
+    toc_depth: '3'
   html_document:
     toc: true
     toc_float: true
@@ -11,6 +13,7 @@ output:
     number_sections: true
     theme: flatly
     code_folding: hide
+subtitle: Applied Machine Learning and Predictive Modelling 1 – FS 2026
 ---
 
 ```{r setup, include=FALSE}
