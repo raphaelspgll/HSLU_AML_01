@@ -78,7 +78,8 @@ heapo_svm_data <- heapo_modelling %>%
     n_residents,
     building_type,
     heatpump_type
-  )
+  ) %>%
+  na.omit()
 
 table(heapo_svm_data$high_consumption)
 ```
@@ -107,3 +108,64 @@ print(prop.table(table(train_data$high_consumption)))
 ```
 
 An 80/20 stratified split preserves the class ratio in both sets.
+
+# Baseline SVM (Radial Kernel, cost = 1)
+
+We start with a radial basis function (RBF) kernel and default cost = 1. The RBF kernel maps data into a high-dimensional space, allowing non-linear decision boundaries — well-suited to energy consumption patterns that interact across weather and household variables.
+
+`scale = TRUE` ensures all numeric features are standardised before training, which is essential for SVMs (they are sensitive to feature scale).
+
+```{r svm-baseline, cache=TRUE}
+set.seed(42)
+svm_baseline <- svm(
+  high_consumption ~ .,
+  data   = train_data,
+  kernel = "radial",
+  cost   = 1,
+  scale  = TRUE
+)
+summary(svm_baseline)
+```
+
+```{r svm-baseline-eval}
+pred_baseline <- predict(svm_baseline, test_x)
+cm_baseline   <- confusionMatrix(pred_baseline, test_y, positive = "high")
+cm_baseline
+```
+
+# Tuned SVM (Cross-Validated)
+
+We use 5-fold cross-validation to search over a small grid of `cost` and `gamma` values. `cost` controls the penalty for misclassification (higher = tighter fit), while `gamma` controls the influence radius of each training point (higher = more local boundaries).
+
+```{r svm-tune, cache=TRUE}
+set.seed(42)
+svm_tune <- tune(
+  svm,
+  high_consumption ~ .,
+  data          = train_data,
+  kernel        = "radial",
+  ranges        = list(
+    cost  = c(1, 10, 100),
+    gamma = c(0.01, 0.1)
+  ),
+  tunecontrol   = tune.control(cross = 5)
+)
+
+# Best parameters
+svm_tune$best.parameters
+```
+
+```{r svm-tune-results}
+tune_results <- svm_tune$performances %>%
+  arrange(error) %>%
+  rename(CV_error = error)
+
+styled_table(tune_results, caption = "CV tuning results — lower error is better")
+```
+
+```{r svm-best-eval}
+best_svm  <- svm_tune$best.model
+pred_best <- predict(best_svm, test_x)
+cm_best   <- confusionMatrix(pred_best, test_y, positive = "high")
+cm_best
+```
