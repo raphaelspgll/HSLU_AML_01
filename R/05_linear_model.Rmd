@@ -45,3 +45,39 @@ styled_table <- function(df, caption = "") {
 ```{r load-data, include=FALSE}
 heapo_modelling <- readRDS(here("data_processed", "heapo", "heapo_modelling.rds"))
 ```
+
+# Introduction
+
+This section fits a Linear Model (LM) to predict daily household energy consumption. The response variable is `log_kWh_total` — the natural log of total daily kWh usage. Log-transforming energy amounts is standard practice: energy consumption is a strictly positive "amount" variable whose distribution is right-skewed on the original scale and approximately normal after log transformation.
+
+The panel structure of the data (multiple daily observations per household) means the i.i.d. assumption of standard OLS is not fully met — standard errors may be slightly understated due to within-household correlation. Results should be interpreted with this caveat in mind.
+
+# Univariate Models
+
+Before fitting a full model, we compare each predictor individually to understand its marginal association with energy consumption.
+
+```{r univariate-models}
+predictors <- c(
+  "heating_degree_days",
+  "sunshine_hours",
+  "humidity_avg",
+  "living_area",
+  "n_residents",
+  "building_type",
+  "heatpump_type"
+)
+
+model_comparison <- predictors %>%
+  map_df(~ {
+    formula <- as.formula(paste("log_kWh_total ~", .x))
+    lm(formula, data = heapo_modelling) %>%
+      broom::glance() %>%
+      mutate(predictor = .x)
+  }) %>%
+  select(predictor, r.squared, adj.r.squared, p.value) %>%
+  arrange(desc(r.squared))
+
+styled_table(model_comparison, caption = "Univariate model R² by predictor")
+```
+
+`heating_degree_days` (cold-weather demand) is expected to be the strongest predictor of daily consumption. The table above confirms which predictors carry the most explanatory power individually.
