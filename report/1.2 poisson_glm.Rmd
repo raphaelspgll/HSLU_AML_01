@@ -3,11 +3,11 @@ title: "Poisson GLM"
 author: "Raphael Spagolla"
 date: "2026 03 04"
 output:
-  html_document:
-    df_print: paged
   pdf_document:
     latex_engine: xelatex
     number_sections: true
+  html_document:
+    df_print: paged
 fontsize: 11pt
 geometry: margin=2.5cm
 ---
@@ -20,63 +20,113 @@ knitr::opts_chunk$set(
 
 set.seed(1234)
 ```
-```{r}
-# 1) Paths
-path_rds <- "data_processed/heapo/heapo_modelling.rds"
 
-# 2) Load
-dat <- readRDS(path_rds)
+# 1. Introduction
 
-# 3) Quick check
-str(dat)
-dim(dat)
-names(dat)
-head(dat)
-```
+This section analyses count data using a Poisson Generalised Linear Model (GLM).  
+The outcome variable is the number of high-consumption days per household-month (`n_high_days`). As this represents non-negative integer counts over a fixed time period, a Poisson model is an appropriate starting point.
 
-### Interpretation of the Count Response Variable
+The objective is both explanatory and predictive: to identify which household and weather characteristics are associated with higher rates of high-consumption days, and to quantify these effects in a consistent modelling framework.
 
-The constructed response variable `n_high_days` represents the **number of days with high electricity consumption within a given month for each household**.
+# 2. Data & Variables
 
-More precisely:
-- `high_consumption = 1` if daily consumption exceeds the median
-- For each household–month, these are summed to obtain `n_high_days`
+The analysis is conducted at the household-month level, where daily observations are aggregated to construct the model variables.
 
-Thus, the model explains the **frequency of high-consumption days per month**.
+The outcome variable, `n_high_days`, measures the number of days within a household-month with high electricity consumption. To account for differences in observation length, the number of observed days (`n_days`) is included as an offset in the model, allowing the estimation of rates rather than raw counts.
 
-An offset `log(n_days)` is included to account for different month lengths, so the model estimates a **daily rate**.
+Predictors include weather variables (e.g., temperature and heating degree days), household characteristics (e.g., living area, number of residents), and building-related features (e.g., building type, heat pump type, floor heating). These variables capture key factors expected to influence consumption behaviour.
 
-```{r}
-# 4) Create period (month)
-dat <- dat %>%
-  mutate(year_month = format(date, "%Y-%m"))
+# 3. Graphical Analysis
 
-# 5) Aggregate to count per household-month
-dat_count <- dat %>%
-  group_by(Household_ID, year_month) %>%
-  summarise(
-    n_high_days = sum(high_consumption, na.rm = TRUE),
-    n_days = n(),
-    # optional: average predictors over period
-    heating_degree_days = mean(heating_degree_days, na.rm = TRUE),
-    temp_avg = mean(temp_avg, na.rm = TRUE),
-    living_area = first(living_area),
-    n_residents = first(n_residents),
-    building_type = first(building_type),
-    heatpump_type = first(heatpump_type),
-    .groups = "drop"
-  )
+A graphical analysis is conducted to examine the distribution of the count outcome and its relationship with the model predictors. The variable `n_high_days` shows typical count-data characteristics, including discreteness, right-skewness, and a substantial number of low-count observations.
 
-# 6) Check
-head(dat_count)
-summary(dat_count$n_high_days)
+
+```{r load-data, message=FALSE, warning=FALSE, echo=FALSE}
+dat_count <- readRDS("../data_processed/poisson/dat_count.rds")
 ```
 
 
+### Continuous and count predictors
 
+```{r eda-continuous, fig.width=12, fig.height=8, echo=FALSE}
+par(mfrow = c(2, 2))
 
+plot(dat_count$heating_degree_days, dat_count$n_high_days,
+     main = "n_high_days vs heating_degree_days",
+     xlab = "heating_degree_days", ylab = "n_high_days")
 
+plot(dat_count$temp_avg, dat_count$n_high_days,
+     main = "n_high_days vs temp_avg",
+     xlab = "temp_avg", ylab = "n_high_days")
 
+plot(dat_count$living_area, dat_count$n_high_days,
+     main = "n_high_days vs living_area",
+     xlab = "living_area", ylab = "n_high_days")
 
+plot(dat_count$n_residents, dat_count$n_high_days,
+     main = "n_high_days vs n_residents",
+     xlab = "n_residents", ylab = "n_high_days")
 
+par(mfrow = c(1, 1))
+```
+The relationship between `n_high_days` and continuous predictors is explored using scatterplots.
 
+For `heating_degree_days`, a clear positive pattern is visible: higher values are generally associated with higher counts of high-consumption days. This is consistent with increased heating demand during colder periods.
+
+For `temp_avg`, an inverse relationship is observed. Higher temperatures correspond to fewer high-consumption days, while lower temperatures are associated with higher counts, reinforcing the dominant role of weather conditions.
+
+The variables `living_area` and `n_residents` show weaker relationships. While there is a slight tendency for larger households and more residents to be associated with higher counts, the variability is substantial, indicating that these factors alone are not strong predictors.
+
+### Categorical and binary predictors
+
+```{r eda-categorical, fig.width=12, fig.height=8, echo=FALSE}
+par(mfrow = c(2, 2))
+
+boxplot(n_high_days ~ building_type, data = dat_count,
+        main = "By building_type",
+        xlab = "building_type", ylab = "n_high_days")
+
+boxplot(n_high_days ~ heatpump_type, data = dat_count,
+        main = "By heatpump_type",
+        xlab = "heatpump_type", ylab = "n_high_days")
+
+boxplot(n_high_days ~ has_floor_heating, data = dat_count,
+        main = "By has_floor_heating",
+        xlab = "has_floor_heating", ylab = "n_high_days")
+
+plot(dat_count$share_weekend, dat_count$n_high_days,
+     main = "n_high_days vs share_weekend",
+     xlab = "share_weekend", ylab = "n_high_days")
+
+par(mfrow = c(1, 1))
+```
+Boxplots are used to compare the distribution of `n_high_days` across groups.
+
+For `building_type`, houses exhibit substantially higher counts and greater variability compared to apartments, suggesting higher energy demand in larger or less efficient buildings.
+
+For `heatpump_type`, differences between air-source and ground-source systems are present but less pronounced, indicating a more moderate effect.
+
+The variable `has_floor_heating` shows a slight shift towards higher counts when floor heating is present, although the distributions overlap considerably.
+
+The variable `share_weekend` does not show a clear relationship with the outcome. The vertical clustering reflects the calendar structure of months rather than a strong behavioural effect, suggesting that weekend share has only a minor influence.
+
+# 4. Poisson Model
+
+## 4.1 Specification
+
+A Poisson Generalised Linear Model (GLM) with log link is used to model the number of high-consumption days per household-month. The response variable is `n_high_days`, and the logarithm of the number of observed days (`log(n_days)`) is included as an offset to account for differing exposure across observations.
+
+The model includes weather variables (heating degree days, average temperature), household characteristics (living area, number of residents), and building-related features (building type, heat pump type, floor heating), as well as the share of weekend days.
+
+```{r poisson-model}
+glm_pois <- glm(
+  n_high_days ~ heating_degree_days + temp_avg + living_area +
+    building_type + heatpump_type + has_floor_heating +
+    n_residents + share_weekend,
+  family = poisson(link = "log"),
+  offset = log(n_days),
+  data = dat_count
+)
+```
+
+exp(coef(glm_pois))
