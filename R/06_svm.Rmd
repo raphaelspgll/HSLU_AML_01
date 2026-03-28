@@ -45,3 +45,64 @@ styled_table <- function(df, caption = "") {
 heapo_modelling <- readRDS(here("data_processed", "heapo", "heapo_modelling.rds"))
 ```
 
+# Introduction
+
+Support Vector Machines (SVMs) are powerful classifiers that find the optimal hyperplane separating two classes by maximising the margin between the nearest data points (support vectors). Unlike the Linear Model, SVMs are non-parametric and can capture complex, non-linear decision boundaries via kernel functions.
+
+**Classification task:** We classify each day as a *high-consumption day* (top 25% of daily kWh usage) or a *normal day*. This binary framing is practically useful: identifying high-load days in advance allows grid operators and energy providers to plan capacity and issue consumption alerts.
+
+The top-quartile threshold is data-driven: it identifies the 25% of days with the highest energy demand, which are disproportionately responsible for grid stress events.
+
+# Data Preparation
+
+## Create Binary Target
+
+```{r create-target}
+q75 <- quantile(heapo_modelling$log_kWh_total, 0.75)
+cat("Q75 threshold (log kWh):", round(q75, 3), "\n")
+cat("Equivalent kWh:", round(exp(q75), 1), "\n")
+
+heapo_svm_data <- heapo_modelling %>%
+  mutate(
+    high_consumption = as.factor(
+      ifelse(log_kWh_total >= q75, "high", "normal")
+    )
+  ) %>%
+  select(
+    high_consumption,
+    heating_degree_days,
+    sunshine_hours,
+    humidity_avg,
+    living_area,
+    n_residents,
+    building_type,
+    heatpump_type
+  )
+
+table(heapo_svm_data$high_consumption)
+```
+
+The binary target `high_consumption` is excluded from the predictors. Note that `log_kWh_total` is also excluded to avoid data leakage — the SVM must predict high-load days from weather and household characteristics alone.
+
+## Train / Test Split
+
+```{r train-test-split}
+set.seed(42)
+train_idx <- createDataPartition(
+  heapo_svm_data$high_consumption,
+  p    = 0.8,
+  list = FALSE
+)
+
+train_data <- heapo_svm_data[train_idx, ]
+test_data  <- heapo_svm_data[-train_idx, ]
+test_x     <- test_data %>% select(-high_consumption)
+test_y     <- test_data$high_consumption
+
+cat("Training rows:", nrow(train_data), "\n")
+cat("Test rows:    ", nrow(test_data), "\n")
+cat("Class balance (train):\n")
+print(prop.table(table(train_data$high_consumption)))
+```
+
+An 80/20 stratified split preserves the class ratio in both sets.
