@@ -1,0 +1,47 @@
+---
+title: "HEAPO – Linear Model"
+author: ""
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+    code_folding: hide
+    theme: flatly
+    df_print: paged
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 10,
+  fig.height = 5
+)
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+
+library(here)
+library(tidyverse)
+library(broom)
+library(car)
+library(knitr)
+library(kableExtra)
+
+set.seed(42)
+
+styled_table <- function(df, caption = "") {
+  df %>%
+    kable(caption = caption, digits = 4) %>%
+    kable_styling(
+      bootstrap_options = c("striped", "hover", "condensed"),
+      full_width = FALSE
+    )
+}
+```
+
+```{r load-data}
+heapo_modelling <- readRDS(here("data_processed", "heapo", "heapo_modelling.rds"))
+```
