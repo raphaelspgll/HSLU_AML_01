@@ -45,9 +45,3 @@ styled_table <- function(df, caption = "") {
 heapo_modelling <- readRDS(here("data_processed", "heapo", "heapo_modelling.rds"))
 ```
 
-# Introduction
-
-This section fits a Support Vector Machine (SVM) to predict daily household energy consumption. The response variable is `log_kWh_total` — the natural log of total daily kWh usage. SVMs are powerful non-parametric methods that can capture complex relationships through kernel transformations while remaining computationally efficient.
-
-The panel structure of the data (multiple daily observations per household) means standard assumptions may not be fully met. Results should be interpreted with this caveat in mind.
-
