@@ -1,0 +1,53 @@
+---
+title: "HEAPO – Support Vector Machine Classification"
+author: ""
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+    code_folding: hide
+    theme: flatly
+    df_print: paged
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 10,
+  fig.height = 5
+)
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+
+library(here)
+library(tidyverse)
+library(e1071)
+library(caret)
+library(knitr)
+library(kableExtra)
+
+set.seed(42)
+
+styled_table <- function(df, caption = "") {
+  kable(df, caption = caption, digits = 4) %>%
+    kable_styling(
+      bootstrap_options = c("striped", "hover", "condensed"),
+      full_width = FALSE
+    )
+}
+```
+
+```{r load-data, include=FALSE}
+heapo_modelling <- readRDS(here("data_processed", "heapo", "heapo_modelling.rds"))
+```
+
+# Introduction
+
+This section fits a Support Vector Machine (SVM) to predict daily household energy consumption. The response variable is `log_kWh_total` — the natural log of total daily kWh usage. SVMs are powerful non-parametric methods that can capture complex relationships through kernel transformations while remaining computationally efficient.
+
+The panel structure of the data (multiple daily observations per household) means standard assumptions may not be fully met. Results should be interpreted with this caveat in mind.
+
