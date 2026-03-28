@@ -180,3 +180,34 @@ ggplot(coef_df, aes(x = estimate, y = reorder(term, estimate))) +
     y        = NULL
   )
 ```
+
+# Model Comparison
+
+We compare the simple and extended models on adjusted R² and in-sample RMSE.
+
+```{r model-comparison}
+rmse <- function(model) sqrt(mean(residuals(model)^2))
+
+comparison <- tibble(
+  Model      = c("Simple MLR (main effects)", "Extended MLR (+ interactions)"),
+  `Adj. R²`  = c(
+    round(summary(heapo.mlm)$adj.r.squared, 4),
+    round(summary(heapo.mlm.ext)$adj.r.squared, 4)
+  ),
+  RMSE       = c(
+    round(rmse(heapo.mlm), 4),
+    round(rmse(heapo.mlm.ext), 4)
+  )
+)
+
+styled_table(comparison, caption = "LM model comparison")
+```
+
+The extended model is expected to show a modest improvement in adjusted R² due to the interaction terms capturing heterogeneity across building and pump types. The improvement is intentionally kept focused — we avoid adding interactions for every predictor to retain interpretability.
+
+# Save Model
+
+```{r save-model}
+saveRDS(heapo.mlm.ext, here("models", "linear_model", "heapo_lm.rds"))
+cat("Model saved to models/linear_model/heapo_lm.rds\n")
+```
