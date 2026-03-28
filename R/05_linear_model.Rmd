@@ -81,3 +81,48 @@ styled_table(model_comparison, caption = "Univariate model R² by predictor")
 ```
 
 `heating_degree_days` (cold-weather demand) is expected to be the strongest predictor of daily consumption. The table above confirms which predictors carry the most explanatory power individually.
+
+# Simple Multiple Linear Regression
+
+We first fit a model with all seven predictors and no interactions. This serves as our interpretable baseline.
+
+```{r simple-mlr}
+heapo.mlm <- lm(
+  log_kWh_total ~ heating_degree_days + sunshine_hours + humidity_avg +
+    living_area + n_residents + building_type + heatpump_type,
+  data = heapo_modelling
+)
+
+summary(heapo.mlm)
+```
+
+**Interpretation of key coefficients:**
+
+- `heating_degree_days`: Each additional heating degree day is associated with a positive increase in log energy consumption — colder days drive higher usage.
+- `sunshine_hours`: More sunshine is associated with lower consumption, likely reflecting lower heating demand on bright days.
+- `living_area`: Larger homes consume more energy, as expected.
+- `n_residents`: More occupants increase energy demand.
+- `building_type` / `heatpump_type`: Categorical effects capture structural and system-level differences in baseline consumption.
+
+All coefficients are on the log scale: a coefficient of 0.05 means a 5% multiplicative change in kWh for a one-unit increase in the predictor.
+
+# Extended Model with Interactions
+
+A common pitfall when comparing LMs to non-parametric methods is using an overly simple LM. To ensure a fair comparison, we add two interaction terms:
+
+- `heating_degree_days × heatpump_type`: different heat pump technologies (e.g., air-source vs. ground-source) have different efficiencies at cold temperatures, so the slope of consumption vs. cold should vary by pump type.
+- `heating_degree_days × building_type`: well-insulated buildings are less sensitive to outdoor temperature than older, poorly-insulated ones.
+
+```{r extended-mlr}
+heapo.mlm.ext <- lm(
+  log_kWh_total ~ heating_degree_days + sunshine_hours + humidity_avg +
+    living_area + n_residents + building_type + heatpump_type +
+    heating_degree_days:heatpump_type +
+    heating_degree_days:building_type,
+  data = heapo_modelling
+)
+
+summary(heapo.mlm.ext)
+```
+
+The interaction coefficients tell us whether the effect of cold weather on consumption differs by pump type or building type. A significant positive interaction means that group responds more strongly to cold; a negative interaction means it is better insulated against temperature swings.
