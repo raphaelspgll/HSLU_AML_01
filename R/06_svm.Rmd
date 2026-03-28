@@ -116,6 +116,7 @@ We start with a radial basis function (RBF) kernel and default cost = 1. The RBF
 `scale = TRUE` ensures all numeric features are standardised before training, which is essential for SVMs (they are sensitive to feature scale).
 
 ```{r svm-baseline, cache=TRUE}
+# e1071::svm() is deterministic — set.seed not required but kept for documentation
 set.seed(42)
 svm_baseline <- svm(
   high_consumption ~ .,
@@ -146,7 +147,7 @@ svm_tune <- tune(
   kernel        = "radial",
   ranges        = list(
     cost  = c(1, 10, 100),
-    gamma = c(0.01, 0.1)
+    gamma = c(0.01, 0.1, round(1/7, 4))  # includes e1071 default gamma (1/n_features)
   ),
   tunecontrol   = tune.control(cross = 5)
 )
@@ -158,7 +159,8 @@ svm_tune$best.parameters
 ```{r svm-tune-results}
 tune_results <- svm_tune$performances %>%
   arrange(error) %>%
-  rename(CV_error = error)
+  rename(CV_error = error) %>%
+  select(-dispersion)
 
 styled_table(tune_results, caption = "CV tuning results — lower error is better")
 ```
