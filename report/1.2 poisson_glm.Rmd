@@ -17,6 +17,8 @@ knitr::opts_chunk$set(
   message = FALSE,
   warning = FALSE
 )
+
+set.seed(1234)
 ```
 ```{r}
 # 1) Paths
