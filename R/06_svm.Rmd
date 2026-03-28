@@ -33,7 +33,8 @@ library(kableExtra)
 set.seed(42)
 
 styled_table <- function(df, caption = "") {
-  kable(df, caption = caption, digits = 4) %>%
+  df %>%
+    kable(caption = caption, digits = 4) %>%
     kable_styling(
       bootstrap_options = c("striped", "hover", "condensed"),
       full_width = FALSE
