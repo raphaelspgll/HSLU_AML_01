@@ -6,7 +6,10 @@
 - [R](https://www.r-project.org/) >= 4.1
 - [RStudio](https://posit.co/download/rstudio-desktop/) (recommended)
 
+
+
 ### Steps
+
 
 1. **Clone the repository**
    ```bash
@@ -14,7 +17,7 @@
    cd HSLU_AML_01
    ```
 
-2. **Open the project in RStudio**
+2. **Open the project in RStudio**http://127.0.0.1:26823/graphics/15399057-be1f-4d2c-befe-061fc6d58626.png
    Double-click `HSLU_AML_01.Rproj`.
    RStudio automatically sets the working directory to the project root — this is required for relative paths to work correctly.
 
