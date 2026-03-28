@@ -42,6 +42,6 @@ styled_table <- function(df, caption = "") {
 }
 ```
 
-```{r load-data}
+```{r load-data, include=FALSE}
 heapo_modelling <- readRDS(here("data_processed", "heapo", "heapo_modelling.rds"))
 ```
