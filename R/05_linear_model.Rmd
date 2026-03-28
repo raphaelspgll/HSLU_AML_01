@@ -126,3 +126,57 @@ summary(heapo.mlm.ext)
 ```
 
 The interaction coefficients tell us whether the effect of cold weather on consumption differs by pump type or building type. A significant positive interaction means that group responds more strongly to cold; a negative interaction means it is better insulated against temperature swings.
+
+# Model Diagnostics
+
+We check the four standard LM assumptions using the built-in diagnostic plots.
+
+```{r diagnostics, fig.height=8}
+par(mfrow = c(2, 2))
+plot(heapo.mlm.ext, main = "Extended MLR Diagnostics")
+par(mfrow = c(1, 1))
+```
+
+- **Residuals vs Fitted**: Checks linearity. A horizontal band with no pattern is ideal.
+- **Q-Q Plot**: Checks normality of residuals. Points near the diagonal indicate normality.
+- **Scale-Location**: Checks homoscedasticity (constant variance). A flat line is ideal.
+- **Residuals vs Leverage**: Identifies influential observations.
+
+```{r vif}
+vif_vals <- vif(heapo.mlm.ext)
+vif_df <- data.frame(
+  Predictor = names(vif_vals),
+  VIF = round(as.numeric(vif_vals), 2)
+)
+styled_table(vif_df, caption = "Variance Inflation Factors (VIF) — extended model")
+```
+
+VIF values above 10 indicate problematic multicollinearity. `heating_degree_days` will naturally have elevated VIF due to its interaction terms — this is expected and does not invalidate the model.
+
+# Coefficient Interpretation
+
+The plot below shows the estimated coefficients of the extended model with 95% confidence intervals. Coefficients whose intervals do not cross zero are statistically significant.
+
+```{r coef-plot, fig.height=7}
+cis <- confint(heapo.mlm.ext)
+
+coef_df <- tibble(
+  term     = names(coef(heapo.mlm.ext)),
+  estimate = coef(heapo.mlm.ext),
+  lower    = cis[, 1],
+  upper    = cis[, 2]
+) %>%
+  filter(term != "(Intercept)")
+
+ggplot(coef_df, aes(x = estimate, y = reorder(term, estimate))) +
+  geom_point(size = 2, color = "#2c3e50") +
+  geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.3, color = "#2c3e50") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "#e74c3c") +
+  theme_minimal(base_size = 13) +
+  labs(
+    title    = "Extended MLR: Coefficient Estimates with 95% CIs",
+    subtitle = "Coefficients on log scale — positive = higher consumption",
+    x        = "Coefficient estimate",
+    y        = NULL
+  )
+```
