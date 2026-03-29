@@ -1,3 +1,4 @@
+# R/poisson_glm/03_fit_poisson.R
 # (3) Fit Poisson GLM with offset
 # Input : data_processed/poisson/dat_count.rds
 # Output: models/poisson_glm/mod_pois.rds

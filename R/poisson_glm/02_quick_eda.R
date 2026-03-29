@@ -1,3 +1,4 @@
+# R/poisson_glm/02_quick_eda.R
 # (2) Quick EDA for monthly count outcome (minimal requirements)
 # Input : data_processed/poisson/dat_count.rds
 # Output: report/figures/poisson_glm/*.png

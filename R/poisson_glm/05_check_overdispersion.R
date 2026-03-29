@@ -1,3 +1,4 @@
+# R/poisson_glm/05_check_overdispersion.R
 # (5) Check overdispersion for Poisson GLM
 # Input : models/poisson_glm/mod_pois.rds
 # Output: models/poisson_glm/overdispersion.txt

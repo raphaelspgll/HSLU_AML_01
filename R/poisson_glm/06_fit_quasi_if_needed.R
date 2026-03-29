@@ -1,3 +1,4 @@
+# R/poisson_glm/06_fit_quasi_if_needed.R
 # (6) Fit quasi-Poisson (same predictors + offset) and compare SE/p-values vs Poisson
 # Input : data_processed/poisson/dat_count.rds
 #         models/poisson_glm/mod_pois.rds

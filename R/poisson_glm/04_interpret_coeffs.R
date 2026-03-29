@@ -1,3 +1,4 @@
+# R/poisson_glm/04_interpret_coeffs.R
 # (4) Interpret coefficients as rate ratios (exp(beta)) + 95% CI
 # Input : models/poisson_glm/mod_pois.rds
 # Output: models/poisson_glm/coeff_rate_ratios.csv

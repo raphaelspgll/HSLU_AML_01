@@ -1,15 +1,19 @@
 ---
-title: "Poisson GLM"
-author: "Raphael Spagolla"
-date: "2026 03 04"
+# title: "Poisson GLM"
+# author: "Raphael Spagolla"
+# date: "2026 03 04"
 output:
   pdf_document:
-    latex_engine: xelatex
-    number_sections: true
+    toc: true
+    toc_depth: '3'
   html_document:
-    df_print: paged
-fontsize: 11pt
-geometry: margin=2.5cm
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+    theme: flatly
+    code_folding: hide
+subtitle: Applied Machine Learning and Predictive Modelling 1 – FS 2026
 ---
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
@@ -17,116 +21,203 @@ knitr::opts_chunk$set(
   message = FALSE,
   warning = FALSE
 )
-
+library(ggplot2)
 set.seed(1234)
 ```
-
-# 1. Introduction
-
-This section analyses count data using a Poisson Generalised Linear Model (GLM).  
-The outcome variable is the number of high-consumption days per household-month (`n_high_days`). As this represents non-negative integer counts over a fixed time period, a Poisson model is an appropriate starting point.
-
-The objective is both explanatory and predictive: to identify which household and weather characteristics are associated with higher rates of high-consumption days, and to quantify these effects in a consistent modelling framework.
-
-# 2. Data & Variables
-
-The analysis is conducted at the household-month level, where daily observations are aggregated to construct the model variables.
-
-The outcome variable, `n_high_days`, measures the number of days within a household-month with high electricity consumption. To account for differences in observation length, the number of observed days (`n_days`) is included as an offset in the model, allowing the estimation of rates rather than raw counts.
-
-Predictors include weather variables (e.g., temperature and heating degree days), household characteristics (e.g., living area, number of residents), and building-related features (e.g., building type, heat pump type, floor heating). These variables capture key factors expected to influence consumption behaviour.
-
-# 3. Graphical Analysis
-
-A graphical analysis is conducted to examine the distribution of the count outcome and its relationship with the model predictors. The variable `n_high_days` shows typical count-data characteristics, including discreteness, right-skewness, and a substantial number of low-count observations.
-
-
-```{r load-data, message=FALSE, warning=FALSE, echo=FALSE}
+```{r import-poisson, echo=FALSE, message=FALSE, warning=FALSE}
+# Load both models (adjust paths if needed)
+mod_pois  <- readRDS("../models/poisson_glm/mod_pois.rds")
+mod_quasi <- readRDS("../models/poisson_glm/mod_quasi.rds")
 dat_count <- readRDS("../data_processed/poisson/dat_count.rds")
 ```
 
+# Poisson GLM
 
-### Continuous and count predictors
+## Objective
 
-```{r eda-continuous, fig.width=12, fig.height=8, echo=FALSE}
-par(mfrow = c(2, 2))
+The aim of this analysis is to model the number of high-consumption days per household-month ($n_{high\ days}$). This variable represents count data, taking non-negative integer values.
 
-plot(dat_count$heating_degree_days, dat_count$n_high_days,
-     main = "n_high_days vs heating_degree_days",
-     xlab = "heating_degree_days", ylab = "n_high_days")
+A Poisson Generalised Linear Model (GLM) is used, as it is appropriate for modelling count outcomes. By including an offset for the number of observed days, the model estimates rates, allowing interpretation of results in terms of relative changes (rate ratios).
 
-plot(dat_count$temp_avg, dat_count$n_high_days,
-     main = "n_high_days vs temp_avg",
-     xlab = "temp_avg", ylab = "n_high_days")
+## Model Setup
 
-plot(dat_count$living_area, dat_count$n_high_days,
-     main = "n_high_days vs living_area",
-     xlab = "living_area", ylab = "n_high_days")
+### Response Variable
 
-plot(dat_count$n_residents, dat_count$n_high_days,
-     main = "n_high_days vs n_residents",
-     xlab = "n_residents", ylab = "n_high_days")
+The response variable is the number of high-consumption days per household-month ($n_{high\ days}$). As this represents a count of events over a fixed period, it takes non-negative integer values.
 
-par(mfrow = c(1, 1))
+### Offset (Exposure)
+
+The number of observed days may vary slightly across household–months. To account for this, the logarithm of the number of observed days (`log_n_days`) is included as an offset in the model. This allows the model to estimate a rate (i.e., high-consumption days per observed day), making observations comparable across different months.
+
+### Model Specification
+
+A Poisson Generalised Linear Model (GLM) with a log-link function is used:
+
+$$
+\log(\mathbb{E}[Y_i]) = \beta_0 + \beta_1 X_{1i} + \cdots + \beta_p X_{pi} + \log(n\_days_i)
+$$
+
+The log-link ensures that predicted values remain positive and enables a multiplicative interpretation of the coefficients.
+
+### Justification
+
+The Poisson model is appropriate because the response variable is count data, and the model naturally accommodates non-negative integer outcomes while allowing the variance to depend on the mean.
+
+## Model Results
+
+### Key Coefficients (Rate Ratios)
+
+To facilitate interpretation, coefficients are exponentiated and presented as **rate ratios**. These indicate multiplicative changes in the expected rate of high-consumption days.
+
+```{r RR-mod-poisson, echo=FALSE, message=FALSE, warning=FALSE}
+library(broom)
+library(dplyr)
+
+tidy(mod_pois) %>%
+  mutate(rate_ratio = exp(estimate)) %>%
+  select(term, rate_ratio, p.value) %>%
+  filter(term != "(Intercept)")
 ```
-The relationship between `n_high_days` and continuous predictors is explored using scatterplots.
+### 3.2 Interpretation
 
-For `heating_degree_days`, a clear positive pattern is visible: higher values are generally associated with higher counts of high-consumption days. This is consistent with increased heating demand during colder periods.
+The results are interpreted in terms of **percentage changes in the expected rate**, holding all other variables constant.
 
-For `temp_avg`, an inverse relationship is observed. Higher temperatures correspond to fewer high-consumption days, while lower temperatures are associated with higher counts, reinforcing the dominant role of weather conditions.
+**Building type (house vs flat):**  Households living in houses have a rate of high-consumption days that is approximately **363% higher** than those living in flats \((4.632 - 1) \times 100\%\). This is the strongest effect in the model, indicating that building characteristics are a key driver of consumption patterns.
 
-The variables `living_area` and `n_residents` show weaker relationships. While there is a slight tendency for larger households and more residents to be associated with higher counts, the variability is substantial, indicating that these factors alone are not strong predictors.
+**Average temperature:**  The rate ratio of 0.915 implies that a one-unit increase in temperature is associated with a **8.5% decrease** in the expected rate of high-consumption days \((1 - 0.915) \times 100\%\). This reflects reduced heating needs at higher temperatures.
 
-### Categorical and binary predictors
+**Number of residents:**  Each additional household member increases the expected rate by approximately **8.9%** \((1.089 - 1) \times 100\%\). This suggests that household size has a consistent positive effect on energy consumption.
 
-```{r eda-categorical, fig.width=12, fig.height=8, echo=FALSE}
-par(mfrow = c(2, 2))
+**Living area:**  The rate ratio of 1.001 indicates a **small positive effect**, where each additional unit of living area increases the expected rate by about **0.09%**. While the per-unit effect is small, it can accumulate for larger dwellings.
 
-boxplot(n_high_days ~ building_type, data = dat_count,
-        main = "By building_type",
-        xlab = "building_type", ylab = "n_high_days")
+Overall, structural and household characteristics (building type, size, and number of residents) exhibit the strongest effects, while temperature captures an important but smaller environmental influence.
 
-boxplot(n_high_days ~ heatpump_type, data = dat_count,
-        main = "By heatpump_type",
-        xlab = "heatpump_type", ylab = "n_high_days")
 
-boxplot(n_high_days ~ has_floor_heating, data = dat_count,
-        main = "By has_floor_heating",
-        xlab = "has_floor_heating", ylab = "n_high_days")
+## 4. Visual Evidence
 
-plot(dat_count$share_weekend, dat_count$n_high_days,
-     main = "n_high_days vs share_weekend",
-     xlab = "share_weekend", ylab = "n_high_days")
+### 4.1 Key Relationships
 
-par(mfrow = c(1, 1))
+```{r glm-poisson-plots, fig.height=4, echo=FALSE, fig.show='hold', out.width='50%'}
+ggplot(dat_count, aes(x = building_type, y = n_high_days)) +
+  geom_boxplot() +
+  labs(title = "High-consumption days by building type",
+       x = "Building type",
+       y = "Number of high-consumption days") +
+  theme_minimal()
+
+ggplot(dat_count, aes(x = temp_avg, y = n_high_days)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(method = "loess") +
+  labs(title = "High-consumption days vs temperature",
+       x = "Average temperature",
+       y = "High-consumption days") +
+  theme_minimal()
 ```
-Boxplots are used to compare the distribution of `n_high_days` across groups.
 
-For `building_type`, houses exhibit substantially higher counts and greater variability compared to apartments, suggesting higher energy demand in larger or less efficient buildings.
+To complement the model results, two simple plots are used to visualise the most important patterns in the data.
 
-For `heatpump_type`, differences between air-source and ground-source systems are present but less pronounced, indicating a more moderate effect.
+The boxplot shows that households living in houses tend to have a higher and more variable number of high-consumption days than those living in flats, which is consistent with the large positive effect estimated in the model.
 
-The variable `has_floor_heating` shows a slight shift towards higher counts when floor heating is present, although the distributions overlap considerably.
+The scatterplot suggests a negative relationship between temperature and the number of high-consumption days, supporting the model result that warmer periods are associated with lower expected consumption frequency.
 
-The variable `share_weekend` does not show a clear relationship with the outcome. The vertical clustering reflects the calendar structure of months rather than a strong behavioural effect, suggesting that weekend share has only a minor influence.
+### 4.2 Coefficient Plot
 
-# 4. Poisson Model
+A coefficient plot summarises the main model results by displaying the estimated **rate ratios** together with their **95% confidence intervals**.
 
-## 4.1 Specification
 
-A Poisson Generalised Linear Model (GLM) with log link is used to model the number of high-consumption days per household-month. The response variable is `n_high_days`, and the logarithm of the number of observed days (`log(n_days)`) is included as an offset to account for differing exposure across observations.
+```{r glm-poisson-rr-plot, fig.height=5, echo=FALSE}
+coef_summary <- coef(summary(mod_pois))
 
-The model includes weather variables (heating degree days, average temperature), household characteristics (living area, number of residents), and building-related features (building type, heat pump type, floor heating), as well as the share of weekend days.
-
-```{r poisson-model}
-glm_pois <- glm(
-  n_high_days ~ heating_degree_days + temp_avg + living_area +
-    building_type + heatpump_type + has_floor_heating +
-    n_residents + share_weekend,
-  family = poisson(link = "log"),
-  offset = log(n_days),
-  data = dat_count
+coef_df <- data.frame(
+  term     = rownames(coef_summary),
+  estimate = coef_summary[, "Estimate"],
+  se       = coef_summary[, "Std. Error"],
+  p_value  = coef_summary[, "Pr(>|z|)"]
 )
+
+coef_df <- coef_df[coef_df$term != "(Intercept)", ]
+
+coef_df$rate_ratio  <- exp(coef_df$estimate)
+coef_df$ci_low      <- exp(coef_df$estimate - 1.96 * coef_df$se)
+coef_df$ci_high     <- exp(coef_df$estimate + 1.96 * coef_df$se)
+coef_df$significant <- coef_df$p_value < 0.05
+
+coef_df$term <- dplyr::recode(coef_df$term,
+  "temp_avg" = "Temperature",
+  "living_area" = "Living area",
+  "building_typehouse" = "House (vs flat)",
+  "heatpump_typeground-source" = "Ground-source heat pump",
+  "has_floor_heating1" = "Floor heating",
+  "n_residents" = "Number of residents",
+  "share_weekend" = "Weekend share",
+  "heating_degree_days" = "Heating degree days"
+)
+
+ggplot(coef_df, aes(x = rate_ratio,
+                    y = reorder(term, rate_ratio),
+                    color = significant)) +
+  geom_point(size = 2.5) +
+  geom_errorbarh(aes(xmin = ci_low, xmax = ci_high), height = 0.3) +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "grey50") +
+  scale_color_manual(values = c("FALSE" = "grey60", "TRUE" = "steelblue"),
+                     labels = c("n.s.", "p < 0.05")) +
+  scale_x_log10() +
+  labs(title = "Rate Ratios with 95% Confidence Intervals",
+       x = "Rate Ratio (log scale)",
+       y = NULL,
+       color = NULL) +
+  theme_minimal(base_size = 13)
 ```
 
-exp(coef(glm_pois))
+This plot provides a compact visual summary of the direction and strength of the estimated effects. Predictors with confidence intervals entirely above 1 increase the expected rate, while those below 1 decrease it.
+
+## 5. Model Diagnostics
+
+### 5.1 Assumptions
+
+The Poisson GLM assumes that the response variable follows a Poisson distribution, implying that the **mean equals the variance**. This assumption is critical for valid statistical inference.
+
+
+### 5.2 Overdispersion
+
+To assess this assumption, we compare the residual deviance to the degrees of freedom:
+
+```{r}
+deviance(mod_pois) / df.residual(mod_pois)
+```
+
+A value substantially greater than 1 indicates **overdispersion**, meaning that the observed variability exceeds what is expected under the Poisson model.
+
+In this case, the ratio is clearly above 1, providing strong evidence of overdispersion. This implies that standard errors are underestimated and p-values may be overly optimistic.
+
+
+### 5.3 Quasi-Poisson Adjustment
+
+To account for overdispersion, a quasi-Poisson model is used (already fitted).
+
+The estimated coefficients remain unchanged, but the standard errors increase substantially. This leads to more conservative statistical inference.
+
+For example, the variable *share of weekend days* is statistically significant under the Poisson model (p = 0.028), but becomes non-significant under the quasi-Poisson model (p = 0.43).
+
+Overall, the quasi-Poisson model provides more reliable inference while preserving the interpretation of effects in terms of rate ratios.
+
+## 6. Key Findings
+
+**Building type is the dominant factor:** Households living in houses have a substantially higher rate of high-consumption days compared to flats, indicating strong structural differences in energy usage.
+
+**Temperature reduces consumption frequency:** Higher average temperatures are associated with fewer high-consumption days, consistent with lower heating demand.
+
+**Household size increases consumption:** Each additional resident leads to a higher rate of high-consumption days, reflecting increased overall energy usage.
+
+**Dwelling size has a smaller positive effect:** Larger living areas are associated with slightly higher consumption frequency, though the effect per unit is modest.
+
+**Some effects weaken after adjustment:** After accounting for overdispersion, certain variables (e.g., weekend share) are no longer statistically significant, highlighting the importance of using robust inference.
+
+## 7. Conclusion
+
+The Poisson GLM provides a clear understanding of the factors influencing the rate of high-consumption days, highlighting the importance of structural characteristics and household composition.
+
+However, strong overdispersion indicates that the Poisson model underestimates variability, making standard inference unreliable.
+
+While the quasi-Poisson model improves inference, a negative binomial model could be considered as a more appropriate alternative for handling overdispersion.
+
