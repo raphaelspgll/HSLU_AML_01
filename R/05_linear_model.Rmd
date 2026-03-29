@@ -1,0 +1,236 @@
+---
+title: "HEAPO – Linear Model"
+author: ""
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+    code_folding: hide
+    theme: flatly
+    df_print: paged
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 10,
+  fig.height = 5
+)
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+
+library(here)
+library(tidyverse)
+library(broom)
+library(car)
+library(knitr)
+library(kableExtra)
+
+set.seed(42)
+
+styled_table <- function(df, caption = "") {
+  df %>%
+    kable(caption = caption, digits = 4) %>%
+    kable_styling(
+      bootstrap_options = c("striped", "hover", "condensed"),
+      full_width = FALSE
+    )
+}
+```
+
+```{r load-data, include=FALSE}
+heapo_modelling <- readRDS(here(
+  "data_processed",
+  "heapo",
+  "heapo_modelling.rds"
+))
+```
+
+# Introduction
+
+This section fits a Linear Model (LM) to predict daily household energy consumption. The response variable is `log_kWh_total` — the natural log of total daily kWh usage. Log-transforming energy amounts is standard practice: energy consumption is a strictly positive "amount" variable whose distribution is right-skewed on the original scale and approximately normal after log transformation.
+
+The panel structure of the data (multiple daily observations per household) means the i.i.d. assumption of standard OLS is not fully met — standard errors may be slightly understated due to within-household correlation. Results should be interpreted with this caveat in mind.
+
+# Univariate Models
+
+Before fitting a full model, we compare each predictor individually to understand its marginal association with energy consumption.
+
+```{r univariate-models}
+predictors <- c(
+  "heating_degree_days",
+  "sunshine_hours",
+  "humidity_avg",
+  "living_area",
+  "n_residents",
+  "building_type",
+  "heatpump_type"
+)
+
+model_comparison <- predictors %>%
+  map_df(
+    ~ {
+      formula <- as.formula(paste("log_kWh_total ~", .x))
+      lm(formula, data = heapo_modelling) %>%
+        broom::glance() %>%
+        mutate(predictor = .x)
+    }
+  ) %>%
+  select(predictor, r.squared, adj.r.squared, p.value) %>%
+  arrange(desc(r.squared))
+
+styled_table(model_comparison, caption = "Univariate model R² by predictor")
+```
+
+`heating_degree_days` (cold-weather demand) is expected to be the strongest predictor of daily consumption. The table above confirms which predictors carry the most explanatory power individually.
+
+# Simple Multiple Linear Regression
+
+We first fit a model with all seven predictors and no interactions. This serves as our interpretable baseline.
+
+```{r simple-mlr}
+heapo.mlm <- lm(
+  log_kWh_total ~ heating_degree_days +
+    sunshine_hours +
+    humidity_avg +
+    living_area +
+    n_residents +
+    building_type +
+    heatpump_type,
+  data = heapo_modelling
+)
+
+summary(heapo.mlm)
+```
+
+**Interpretation of key coefficients:**
+
+- `heating_degree_days`: Each additional heating degree day is associated with a positive increase in log energy consumption — colder days drive higher usage.
+- `sunshine_hours`: More sunshine is associated with lower consumption, likely reflecting lower heating demand on bright days.
+- `living_area`: Larger homes consume more energy, as expected.
+- `n_residents`: More occupants increase energy demand.
+- `building_type` / `heatpump_type`: Categorical effects capture structural and system-level differences in baseline consumption.
+
+All coefficients are on the log scale: a coefficient of 0.05 means a 5% multiplicative change in kWh for a one-unit increase in the predictor.
+
+# Extended Model with Interactions
+
+A common pitfall when comparing LMs to non-parametric methods is using an overly simple LM. To ensure a fair comparison, we add two interaction terms:
+
+- `heating_degree_days × heatpump_type`: different heat pump technologies (e.g., air-source vs. ground-source) have different efficiencies at cold temperatures, so the slope of consumption vs. cold should vary by pump type.
+- `heating_degree_days × building_type`: well-insulated buildings are less sensitive to outdoor temperature than older, poorly-insulated ones.
+
+```{r extended-mlr}
+heapo.mlm.ext <- lm(
+  log_kWh_total ~ heating_degree_days +
+    sunshine_hours +
+    humidity_avg +
+    living_area +
+    n_residents +
+    building_type +
+    heatpump_type +
+    heating_degree_days:heatpump_type +
+    heating_degree_days:building_type,
+  data = heapo_modelling
+)
+
+summary(heapo.mlm.ext)
+```
+
+The interaction coefficients tell us whether the effect of cold weather on consumption differs by pump type or building type. A significant positive interaction means that group responds more strongly to cold; a negative interaction means it is better insulated against temperature swings.
+
+# Model Diagnostics
+
+We check the four standard LM assumptions using the built-in diagnostic plots.
+
+```{r diagnostics, fig.height=8}
+par(mfrow = c(2, 2))
+plot(heapo.mlm.ext, main = "Extended MLR Diagnostics")
+par(mfrow = c(1, 1))
+```
+
+- **Residuals vs Fitted**: Checks linearity. A horizontal band with no pattern is ideal.
+- **Q-Q Plot**: Checks normality of residuals. Points near the diagonal indicate normality.
+- **Scale-Location**: Checks homoscedasticity (constant variance). A flat line is ideal.
+- **Residuals vs Leverage**: Identifies influential observations.
+
+```{r vif}
+vif_vals <- vif(heapo.mlm.ext)
+vif_df <- data.frame(
+  Predictor = names(vif_vals),
+  VIF = round(as.numeric(vif_vals), 2)
+)
+styled_table(
+  vif_df,
+  caption = "Variance Inflation Factors (VIF) — extended model"
+)
+```
+
+VIF values above 10 indicate problematic multicollinearity. `heating_degree_days` will naturally have elevated VIF due to its interaction terms — this is expected and does not invalidate the model.
+
+# Coefficient Interpretation
+
+The plot below shows the estimated coefficients of the extended model with 95% confidence intervals. Coefficients whose intervals do not cross zero are statistically significant.
+
+```{r coef-plot, fig.height=7}
+cis <- confint(heapo.mlm.ext)
+
+coef_df <- tibble(
+  term = names(coef(heapo.mlm.ext)),
+  estimate = coef(heapo.mlm.ext),
+  lower = cis[, 1],
+  upper = cis[, 2]
+) %>%
+  filter(term != "(Intercept)")
+
+ggplot(coef_df, aes(x = estimate, y = reorder(term, estimate))) +
+  geom_point(size = 2, color = "#2c3e50") +
+  geom_errorbarh(
+    aes(xmin = lower, xmax = upper),
+    height = 0.3,
+    color = "#2c3e50"
+  ) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "#e74c3c") +
+  theme_minimal(base_size = 13) +
+  labs(
+    title = "Extended MLR: Coefficient Estimates with 95% CIs",
+    subtitle = "Coefficients on log scale — positive = higher consumption",
+    x = "Coefficient estimate",
+    y = NULL
+  )
+```
+
+# Model Comparison
+
+We compare the simple and extended models on adjusted R² and in-sample RMSE.
+
+```{r model-comparison}
+rmse <- function(model) sqrt(mean(residuals(model)^2))
+
+comparison <- tibble(
+  Model = c("Simple MLR (main effects)", "Extended MLR (+ interactions)"),
+  `Adj. R²` = c(
+    round(summary(heapo.mlm)$adj.r.squared, 4),
+    round(summary(heapo.mlm.ext)$adj.r.squared, 4)
+  ),
+  RMSE = c(
+    round(rmse(heapo.mlm), 4),
+    round(rmse(heapo.mlm.ext), 4)
+  )
+)
+
+styled_table(comparison, caption = "LM model comparison")
+```
+
+The extended model is expected to show a modest improvement in adjusted R² due to the interaction terms capturing heterogeneity across building and pump types. The improvement is intentionally kept focused — we avoid adding interactions for every predictor to retain interpretability.
+
+# Save Model
+
+```{r save-model}
+saveRDS(heapo.mlm.ext, here("models", "linear_model", "heapo_lm.rds"))
+cat("Model saved to models/linear_model/heapo_lm.rds\n")
+```
