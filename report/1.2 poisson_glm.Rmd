@@ -27,7 +27,7 @@ set.seed(1234)
 ```{r import-poisson, echo=FALSE, message=FALSE, warning=FALSE}
 # Load both models (adjust paths if needed)
 mod_pois  <- readRDS("../models/poisson_glm/mod_pois.rds")
-mod_quasi <- readRDS("../models/poisson_glm/mod_quasi.rds")
+mod_quasi_pois <- readRDS("../models/poisson_glm/mod_quasi.rds")
 dat_count <- readRDS("../data_processed/poisson/dat_count.rds")
 ```
 
@@ -39,35 +39,20 @@ The aim of this analysis is to model the number of high-consumption days per hou
 
 A Poisson Generalised Linear Model (GLM) is used, as it is appropriate for modelling count outcomes. By including an offset for the number of observed days, the model estimates rates, allowing interpretation of results in terms of relative changes (rate ratios).
 
-## Model Setup
+## Model setup
 
-### Response Variable
+The response variable is the number of high-consumption days per household-month ($n_{high\ days}$). Since this outcome is a count of events observed over a period of time, it takes non-negative integer values. Because the number of observed days can vary slightly across household–months, the model includes the logarithm of the observed days $(\log(n_{days}))$ as an offset. This adjustment effectively converts the outcome into a rate—high-consumption days per observed day—so that observations remain comparable even when exposure differs between months.
 
-The response variable is the number of high-consumption days per household-month ($n_{high\ days}$). As this represents a count of events over a fixed period, it takes non-negative integer values.
-
-### Offset (Exposure)
-
-The number of observed days may vary slightly across household–months. To account for this, the logarithm of the number of observed days (`log_n_days`) is included as an offset in the model. This allows the model to estimate a rate (i.e., high-consumption days per observed day), making observations comparable across different months.
-
-### Model Specification
-
-A Poisson Generalised Linear Model (GLM) with a log-link function is used:
+To model these rates, a Poisson Generalised Linear Model (GLM) with a log-link is fitted:
 
 $$
 \log(\mathbb{E}[Y_i]) = \beta_0 + \beta_1 X_{1i} + \cdots + \beta_p X_{pi} + \log(n\_days_i)
 $$
-
-The log-link ensures that predicted values remain positive and enables a multiplicative interpretation of the coefficients.
-
-### Justification
-
-The Poisson model is appropriate because the response variable is count data, and the model naturally accommodates non-negative integer outcomes while allowing the variance to depend on the mean.
+The log-link guarantees positive fitted values and supports a multiplicative interpretation of effects. This modelling choice is appropriate because the response is count data, and the Poisson framework naturally accommodates non-negative outcomes while allowing the variance to depend on the mean.
 
 ## Model Results
 
-### Key Coefficients (Rate Ratios)
-
-To facilitate interpretation, coefficients are exponentiated and presented as **rate ratios**. These indicate multiplicative changes in the expected rate of high-consumption days.
+To facilitate interpretation, coefficients are exponentiated and presented as *rate ratios*. These indicate multiplicative changes in the expected rate of high-consumption days.
 
 ```{r RR-mod-poisson, echo=FALSE, message=FALSE, warning=FALSE}
 library(broom)
@@ -78,24 +63,27 @@ tidy(mod_pois) %>%
   select(term, rate_ratio, p.value) %>%
   filter(term != "(Intercept)")
 ```
-### 3.2 Interpretation
 
-The results are interpreted in terms of **percentage changes in the expected rate**, holding all other variables constant.
+The results are interpreted in terms of *percentage changes in the expected rate*, holding all other variables constant.
 
-**Building type (house vs flat):**  Households living in houses have a rate of high-consumption days that is approximately **363% higher** than those living in flats \((4.632 - 1) \times 100\%\). This is the strongest effect in the model, indicating that building characteristics are a key driver of consumption patterns.
+**Building type (house vs flat):**  Households living in houses have a rate of high-consumption days that is approximately 363% higher than those living in flats \((4.632 - 1) \times 100\%\). This is the strongest effect in the model, indicating that building characteristics are a key driver of consumption patterns.
 
-**Average temperature:**  The rate ratio of 0.915 implies that a one-unit increase in temperature is associated with a **8.5% decrease** in the expected rate of high-consumption days \((1 - 0.915) \times 100\%\). This reflects reduced heating needs at higher temperatures.
+**Average temperature:**  The rate ratio of 0.915 implies that a one-unit increase in temperature is associated with a 8.5% decrease in the expected rate of high-consumption days \((1 - 0.915) \times 100\%\). This reflects reduced heating needs at higher temperatures.
 
-**Number of residents:**  Each additional household member increases the expected rate by approximately **8.9%** \((1.089 - 1) \times 100\%\). This suggests that household size has a consistent positive effect on energy consumption.
+**Number of residents:**  Each additional household member increases the expected rate by approximately 8.9% \((1.089 - 1) \times 100\%\). This suggests that household size has a consistent positive effect on energy consumption.
 
-**Living area:**  The rate ratio of 1.001 indicates a **small positive effect**, where each additional unit of living area increases the expected rate by about **0.09%**. While the per-unit effect is small, it can accumulate for larger dwellings.
+**Living area:**  The rate ratio of 1.001 indicates a *small positive effect*, where each additional unit of living area increases the expected rate by about 0.09%. While the per-unit effect is small, it can accumulate for larger dwellings.
 
 Overall, structural and household characteristics (building type, size, and number of residents) exhibit the strongest effects, while temperature captures an important but smaller environmental influence.
 
 
 ## 4. Visual Evidence
 
-### 4.1 Key Relationships
+To complement the model output, the plots below provide direct visual support for the main relationships in the data.
+
+The *boxplot by building type* shows a clear separation between apartments and houses. Apartments have a low median number of high-consumption days and a relatively tight spread, while houses display a much higher median and substantially greater variability. The distribution for houses also extends to much larger values, indicating that high-consumption days are both more frequent and more heterogeneous among households living in houses.
+
+The *scatterplot of high-consumption days versus average temperature* reveals a strong negative pattern. At lower temperatures, high-consumption days are often high (with many observations in the upper range), whereas at warmer temperatures the observations concentrate at much lower counts. The smooth trend line decreases steadily with temperature and flattens at higher temperatures, suggesting that high-consumption days become less common as conditions get warmer.
 
 ```{r glm-poisson-plots, fig.height=4, echo=FALSE, fig.show='hold', out.width='50%'}
 ggplot(dat_count, aes(x = building_type, y = n_high_days)) +
@@ -114,15 +102,7 @@ ggplot(dat_count, aes(x = temp_avg, y = n_high_days)) +
   theme_minimal()
 ```
 
-To complement the model results, two simple plots are used to visualise the most important patterns in the data.
-
-The boxplot shows that households living in houses tend to have a higher and more variable number of high-consumption days than those living in flats, which is consistent with the large positive effect estimated in the model.
-
-The scatterplot suggests a negative relationship between temperature and the number of high-consumption days, supporting the model result that warmer periods are associated with lower expected consumption frequency.
-
-### 4.2 Coefficient Plot
-
-A coefficient plot summarises the main model results by displaying the estimated **rate ratios** together with their **95% confidence intervals**.
+Finally, the *rate-ratio coefficient plot with 95% confidence intervals* summarises the direction and strength of the model effects. The building type effect stands out visually, with the rate ratio for *House (vs flat)* far above 1, indicating a much higher expected rate in houses. *Temperature* and *weekend share* are clearly below 1, consistent with lower expected rates as temperature increases and when the share of weekend days is higher. *Number of residents* and *floor heating* lie slightly above 1, indicating moderate increases in the expected rate. In contrast, effects such as *heating degree days* and *living area* lie close to 1 with confidence intervals overlapping 1, suggesting weak or uncertain contributions once the other variables are accounted for.
 
 
 ```{r glm-poisson-rr-plot, fig.height=5, echo=FALSE}
@@ -169,39 +149,29 @@ ggplot(coef_df, aes(x = rate_ratio,
   theme_minimal(base_size = 13)
 ```
 
-This plot provides a compact visual summary of the direction and strength of the estimated effects. Predictors with confidence intervals entirely above 1 increase the expected rate, while those below 1 decrease it.
+## Model Diagnostics
 
-## 5. Model Diagnostics
+```{r, echo=FALSE}
+# Poisson diagnostics
+s_m_p <- summary(mod_pois)
+disp_pois <- s_m_p$deviance / s_m_p$df.residual
 
-### 5.1 Assumptions
+# Quasi-Poisson diagnostics
+s_m_q <- summary(mod_quasi_pois)
 
-The Poisson GLM assumes that the response variable follows a Poisson distribution, implying that the **mean equals the variance**. This assumption is critical for valid statistical inference.
+# dispersion estimate (phi) for quasi-Poisson via Pearson residuals
+phi_q <- sum(residuals(mod_quasi_pois, type = "pearson")^2) / df.residual(mod_quasi_pois)
 
-
-### 5.2 Overdispersion
-
-To assess this assumption, we compare the residual deviance to the degrees of freedom:
-
-```{r}
-deviance(mod_pois) / df.residual(mod_pois)
+# p-value helper (works for both models)
+p_pois  <- coef(summary(mod_pois))[,4]
+p_quasi <- coef(summary(mod_quasi_pois))[,4]
 ```
 
-A value substantially greater than 1 indicates **overdispersion**, meaning that the observed variability exceeds what is expected under the Poisson model.
+A key assumption of the Poisson GLM is *equidispersion*, i.e., that the conditional variance equals the conditional mean. We assess this by comparing the *residual deviance* to the *residual degrees of freedom*. For the fitted Poisson model, the residual deviance is `r round(s_m_p$deviance, 1)` on `r s_m_p$df.residual` df, yielding a deviance/df ratio of `r round(disp_pois, 2)`. Since this ratio is clearly larger than 1, there is strong evidence of *overdispersion*, meaning that the Poisson model would tend to *underestimate standard errors* and potentially overstate statistical significance.
 
-In this case, the ratio is clearly above 1, providing strong evidence of overdispersion. This implies that standard errors are underestimated and p-values may be overly optimistic.
+We therefore refit the model using a *quasi-Poisson* family. This keeps the same mean structure (and thus the same *rate-ratio interpretation*), but inflates standard errors to reflect the extra-Poisson variability. The estimated dispersion for the quasi-Poisson fit is ($\hat{\phi}$ =) `r round(phi_q, 2)`, confirming substantial extra-Poisson variation. As a consequence, inference becomes more conservative: for example, *share_weekend* changes from significant under the Poisson model (p = `r signif(p_pois["share_weekend"], 2)`) to non-significant under the quasi-Poisson model (p = `r signif(p_quasi["share_weekend"], 2)`).
 
-
-### 5.3 Quasi-Poisson Adjustment
-
-To account for overdispersion, a quasi-Poisson model is used (already fitted).
-
-The estimated coefficients remain unchanged, but the standard errors increase substantially. This leads to more conservative statistical inference.
-
-For example, the variable *share of weekend days* is statistically significant under the Poisson model (p = 0.028), but becomes non-significant under the quasi-Poisson model (p = 0.43).
-
-Overall, the quasi-Poisson model provides more reliable inference while preserving the interpretation of effects in terms of rate ratios.
-
-## 6. Key Findings
+## Key Findings
 
 **Building type is the dominant factor:** Households living in houses have a substantially higher rate of high-consumption days compared to flats, indicating strong structural differences in energy usage.
 
@@ -213,7 +183,7 @@ Overall, the quasi-Poisson model provides more reliable inference while preservi
 
 **Some effects weaken after adjustment:** After accounting for overdispersion, certain variables (e.g., weekend share) are no longer statistically significant, highlighting the importance of using robust inference.
 
-## 7. Conclusion
+## Conclusion
 
 The Poisson GLM provides a clear understanding of the factors influencing the rate of high-consumption days, highlighting the importance of structural characteristics and household composition.
 
