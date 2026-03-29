@@ -1,0 +1,8 @@
+Overdispersion check (Poisson GLM)
+==================================
+Residual deviance: 27529.614
+Residual df      : 3291
+Dispersion (dev/df): 8.3651
+
+Interpretation: OVERDISPERSION likely (consider quasi-Poisson / NB).
+
