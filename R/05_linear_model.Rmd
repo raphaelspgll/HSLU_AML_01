@@ -43,7 +43,11 @@ styled_table <- function(df, caption = "") {
 ```
 
 ```{r load-data, include=FALSE}
-heapo_modelling <- readRDS(here("data_processed", "heapo", "heapo_modelling.rds"))
+heapo_modelling <- readRDS(here(
+  "data_processed",
+  "heapo",
+  "heapo_modelling.rds"
+))
 ```
 
 # Introduction
@@ -68,12 +72,14 @@ predictors <- c(
 )
 
 model_comparison <- predictors %>%
-  map_df(~ {
-    formula <- as.formula(paste("log_kWh_total ~", .x))
-    lm(formula, data = heapo_modelling) %>%
-      broom::glance() %>%
-      mutate(predictor = .x)
-  }) %>%
+  map_df(
+    ~ {
+      formula <- as.formula(paste("log_kWh_total ~", .x))
+      lm(formula, data = heapo_modelling) %>%
+        broom::glance() %>%
+        mutate(predictor = .x)
+    }
+  ) %>%
   select(predictor, r.squared, adj.r.squared, p.value) %>%
   arrange(desc(r.squared))
 
@@ -88,8 +94,13 @@ We first fit a model with all seven predictors and no interactions. This serves 
 
 ```{r simple-mlr}
 heapo.mlm <- lm(
-  log_kWh_total ~ heating_degree_days + sunshine_hours + humidity_avg +
-    living_area + n_residents + building_type + heatpump_type,
+  log_kWh_total ~ heating_degree_days +
+    sunshine_hours +
+    humidity_avg +
+    living_area +
+    n_residents +
+    building_type +
+    heatpump_type,
   data = heapo_modelling
 )
 
@@ -115,8 +126,13 @@ A common pitfall when comparing LMs to non-parametric methods is using an overly
 
 ```{r extended-mlr}
 heapo.mlm.ext <- lm(
-  log_kWh_total ~ heating_degree_days + sunshine_hours + humidity_avg +
-    living_area + n_residents + building_type + heatpump_type +
+  log_kWh_total ~ heating_degree_days +
+    sunshine_hours +
+    humidity_avg +
+    living_area +
+    n_residents +
+    building_type +
+    heatpump_type +
     heating_degree_days:heatpump_type +
     heating_degree_days:building_type,
   data = heapo_modelling
@@ -148,7 +164,10 @@ vif_df <- data.frame(
   Predictor = names(vif_vals),
   VIF = round(as.numeric(vif_vals), 2)
 )
-styled_table(vif_df, caption = "Variance Inflation Factors (VIF) — extended model")
+styled_table(
+  vif_df,
+  caption = "Variance Inflation Factors (VIF) — extended model"
+)
 ```
 
 VIF values above 10 indicate problematic multicollinearity. `heating_degree_days` will naturally have elevated VIF due to its interaction terms — this is expected and does not invalidate the model.
@@ -161,23 +180,27 @@ The plot below shows the estimated coefficients of the extended model with 95% c
 cis <- confint(heapo.mlm.ext)
 
 coef_df <- tibble(
-  term     = names(coef(heapo.mlm.ext)),
+  term = names(coef(heapo.mlm.ext)),
   estimate = coef(heapo.mlm.ext),
-  lower    = cis[, 1],
-  upper    = cis[, 2]
+  lower = cis[, 1],
+  upper = cis[, 2]
 ) %>%
   filter(term != "(Intercept)")
 
 ggplot(coef_df, aes(x = estimate, y = reorder(term, estimate))) +
   geom_point(size = 2, color = "#2c3e50") +
-  geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.3, color = "#2c3e50") +
+  geom_errorbarh(
+    aes(xmin = lower, xmax = upper),
+    height = 0.3,
+    color = "#2c3e50"
+  ) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "#e74c3c") +
   theme_minimal(base_size = 13) +
   labs(
-    title    = "Extended MLR: Coefficient Estimates with 95% CIs",
+    title = "Extended MLR: Coefficient Estimates with 95% CIs",
     subtitle = "Coefficients on log scale — positive = higher consumption",
-    x        = "Coefficient estimate",
-    y        = NULL
+    x = "Coefficient estimate",
+    y = NULL
   )
 ```
 
@@ -189,12 +212,12 @@ We compare the simple and extended models on adjusted R² and in-sample RMSE.
 rmse <- function(model) sqrt(mean(residuals(model)^2))
 
 comparison <- tibble(
-  Model      = c("Simple MLR (main effects)", "Extended MLR (+ interactions)"),
-  `Adj. R²`  = c(
+  Model = c("Simple MLR (main effects)", "Extended MLR (+ interactions)"),
+  `Adj. R²` = c(
     round(summary(heapo.mlm)$adj.r.squared, 4),
     round(summary(heapo.mlm.ext)$adj.r.squared, 4)
   ),
-  RMSE       = c(
+  RMSE = c(
     round(rmse(heapo.mlm), 4),
     round(rmse(heapo.mlm.ext), 4)
   )
