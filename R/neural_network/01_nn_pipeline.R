@@ -10,7 +10,7 @@ suppressPackageStartupMessages({
 # -----------------------------
 # Paths
 # -----------------------------
-path_in <- "data_processed/heapo/heapo_modelling.rds"
+path_in <- "../HSLU_AML_01/data_processed/heapo/heapo_modelling.rds"
 
 # -----------------------------
 # Load
@@ -246,10 +246,12 @@ cat("[05] Sensitivity:", round(sensitivity, 4), "\n")
 cat("[05] Specificity:", round(specificity, 4), "\n")
 
 # ----------------------------------------
-# (6) Simple evaluation plot
+# (6) Simple evaluation plots
 # ----------------------------------------
 
-plot(pred_prob_1, col = ifelse(truth == "1", "red", "blue"),
+# Predicted probabilities
+plot(pred_prob_1,
+     col = ifelse(truth == "1", "red", "blue"),
      pch = 16,
      main = "Predicted probabilities (NN)",
      xlab = "Observation",
@@ -275,6 +277,22 @@ axis(2, at = 1:2, labels = rownames(cm_mat))
 text(rep(1:2, each = 2),
      rep(1:2, times = 2),
      labels = cm_mat)
+
+# ROC curve
+suppressPackageStartupMessages({
+  library(ROCR)
+})
+
+pred_roc <- ROCR::prediction(pred_prob_1, truth)
+perf_roc <- ROCR::performance(pred_roc, "tpr", "fpr")
+
+plot(perf_roc,
+     lwd = 2,
+     main = "ROC Curve (NN)",
+     xlab = "False Positive Rate",
+     ylab = "True Positive Rate")
+
+abline(a = 0, b = 1, lty = 2)
 
 # ----------------------------------------
 # (7) Save outputs (figures + results)
