@@ -1,5 +1,5 @@
 ---
-# title: "Poisson GLM"
+# title: "Neural Network"
 # author: "Raphael Spagolla"
 # date: "2026 03 04"
 output:
@@ -35,22 +35,50 @@ dat_count <- readRDS("../data_processed/poisson/dat_count.rds")
 
 ## Objective
 
-The aim of this analysis is to model the number of high-consumption days per household-month ($n_{high\ days}$). This variable represents count data, taking non-negative integer values.
+The aim of this analysis is to predict whether an observation corresponds to a high-consumption event (`high_consumption`), a binary outcome taking values 0 or 1. Unlike the Poisson GLM, which models counts , this setting is a classification problem.
 
-A Poisson Generalised Linear Model (GLM) is used, as it is appropriate for modelling count outcomes. By including an offset for the number of observed days, the model estimates rates, allowing interpretation of results in terms of relative changes (rate ratios).
+A neural network is used to capture potentially non-linear relationships between consumption and predictors such as weather, building characteristics, and household composition. The focus is on predictive performance, with probabilities converted into class predictions and evaluated on test data using accuracy, sensitivity, and specificity.
 
 ## Data preparation
 
+The dataset consists of 99,838 observations and includes variables related to weather conditions, building characteristics, and household composition . The response variable, `high_consumption`, is binary and approximately balanced between the two classes.
+
+To ensure valid model evaluation, the data is split into training (80%) and test (20%) sets using a stratified sampling approach, preserving the class distribution in both subsets. This avoids bias in performance estimates.
+
+Categorical variables are converted into dummy variables using one-hot encoding, and all predictors are scaled based on the training data. The same transformation is then applied to the test set, ensuring consistency and preventing data leakage.
+
 ## Model setup
 
-The response variable is the number of high-consumption days per household-month ($n_{high\ days}$). Since this outcome is a count of events observed over a period of time, it takes non-negative integer values. Because the number of observed days can vary slightly across household–months, the model includes the logarithm of the observed days $(\log(n_{days}))$ as an offset. This adjustment effectively converts the outcome into a rate—high-consumption days per observed day—so that observations remain comparable even when exposure differs between months.
+A feedforward neural network was fitted to classify whether an observation corresponds to a high-consumption event. The model uses 8 input variables, one hidden layer with 3 neurons, and 1 output node, corresponding to an **8-3-1 network** .
 
-To model these rates, a Poisson Generalised Linear Model (GLM) with a log-link is fitted:
+In compact form, the model can be written as:
 
 $$
-\log(\mathbb{E}[Y_i]) = \beta_0 + \beta_1 X_{1i} + \cdots + \beta_p X_{pi} + \log(n\_days_i)
+\hat{y}*i = f\left( \sum*{j=1}^{3} w_j^{(2)} , g\left( \sum_{k=1}^{8} w_{jk}^{(1)} x_{ik} + b_j^{(1)} \right) + b^{(2)} \right)
 $$
-The log-link guarantees positive fitted values and supports a multiplicative interpretation of effects. This modelling choice is appropriate because the response is count data, and the Poisson framework naturally accommodates non-negative outcomes while allowing the variance to depend on the mean.
+
+where $x_{ik}$ denotes the input predictors, $g(\cdot)$ is the hidden-layer activation function, and $f(\cdot)$ produces the predicted probability of high consumption.
+
+The model was estimated using the `nnet` package with a weight decay parameter (0.001) to regularise the network and reduce overfitting, and a maximum of 300 iterations to ensure convergence . All categorical predictors were dummy-encoded and inputs were scaled prior to training.
+
+## Model Results
+
+Model performance is evaluated on the held-out test set using standard classification metrics. The neural network achieves an overall accuracy of 0.770, indicating that approximately 77% of observations are correctly classified.
+
+```{r, echo=FALSE}
+results_nn <- read.csv("../models/neural_network/nn_test_metrics.csv")
+
+knitr::kable(
+  results_nn,
+  digits = 3,
+  col.names = c("Model", "Accuracy", "Sensitivity", "Specificity"),
+  caption = "Neural Network Performance Metrics"
+)
+```
+Sensitivity (true positive rate) is 0.803, showing that the model performs well in identifying high-consumption events. Specificity (true negative rate) is slightly lower at 0.737, indicating somewhat weaker performance in correctly classifying low-consumption cases.
+
+Overall, the results suggest that the model has good predictive performance, with a balanced ability to detect both classes, although it is slightly more effective at identifying high-consumption observations.
+
 
 ## Model Results
 
