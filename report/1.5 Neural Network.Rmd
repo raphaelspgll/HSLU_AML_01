@@ -78,8 +78,6 @@ Overall, the results suggest that the model has good predictive performance, wit
 
 ## Visual Evidence
 
-### Visual Evidence
-
 The *predicted probability plot* shows how the neural network separates the two classes. Observations belonging to the high-consumption class (red) tend to have higher predicted probabilities, while low-consumption observations (blue) are more concentrated at lower values. However, there is substantial overlap between the two groups, particularly in the mid-range of probabilities. This indicates that, although the model captures meaningful patterns, it cannot perfectly distinguish between the two classes, which is consistent with the observed classification errors.
 
 The *confusion matrix* provides a direct summary of classification performance. The majority of observations lie on the diagonal, indicating correct predictions for both high- and low-consumption cases. The model correctly identifies a large number of high-consumption events, as reflected in the high true positive count, while also achieving a substantial number of correct low-consumption classifications. Misclassifications occur in both directions, with some low-consumption observations predicted as high and vice versa, confirming that class separation is not complete.
