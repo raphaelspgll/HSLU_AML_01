@@ -84,10 +84,68 @@ print(prop.table(table(train$high_consumption)))
 cat("\n[02] Class balance in test:\n")
 print(prop.table(table(test$high_consumption)))
 
+# ----------------------------------------
+# (3) Encode categorical variables + scale numeric predictors
+# ----------------------------------------
+# Goal:
+# - Convert categorical predictors into numeric dummy variables
+# - Scale numeric predictors using training data only
+# - Apply the same transformation to the test set
 
+suppressPackageStartupMessages({
+  library(dplyr)
+})
 
+# -----------------------------
+# Separate response and predictors
+# -----------------------------
+y_train <- train$high_consumption
+y_test  <- test$high_consumption
 
-# 3. Scaling
+x_train_raw <- train %>% select(-high_consumption)
+x_test_raw  <- test  %>% select(-high_consumption)
+
+# -----------------------------
+# One-hot encode categorical predictors
+# -----------------------------
+# model.matrix() converts factors into dummy variables
+# We remove the intercept column afterwards
+
+x_train_mm <- model.matrix(~ ., data = x_train_raw)[, -1]
+x_test_mm  <- model.matrix(~ ., data = x_test_raw)[, -1]
+
+cat("\n[03] Encoded predictor dimensions\n")
+cat("[03] Train matrix:", nrow(x_train_mm), "rows x", ncol(x_train_mm), "cols\n")
+cat("[03] Test matrix :", nrow(x_test_mm), "rows x", ncol(x_test_mm), "cols\n")
+
+# -----------------------------
+# Scale predictors using TRAIN only
+# -----------------------------
+# Important:
+# - fit scaling parameters on training set
+# - reuse same center/scale for test set
+
+train_means <- apply(x_train_mm, 2, mean)
+train_sds   <- apply(x_train_mm, 2, sd)
+
+# Safety fix: if a column has sd = 0, replace with 1
+train_sds[train_sds == 0] <- 1
+
+x_train_scaled <- scale(x_train_mm, center = train_means, scale = train_sds)
+x_test_scaled  <- scale(x_test_mm, center = train_means, scale = train_sds)
+
+# Convert back to data frames
+train_nn <- as.data.frame(x_train_scaled)
+test_nn  <- as.data.frame(x_test_scaled)
+
+# Add response back
+train_nn$high_consumption <- y_train
+test_nn$high_consumption  <- y_test
+
+cat("\n[03] Scaling completed\n")
+cat("[03] Final train_nn rows:", nrow(train_nn), "| cols:", ncol(train_nn), "\n")
+cat("[03] Final test_nn rows :", nrow(test_nn),  "| cols:", ncol(test_nn), "\n")
+
 # 4. Fit NN
 # 5. Predict
 # 6. Evaluate (metrics + plots)
