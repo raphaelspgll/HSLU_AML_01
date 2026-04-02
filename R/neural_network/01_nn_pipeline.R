@@ -8,9 +8,9 @@ suppressPackageStartupMessages({
 })
 
 # -----------------------------
-# Paths
+# Paths /HSLU_AML_01
 # -----------------------------
-path_in <- "../HSLU_AML_01/data_processed/heapo/heapo_modelling.rds"
+path_in <- "../data_processed/heapo/heapo_modelling.rds"
 
 # -----------------------------
 # Load
@@ -176,24 +176,33 @@ if (!dir.exists(model_dir)) {
   dir.create(model_dir, recursive = TRUE)
 }
 
-# Fit one simple model
-set.seed(42)
-
-mod_nn <- nnet(
-  high_consumption ~ .,
-  data = train_nn,
-  size = 3,
-  decay = 0.001,
-  maxit = 300,
-  trace = FALSE
-)
-
-cat("\n[04] Neural network fitted successfully with nnet\n")
-
-# Save model
-saveRDS(mod_nn, path_mod)
-
-cat("[04] Saved neural network model:", path_mod, "\n")
+# Check if model already exists
+if (file.exists(path_mod)) {
+  
+  # Load existing model
+  mod_nn <- readRDS(path_mod)
+  cat("\n[04] Loaded existing neural network model from:", path_mod, "\n")
+  
+} else {
+  
+  # Fit new model
+  set.seed(42)
+  
+  mod_nn <- nnet(
+    high_consumption ~ .,
+    data = train_nn,
+    size = 3,
+    decay = 0.001,
+    maxit = 300,
+    trace = FALSE
+  )
+  
+  cat("\n[04] Neural network fitted successfully with nnet\n")
+  
+  # Save model
+  saveRDS(mod_nn, path_mod)
+  cat("[04] Saved neural network model:", path_mod, "\n")
+}
 
 # ----------------------------------------
 # (5) Predict + evaluate
