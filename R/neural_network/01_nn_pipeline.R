@@ -146,7 +146,68 @@ cat("\n[03] Scaling completed\n")
 cat("[03] Final train_nn rows:", nrow(train_nn), "| cols:", ncol(train_nn), "\n")
 cat("[03] Final test_nn rows :", nrow(test_nn),  "| cols:", ncol(test_nn), "\n")
 
-# 4. Fit NN
+# ----------------------------------------
+# (3b) Make encoded column names safe
+# ----------------------------------------
+
+colnames(train_nn) <- make.names(colnames(train_nn))
+colnames(test_nn)  <- make.names(colnames(test_nn))
+
+cat("\n[03b] Safe column names applied\n")
+print(names(train_nn))
+
+# ----------------------------------------
+# (4) Fit Neural Network
+# ----------------------------------------
+# Goal:
+# - Fit a simple binary classification neural network
+# - Use a small architecture for interpretability and stability
+
+suppressPackageStartupMessages({
+  library(neuralnet)
+})
+
+# -----------------------------
+# Prepare response for neuralnet
+# -----------------------------
+# neuralnet works best with numeric response
+# For binary classification: use 0/1 instead of factor
+
+train_nn$high_consumption <- as.numeric(as.character(train_nn$high_consumption))
+test_nn$high_consumption  <- as.numeric(as.character(test_nn$high_consumption))
+
+# -----------------------------
+# Define formula
+# -----------------------------
+# Use all encoded predictors
+pred_names <- setdiff(names(train_nn), "high_consumption")
+
+form_nn <- as.formula(
+  paste("high_consumption ~", paste(pred_names, collapse = " + "))
+)
+
+cat("\n[04] Model formula:\n")
+print(form_nn)
+
+# -----------------------------
+# Fit neural network
+# -----------------------------
+# hidden = 3  -> one hidden layer with 3 neurons
+# linear.output = FALSE -> classification output
+# act.fct = 'logistic'  -> sigmoid activation
+
+set.seed(42)
+
+mod_nn <- neuralnet(
+  formula = form_nn,
+  data = train_nn,
+  hidden = 3,
+  linear.output = FALSE,
+  act.fct = "logistic"
+)
+
+cat("\n[04] Neural network fitted successfully\n")
+
 # 5. Predict
 # 6. Evaluate (metrics + plots)
 # 7. Save outputs (figures + results)
