@@ -32,35 +32,33 @@ source("../R/neural_network/01_nn_pipeline.R")
 
 ## Objective
 
-The aim of this analysis is to predict whether an observation corresponds to a high-consumption event (`high_consumption`), a binary outcome taking values 0 or 1. Unlike the Poisson GLM, which models counts , this setting is a classification problem.
+The aim of this analysis is to predict whether an observation corresponds to a high-consumption event (high_consumption), a binary outcome taking values 0 or 1. This is a classification problem, where the focus is on accurately distinguishing between high- and low-consumption cases.
 
-A neural network is used to capture potentially non-linear relationships between consumption and predictors such as weather, building characteristics, and household composition. The focus is on predictive performance, with probabilities converted into class predictions and evaluated on test data using accuracy, sensitivity, and specificity.
+From a practical perspective, reliable classification of high-consumption events can support decision-making processes such as resource allocation, cost management, or demand planning. Early identification of such events allows for more efficient operational responses.
 
-## Data preparation
+A neural network is employed to capture potentially complex and non-linear relationships between consumption and predictors, including weather conditions, building characteristics, and household composition. Model performance is evaluated based on predictive accuracy and classification metrics derived from test data.
 
-The dataset consists of 99,838 observations and includes variables related to weather conditions, building characteristics, and household composition . The response variable, `high_consumption`, is binary and approximately balanced between the two classes.
+## Data Preparation
 
-To ensure valid model evaluation, the data is split into training (80%) and test (20%) sets using a stratified sampling approach, preserving the class distribution in both subsets. This avoids bias in performance estimates.
+The dataset consists of 99,838 observations and includes variables related to weather conditions, building characteristics, and household composition. The response variable, *high_consumption*, is binary and approximately balanced between the two classes.
 
-Categorical variables are converted into dummy variables using one-hot encoding, and all predictors are scaled based on the training data. The same transformation is then applied to the test set, ensuring consistency and preventing data leakage.
+To ensure valid model evaluation, the data is split into training (80%) and test (20%) sets using a stratified sampling approach. This preserves the class distribution in both subsets and avoids biased performance estimates that could arise from imbalanced splits.
+
+Categorical variables are transformed into dummy variables using one-hot encoding, allowing them to be used as inputs in the neural network. In addition, all predictors are scaled based on the training data. This step is important for neural networks, as it improves numerical stability and facilitates efficient training. The same transformations are then applied to the test set to ensure consistency and prevent data leakage.
 
 ## Model setup
 
-A feedforward neural network was fitted to classify whether an observation corresponds to a high-consumption event. The model uses 8 input variables, one hidden layer with 3 neurons, and 1 output node, corresponding to an **8-3-1 network** .
+The neural network is specified with an architecture of (8–3–1), consisting of eight input nodes, one hidden layer with three neurons, and a single output neuron for binary classification. This relatively simple structure is chosen to balance model flexibility with the risk of overfitting, allowing the network to capture non-linear relationships without introducing unnecessary complexity.
 
-In compact form, the model can be written as:
+A non-linear activation function is applied in the hidden layer, enabling the model to learn complex patterns in the data. The output layer produces predicted probabilities for the high-consumption class.
 
-$$
-\hat{y}*i = f\left( \sum*{j=1}^{3} w_j^{(2)} , g\left( \sum_{k=1}^{8} w_{jk}^{(1)} x_{ik} + b_j^{(1)} \right) + b^{(2)} \right)
-$$
+To improve generalisation, weight decay (set to 0.001) is included as a regularisation mechanism. This penalises large weights and helps reduce model variance. The network is trained using the nnet package with a sufficient number of iterations to ensure convergence.
 
-where $x_{ik}$ denotes the input predictors, $g(\cdot)$ is the hidden-layer activation function, and $f(\cdot)$ produces the predicted probability of high consumption.
-
-The model was estimated using the `nnet` package with a weight decay parameter (0.001) to regularise the network and reduce overfitting, and a maximum of 300 iterations to ensure convergence . All categorical predictors were dummy-encoded and inputs were scaled prior to training.
+Overall, the chosen specification reflects a trade-off between predictive performance and model stability, favouring a parsimonious architecture that performs reliably on unseen data.
 
 ## Model Results
 
-Model performance is evaluated on the held-out test set using standard classification metrics. The neural network achieves an overall accuracy of 0.770, indicating that approximately 77% of observations are correctly classified.
+The neural network achieves an accuracy of approximately 0.77, indicating solid predictive performance and a clear improvement over a naive classifier $(\approx 0.50)$ given the balanced dataset. This suggests that the model captures meaningful structure in the data.
 
 ```{r, echo=FALSE}
 results_nn <- read.csv("../models/neural_network/nn_test_metrics.csv")
@@ -72,15 +70,17 @@ knitr::kable(
   caption = "Neural Network Performance Metrics"
 )
 ```
-Sensitivity (true positive rate) is 0.803, showing that the model performs well in identifying high-consumption events. Specificity (true negative rate) is slightly lower at 0.737, indicating somewhat weaker performance in correctly classifying low-consumption cases.
+Sensitivity (0.803) exceeds specificity (0.737), indicating that the model is more effective at identifying high-consumption events than low-consumption cases. This suggests that patterns associated with high consumption are more strongly captured by the available predictors. While this may be advantageous in contexts where detecting high-consumption events is particularly important, it also implies a slightly higher rate of false positives.
 
-Overall, the results suggest that the model has good predictive performance, with a balanced ability to detect both classes, although it is slightly more effective at identifying high-consumption observations.
+Overall, the confusion matrix shows that the majority of observations are correctly classified, with most predictions concentrated along the diagonal. However, misclassifications occur in both directions, indicating that some observations share similar characteristics across classes.
+
+These results indicate good overall classification performance, although some variability remains unexplained, likely due to overlap in predictor patterns between the two classes.
 
 ## Visual Evidence
 
-The *predicted probability plot* shows how the neural network separates the two classes. Observations belonging to the high-consumption class (red) tend to have higher predicted probabilities, while low-consumption observations (blue) are more concentrated at lower values. However, there is substantial overlap between the two groups, particularly in the mid-range of probabilities. This indicates that, although the model captures meaningful patterns, it cannot perfectly distinguish between the two classes, which is consistent with the observed classification errors.
+The *predicted probability plot* illustrates how the neural network separates the two classes. Observations belonging to the high-consumption class tend to have higher predicted probabilities, while low-consumption cases are concentrated at lower values. However, noticeable overlap in the mid-range indicates that some observations cannot be clearly distinguished, which explains the presence of classification errors.
 
-The *confusion matrix* provides a direct summary of classification performance. The majority of observations lie on the diagonal, indicating correct predictions for both high- and low-consumption cases. The model correctly identifies a large number of high-consumption events, as reflected in the high true positive count, while also achieving a substantial number of correct low-consumption classifications. Misclassifications occur in both directions, with some low-consumption observations predicted as high and vice versa, confirming that class separation is not complete.
+The *confusion matrix* provides a direct summary of classification performance. Most observations lie on the diagonal, confirming a high number of correct predictions for both classes. Nevertheless, errors occur in both directions, highlighting that class separation is not complete.
 
 ```{r nn_plots_side_by_side, echo=FALSE, fig.width=10, fig.height=4}
 # ----------------------------------------
@@ -130,7 +130,7 @@ text(
 par(mfrow = c(1,1))
 ```
 
-Finally, the *ROC curve* summarises model performance across all possible classification thresholds. The curve lies clearly above the diagonal reference line, indicating that the model performs substantially better than random classification. The steep initial increase shows that high true positive rates can be achieved with relatively low false positive rates, while the gradual flattening at higher values reflects diminishing gains. Overall, the shape of the curve suggests good discriminative ability, supporting the results obtained from the confusion matrix and accuracy metrics.
+The *ROC curve* further evaluates model performance across all possible classification thresholds. The curve lies clearly above the diagonal reference line, indicating strong discriminative ability and performance well above random classification. The steep initial increase suggests that high true positive rates can be achieved with relatively low false positive rates, while the flattening at higher values reflects diminishing gains.
 
 ```{r nn_roc, echo=FALSE, fig.width=6, fig.height=5}
 plot(
@@ -146,11 +146,33 @@ abline(a = 0, b = 1, lty = 2)
 
 ## Model Diagnostics
 
+Neural network diagnostics focus on predictive performance rather than distributional assumptions. The chosen architecture (8–3–1) provides a balance between flexibility and overfitting, allowing the model to capture non-linear relationships while maintaining stable generalisation.
+
+The test accuracy of approximately 77% indicates reasonable generalisation to unseen data. The absence of a substantial gap between training and test performance suggests that overfitting is limited, although some dependence on the specific train–test split may remain.
+
+The ROC curve confirms consistent performance across classification thresholds and a clear improvement over random classification. However, the observed overlap in predicted probabilities indicates that the available predictors do not fully separate the two classes. This suggests that model performance is constrained more by the information content of the data than by the chosen model structure.
+
+Alternative network configurations were explored to assess the impact of model complexity. Increasing the number of hidden neurons led to slight improvements in training performance but did not translate into meaningful gains in test accuracy, indicating potential overfitting. Simpler architectures achieved comparable results with greater stability, supporting the choice of the 8–3–1 specification.
 
 ## Key Findings
 
+* The neural network achieves solid predictive performance, with an accuracy of approximately 77%, clearly outperforming a naive baseline.
+
+* The model is more effective at identifying high-consumption events than low-consumption cases, as reflected in higher sensitivity compared to specificity.
+
+* The confusion matrix and ROC curve confirm good overall classification ability, although not perfect.
+
+* Overlap in predicted probabilities indicates that some observations cannot be clearly separated, limiting maximum achievable performance.
+
+* Increasing model complexity does not lead to substantial improvements, suggesting that performance is primarily constrained by the available features rather than the model itself.
 
 ## Conclusion
 
+The neural network achieves solid predictive performance and successfully captures non-linear relationships in the data. With an accuracy of approximately 77%, it provides a meaningful improvement over baseline classification and demonstrates good overall discriminative ability.
 
+However, the presence of overlap in predicted probabilities indicates that the model cannot fully distinguish between the two classes. This suggests that performance is primarily constrained by the available predictors rather than by model complexity.
+
+From a practical perspective, the model can serve as a useful decision-support tool for identifying high-consumption events, although predictions should be interpreted with some caution due to remaining classification uncertainty.
+
+Further improvements are more likely to come from enhanced feature engineering or the inclusion of additional relevant variables rather than increasing model complexity. In addition, more robust evaluation methods, such as cross-validation, could provide more stable performance estimates and reduce dependence on a single train–test split.
 
