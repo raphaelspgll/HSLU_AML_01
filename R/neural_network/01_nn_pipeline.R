@@ -161,30 +161,29 @@ print(names(train_nn))
 # ----------------------------------------
 # Goal:
 # - Fit a simple binary classification neural network
-# - Use a small architecture for interpretability and stability
+# - Use one hidden layer with 3 neurons
+# - Predict high_consumption (0/1)
 
 suppressPackageStartupMessages({
   library(neuralnet)
 })
 
 # -----------------------------
-# Prepare response for neuralnet
+# Response must be numeric 0/1
 # -----------------------------
-# neuralnet works best with numeric response
-# For binary classification: use 0/1 instead of factor
-
 train_nn$high_consumption <- as.numeric(as.character(train_nn$high_consumption))
 test_nn$high_consumption  <- as.numeric(as.character(test_nn$high_consumption))
+
+# Quick check
+cat("\n[04] Response check (train):\n")
+print(table(train_nn$high_consumption))
 
 # -----------------------------
 # Define formula
 # -----------------------------
-# Use all encoded predictors
-pred_names <- setdiff(names(train_nn), "high_consumption")
-
-form_nn <- as.formula(
-  paste("high_consumption ~", paste(pred_names, collapse = " + "))
-)
+# Since all predictor names are now safe,
+# we can simply use all columns except the response
+form_nn <- high_consumption ~ .
 
 cat("\n[04] Model formula:\n")
 print(form_nn)
@@ -192,10 +191,6 @@ print(form_nn)
 # -----------------------------
 # Fit neural network
 # -----------------------------
-# hidden = 3  -> one hidden layer with 3 neurons
-# linear.output = FALSE -> classification output
-# act.fct = 'logistic'  -> sigmoid activation
-
 set.seed(42)
 
 mod_nn <- neuralnet(
@@ -207,6 +202,23 @@ mod_nn <- neuralnet(
 )
 
 cat("\n[04] Neural network fitted successfully\n")
+
+# ----------------------------------------
+# (4b) Save Neural Network model
+# ----------------------------------------
+
+model_dir <- "models/neural_network"
+path_mod  <- file.path(model_dir, "mod_nn.rds")
+
+# Create directory if needed
+if (!dir.exists(model_dir)) {
+  dir.create(model_dir, recursive = TRUE)
+}
+
+# Save model
+saveRDS(mod_nn, path_mod)
+
+cat("\n[04b] Saved neural network model:", path_mod, "\n")
 
 # 5. Predict
 # 6. Evaluate (metrics + plots)
