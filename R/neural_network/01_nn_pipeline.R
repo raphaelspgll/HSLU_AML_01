@@ -157,69 +157,93 @@ cat("\n[03b] Safe column names applied\n")
 print(names(train_nn))
 
 # ----------------------------------------
-# (4) Fit Neural Network
+# (4) Fit Neural Network with nnet
 # ----------------------------------------
-# Goal:
-# - Fit a simple binary classification neural network
-# - Use one hidden layer with 3 neurons
-# - Predict high_consumption (0/1)
 
 suppressPackageStartupMessages({
-  library(neuralnet)
+  library(nnet)
 })
 
-# -----------------------------
-# Response must be numeric 0/1
-# -----------------------------
-train_nn$high_consumption <- as.numeric(as.character(train_nn$high_consumption))
-test_nn$high_consumption  <- as.numeric(as.character(test_nn$high_consumption))
+# Response must be factor for classification
+train_nn$high_consumption <- as.factor(train_nn$high_consumption)
+test_nn$high_consumption  <- as.factor(test_nn$high_consumption)
 
-# Quick check
-cat("\n[04] Response check (train):\n")
-print(table(train_nn$high_consumption))
-
-# -----------------------------
-# Define formula
-# -----------------------------
-# Since all predictor names are now safe,
-# we can simply use all columns except the response
-form_nn <- high_consumption ~ .
-
-cat("\n[04] Model formula:\n")
-print(form_nn)
-
-# -----------------------------
-# Fit neural network
-# -----------------------------
-set.seed(42)
-
-mod_nn <- neuralnet(
-  formula = form_nn,
-  data = train_nn,
-  hidden = 3,
-  linear.output = FALSE,
-  act.fct = "logistic"
-)
-
-cat("\n[04] Neural network fitted successfully\n")
-
-# ----------------------------------------
-# (4b) Save Neural Network model
-# ----------------------------------------
-
+# Paths
 model_dir <- "models/neural_network"
-path_mod  <- file.path(model_dir, "mod_nn.rds")
+path_mod  <- file.path(model_dir, "mod_nn_nnet.rds")
 
-# Create directory if needed
 if (!dir.exists(model_dir)) {
   dir.create(model_dir, recursive = TRUE)
 }
 
+# Fit one simple model
+set.seed(42)
+
+mod_nn <- nnet(
+  high_consumption ~ .,
+  data = train_nn,
+  size = 3,
+  decay = 0.001,
+  maxit = 300,
+  trace = FALSE
+)
+
+cat("\n[04] Neural network fitted successfully with nnet\n")
+
 # Save model
 saveRDS(mod_nn, path_mod)
 
-cat("\n[04b] Saved neural network model:", path_mod, "\n")
+cat("[04] Saved neural network model:", path_mod, "\n")
 
-# 5. Predict
+# ----------------------------------------
+# (5) Predict + evaluate
+# ----------------------------------------
+# Goal:
+# - Predict class probabilities on the test set
+# - Convert probabilities into class predictions
+# - Evaluate the model with a confusion matrix and accuracy
+
+pred_prob <- predict(mod_nn, newdata = test_nn, type = "raw")
+
+# For binary classification, extract probability of class "1"
+if (is.matrix(pred_prob)) {
+  if ("1" %in% colnames(pred_prob)) {
+    pred_prob_1 <- pred_prob[, "1"]
+  } else {
+    pred_prob_1 <- pred_prob[, ncol(pred_prob)]
+  }
+} else {
+  pred_prob_1 <- pred_prob
+}
+
+# Convert probabilities to class predictions using 0.5 cutoff
+pred_class <- ifelse(pred_prob_1 >= 0.5, "1", "0")
+pred_class <- factor(pred_class, levels = levels(test_nn$high_consumption))
+
+# True labels
+truth <- test_nn$high_consumption
+
+# Confusion matrix
+cm <- table(Predicted = pred_class, Actual = truth)
+
+# Accuracy
+acc <- mean(pred_class == truth)
+
+cat("\n[05] Confusion matrix:\n")
+print(cm)
+
+cat("\n[05] Accuracy:", round(acc, 4), "\n")
+
+tp <- cm["1", "1"]
+tn <- cm["0", "0"]
+fp <- cm["1", "0"]
+fn <- cm["0", "1"]
+
+sensitivity <- tp / (tp + fn)
+specificity <- tn / (tn + fp)
+
+cat("[05] Sensitivity:", round(sensitivity, 4), "\n")
+cat("[05] Specificity:", round(specificity, 4), "\n")
+
 # 6. Evaluate (metrics + plots)
 # 7. Save outputs (figures + results)
