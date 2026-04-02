@@ -245,5 +245,80 @@ specificity <- tn / (tn + fp)
 cat("[05] Sensitivity:", round(sensitivity, 4), "\n")
 cat("[05] Specificity:", round(specificity, 4), "\n")
 
-# 6. Evaluate (metrics + plots)
-# 7. Save outputs (figures + results)
+# ----------------------------------------
+# (6) Simple evaluation plot
+# ----------------------------------------
+
+plot(pred_prob_1, col = ifelse(truth == "1", "red", "blue"),
+     pch = 16,
+     main = "Predicted probabilities (NN)",
+     xlab = "Observation",
+     ylab = "Predicted probability")
+
+legend("topright",
+       legend = c("Actual 1", "Actual 0"),
+       col = c("red", "blue"),
+       pch = 16)
+
+# Simple confusion matrix visualization
+cm_mat <- as.matrix(cm)
+
+image(1:2, 1:2, cm_mat,
+      axes = FALSE,
+      xlab = "Actual",
+      ylab = "Predicted",
+      main = "Confusion Matrix (NN)")
+
+axis(1, at = 1:2, labels = colnames(cm_mat))
+axis(2, at = 1:2, labels = rownames(cm_mat))
+
+text(rep(1:2, each = 2),
+     rep(1:2, times = 2),
+     labels = cm_mat)
+
+# ----------------------------------------
+# (7) Save outputs (figures + results)
+# ----------------------------------------
+
+# 1. Save metrics
+results_nn <- data.frame(
+  model = "Neural Network",
+  accuracy = acc,
+  sensitivity = sensitivity,
+  specificity = specificity
+)
+
+write.csv(results_nn,
+          "models/neural_network/nn_test_metrics.csv",
+          row.names = FALSE)
+
+# 2. Save confusion matrix
+write.csv(as.data.frame(cm),
+          "models/neural_network/nn_confusion_matrix.csv",
+          row.names = FALSE)
+
+# 3. Save plot
+fig_dir <- "report/figures/neural_network"
+
+if (!dir.exists(fig_dir)) {
+  dir.create(fig_dir, recursive = TRUE)
+}
+
+png(file.path(fig_dir, "nn_predicted_probabilities.png"),
+    width = 1200, height = 800, res = 150)
+
+plot(pred_prob_1,
+     col = ifelse(truth == "1", "red", "blue"),
+     pch = 16,
+     main = "Predicted probabilities (Neural Network)",
+     xlab = "Observation",
+     ylab = "Predicted probability")
+
+legend("topright",
+       legend = c("Actual 1", "Actual 0"),
+       col = c("red", "blue"),
+       pch = 16)
+
+dev.off()
+
+cat("[07] Saved plot to:", fig_dir, "\n")
