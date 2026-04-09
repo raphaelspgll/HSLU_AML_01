@@ -27,6 +27,7 @@ library(here)
 library(tidyverse)
 library(e1071)
 library(caret)
+library(doParallel)
 library(knitr)
 library(kableExtra)
 
@@ -143,38 +144,51 @@ cm_baseline
 We use 5-fold cross-validation to search over a small grid of `cost` and `gamma` values. `cost` controls the penalty for misclassification (higher = tighter fit), while `gamma` controls the influence radius of each training point (higher = more local boundaries).
 
 ```{r svm-tune, cache=TRUE}
-set.seed(42)
-svm_tune <- tune(
-  svm,
-  high_consumption ~ .,
-  data = train_data,
-  kernel = "radial",
-  ranges = list(
-    cost = c(1, 10, 100),
-    gamma = c(0.01, 0.1, round(1 / 7, 4)) # includes e1071 default gamma (1/n_features)
-  ),
-  tunecontrol = tune.control(cross = 5)
+# Parallelise across all available cores (leave 1 free)
+cl <- makePSOCKcluster(max(1, parallel::detectCores() - 1))
+registerDoParallel(cl)
+
+ctrl <- trainControl(
+  method = "cv",
+  number = 5,
+  allowParallel = TRUE,
+  classProbs = TRUE
 )
 
-# Best parameters
-svm_tune$best.parameters
+tune_grid <- expand.grid(
+  C = c(1, 10, 100),
+  sigma = c(0.01, 0.1, round(1 / 7, 4)) # includes e1071 default gamma (1/n_features)
+)
+
+set.seed(42)
+svm_caret <- train(
+  high_consumption ~ .,
+  data = train_data,
+  method = "svmRadial", # RBF kernel, wraps kernlab::ksvm
+  trControl = ctrl,
+  tuneGrid = tune_grid,
+  preProcess = c("center", "scale")
+)
+
+stopCluster(cl)
+registerDoSEQ() # restore sequential backend
+
+svm_caret$bestTune
 ```
 
 ```{r svm-tune-results}
-tune_results <- svm_tune$performances %>%
-  arrange(error) %>%
-  rename(CV_error = error) %>%
-  select(-dispersion)
+tune_results <- svm_caret$results %>%
+  arrange(Accuracy) %>%
+  select(C, sigma, Accuracy, Kappa)
 
 styled_table(
   tune_results,
-  caption = "CV tuning results — lower error is better"
+  caption = "CV tuning results — higher accuracy is better"
 )
 ```
 
 ```{r svm-best-eval}
-best_svm <- svm_tune$best.model
-pred_best <- predict(best_svm, test_x)
+pred_best <- predict(svm_caret, test_x)
 cm_best <- confusionMatrix(pred_best, test_y, positive = "high")
 cm_best
 ```
@@ -198,9 +212,9 @@ eval_table <- bind_rows(
     cm_best,
     paste0(
       "Tuned SVM (cost=",
-      svm_tune$best.parameters$cost,
-      ", gamma=",
-      svm_tune$best.parameters$gamma,
+      svm_caret$bestTune$C,
+      ", sigma=",
+      round(svm_caret$bestTune$sigma, 4),
       ")"
     )
   )
@@ -221,6 +235,6 @@ The tuned model is selected as the final model based on lowest cross-validation 
 # Save Model
 
 ```{r save-model}
-saveRDS(best_svm, here("models", "svm", "heapo_svm.rds"))
+saveRDS(svm_caret, here("models", "svm", "heapo_svm.rds"))
 cat("Model saved to models/svm/heapo_svm.rds\n")
 ```
