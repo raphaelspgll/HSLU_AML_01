@@ -1,0 +1,11 @@
+Quick EDA summary (household-month level)
+=======================================
+Rows: 3300
+
+Outcome: n_high_days
+Share of zeros: 0.2024
+Summary: Min.=0, 1st Qu.=2, Median=15, Mean=15.1254545454545, 3rd Qu.=28, Max.=31
+
+Exposure: n_days
+Summary: Min.=4, 1st Qu.=30, Median=31, Mean=30.2539393939394, 3rd Qu.=31, Max.=31
+

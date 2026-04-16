@@ -6,6 +6,7 @@
 #
 # Usage: source("R/setup.R")  (from RStudio with HSLU_AML_01.Rproj open)
 ###############################################################################
+options(timeout = 600)
 
 message("=== HEAPO Project Setup ===\n")
 
@@ -13,8 +14,10 @@ message("=== HEAPO Project Setup ===\n")
 #    Uses Posit Package Manager as fallback (more reliable for newer R versions)
 if (!requireNamespace("renv", quietly = TRUE)) {
   message("Installing renv...")
-  install.packages("renv",
-                   repos = "https://packagemanager.posit.co/cran/latest")
+  install.packages(
+    "renv",
+    repos = "https://packagemanager.posit.co/cran/latest"
+  )
 }
 
 # 2. Initialise renv for this project
@@ -24,6 +27,8 @@ renv::init(bare = TRUE)
 
 # 3. All packages required by the R scripts and Rmd reports
 packages <- c(
+  # Find correct path for projects
+  "here",
   # Data wrangling
   "dplyr",
   "readr",
@@ -46,6 +51,22 @@ renv::install(packages)
 # 5. Snapshot the installed versions into renv.lock
 message("Creating renv.lock snapshot...")
 renv::snapshot()
+
+# 6. Download data
+library("here")
+zip_url <- "https://zenodo.org/records/15056919/files/heapo_data.zip?download=1"
+dest_dir <- here("data_raw")
+zip_file <- file.path(dest_dir, "heapo_data.zip")
+
+message("Downloading data from Zenodo...")
+download.file(url = zip_url, destfile = zip_file, mode = "wb")
+
+message("Unzipping files...")
+unzip(zipfile = zip_file, exdir = dest_dir)
+
+file.remove(zip_file)
+
+message("Done! Data is ready in: ", dest_dir)
 
 message("\n=== Setup complete! ===")
 message("Next steps:")

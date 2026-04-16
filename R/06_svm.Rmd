@@ -1,0 +1,226 @@
+---
+title: "HEAPO – Support Vector Machine Classification"
+author: ""
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+    code_folding: hide
+    theme: flatly
+    df_print: paged
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 10,
+  fig.height = 5
+)
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+
+library(here)
+library(tidyverse)
+library(e1071)
+library(caret)
+library(knitr)
+library(kableExtra)
+
+set.seed(42)
+
+styled_table <- function(df, caption = "") {
+  df %>%
+    kable(caption = caption, digits = 4) %>%
+    kable_styling(
+      bootstrap_options = c("striped", "hover", "condensed"),
+      full_width = FALSE
+    )
+}
+```
+
+```{r load-data, include=FALSE}
+heapo_modelling <- readRDS(here(
+  "data_processed",
+  "heapo",
+  "heapo_modelling.rds"
+))
+```
+
+# Introduction
+
+Support Vector Machines (SVMs) are powerful classifiers that find the optimal hyperplane separating two classes by maximising the margin between the nearest data points (support vectors). Unlike the Linear Model, SVMs are non-parametric and can capture complex, non-linear decision boundaries via kernel functions.
+
+**Classification task:** We classify each day as a *high-consumption day* (top 25% of daily kWh usage) or a *normal day*. This binary framing is practically useful: identifying high-load days in advance allows grid operators and energy providers to plan capacity and issue consumption alerts.
+
+The top-quartile threshold is data-driven: it identifies the 25% of days with the highest energy demand, which are disproportionately responsible for grid stress events.
+
+# Data Preparation
+
+## Create Binary Target
+
+```{r create-target}
+q75 <- quantile(heapo_modelling$log_kWh_total, 0.75)
+cat("Q75 threshold (log kWh):", round(q75, 3), "\n")
+cat("Equivalent kWh:", round(exp(q75), 1), "\n")
+
+heapo_svm_data <- heapo_modelling %>%
+  mutate(
+    high_consumption = as.factor(
+      ifelse(log_kWh_total >= q75, "high", "normal")
+    )
+  ) %>%
+  select(
+    high_consumption,
+    heating_degree_days,
+    sunshine_hours,
+    humidity_avg,
+    living_area,
+    n_residents,
+    building_type,
+    heatpump_type
+  ) %>%
+  na.omit()
+
+table(heapo_svm_data$high_consumption)
+```
+
+The binary target `high_consumption` is excluded from the predictors. Note that `log_kWh_total` is also excluded to avoid data leakage — the SVM must predict high-load days from weather and household characteristics alone.
+
+## Train / Test Split
+
+```{r train-test-split}
+set.seed(42)
+train_idx <- createDataPartition(
+  heapo_svm_data$high_consumption,
+  p = 0.8,
+  list = FALSE
+)
+
+train_data <- heapo_svm_data[train_idx, ]
+test_data <- heapo_svm_data[-train_idx, ]
+test_x <- test_data %>% select(-high_consumption)
+test_y <- test_data$high_consumption
+
+cat("Training rows:", nrow(train_data), "\n")
+cat("Test rows:    ", nrow(test_data), "\n")
+cat("Class balance (train):\n")
+print(prop.table(table(train_data$high_consumption)))
+```
+
+An 80/20 stratified split preserves the class ratio in both sets.
+
+# Baseline SVM (Radial Kernel, cost = 1)
+
+We start with a radial basis function (RBF) kernel and default cost = 1. The RBF kernel maps data into a high-dimensional space, allowing non-linear decision boundaries — well-suited to energy consumption patterns that interact across weather and household variables.
+
+`scale = TRUE` ensures all numeric features are standardised before training, which is essential for SVMs (they are sensitive to feature scale).
+
+```{r svm-baseline, cache=TRUE}
+# e1071::svm() is deterministic — set.seed not required but kept for documentation
+set.seed(42)
+svm_baseline <- svm(
+  high_consumption ~ .,
+  data = train_data,
+  kernel = "radial",
+  cost = 1,
+  scale = TRUE
+)
+summary(svm_baseline)
+```
+
+```{r svm-baseline-eval}
+pred_baseline <- predict(svm_baseline, test_x)
+cm_baseline <- confusionMatrix(pred_baseline, test_y, positive = "high")
+cm_baseline
+```
+
+# Tuned SVM (Cross-Validated)
+
+We use 5-fold cross-validation to search over a small grid of `cost` and `gamma` values. `cost` controls the penalty for misclassification (higher = tighter fit), while `gamma` controls the influence radius of each training point (higher = more local boundaries).
+
+```{r svm-tune, cache=TRUE}
+set.seed(42)
+svm_tune <- tune(
+  svm,
+  high_consumption ~ .,
+  data = train_data,
+  kernel = "radial",
+  ranges = list(
+    cost = c(1, 10, 100),
+    gamma = c(0.01, 0.1, round(1 / 7, 4)) # includes e1071 default gamma (1/n_features)
+  ),
+  tunecontrol = tune.control(cross = 5)
+)
+
+# Best parameters
+svm_tune$best.parameters
+```
+
+```{r svm-tune-results}
+tune_results <- svm_tune$performances %>%
+  arrange(error) %>%
+  rename(CV_error = error) %>%
+  select(-dispersion)
+
+styled_table(
+  tune_results,
+  caption = "CV tuning results — lower error is better"
+)
+```
+
+```{r svm-best-eval}
+best_svm <- svm_tune$best.model
+pred_best <- predict(best_svm, test_x)
+cm_best <- confusionMatrix(pred_best, test_y, positive = "high")
+cm_best
+```
+
+# Model Evaluation & Comparison
+
+```{r evaluation-table}
+extract_metrics <- function(cm, model_name) {
+  tibble(
+    Model = model_name,
+    Accuracy = round(cm$overall["Accuracy"], 4),
+    Sensitivity = round(cm$byClass["Sensitivity"], 4),
+    Specificity = round(cm$byClass["Specificity"], 4),
+    `F1 Score` = round(cm$byClass["F1"], 4)
+  )
+}
+
+eval_table <- bind_rows(
+  extract_metrics(cm_baseline, "Baseline SVM (cost=1, default gamma)"),
+  extract_metrics(
+    cm_best,
+    paste0(
+      "Tuned SVM (cost=",
+      svm_tune$best.parameters$cost,
+      ", gamma=",
+      svm_tune$best.parameters$gamma,
+      ")"
+    )
+  )
+)
+
+styled_table(eval_table, caption = "SVM model comparison on test set")
+```
+
+**Interpretation:**
+
+- **Accuracy**: Overall proportion of days correctly classified.
+- **Sensitivity**: Of all actual high-consumption days, how many did the model correctly flag? High sensitivity means fewer missed high-load events — important for grid planning.
+- **Specificity**: Of all normal days, how many were correctly identified? High specificity avoids unnecessary alerts.
+- **F1 Score**: Harmonic mean of precision and recall for the high-consumption class — useful when classes are imbalanced.
+
+The tuned model is selected as the final model based on lowest cross-validation error. An improvement in sensitivity is particularly valuable in this domain: missing a high-load day has higher consequences than a false alarm.
+
+# Save Model
+
+```{r save-model}
+saveRDS(best_svm, here("models", "svm", "heapo_svm.rds"))
+cat("Model saved to models/svm/heapo_svm.rds\n")
+```

@@ -1,0 +1,28 @@
+Poisson GLM summary
+===================
+
+Formula: n_high_days ~ heating_degree_days + temp_avg + living_area + 
+Formula:     building_type + heatpump_type + has_floor_heating + n_residents + 
+Formula:     share_weekend
+Offset: log_n_days
+
+Call:
+glm(formula = form, family = poisson(link = "log"), data = dat_count, 
+    offset = log_n_days)
+
+Coefficients (summary):
+                                Estimate   Std. Error     z value      Pr(>|z|)
+(Intercept)                -1.7508117963 1.384580e-01 -12.6450775  1.191070e-36
+heating_degree_days        -0.0013634557 4.401123e-03  -0.3097972  7.567152e-01
+temp_avg                   -0.0891990362 4.825030e-03 -18.4867311  2.640860e-76
+living_area                 0.0008830486 5.513298e-05  16.0167029  9.769504e-58
+building_typehouse          1.5329642721 8.412830e-02  18.2217422  3.469312e-74
+heatpump_typeground-source -0.0972556784 9.339585e-03 -10.4132765  2.156686e-25
+has_floor_heating1          0.1226241181 1.217522e-02  10.0716174  7.375505e-24
+n_residents                 0.0849272734 3.935024e-03  21.5824002 2.628625e-103
+share_weekend              -0.4084750319 1.859968e-01  -2.1961405  2.808189e-02
+
+Null deviance: 43758.451 on 3299 df
+Residual deviance: 27529.614 on 3291 df
+AIC: 39291.638
+
