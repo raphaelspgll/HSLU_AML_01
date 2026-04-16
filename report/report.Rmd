@@ -173,7 +173,11 @@ The HEAPO dataset was collected as part of a Swiss research project monitoring r
 
 *Lead: Emanuel Lemma*
 
+### Objective
+
 Can we predict whether a given household-day will see above-average electricity consumption before it happens? This section fits a **Generalised Linear Model with a binomial family** to answer exactly that question. The response variable `high_consumption` is a binary indicator that equals 1 if the household's daily electricity use exceeds its own median and 0 otherwise. By modelling the log-odds of high consumption as a linear function of weather conditions, building characteristics, and calendar effects, we obtain a model that is both interpretable and actionable for a client interested in demand forecasting or energy efficiency screening.
+
+### Model Setup
 
 ```{r glm-binomial-prep}
 set.seed(42)
@@ -194,13 +198,17 @@ test_df   <- df_glm[-train_idx, ]
 ```
 
 ```{r glm-binomial-fit, cache=TRUE}
-if (!file.exists("../models/glm_binomial.rds")) {
+if (!file.exists("../models/glm_binomial/glm_binomial.rds")) {
   model_glm <- glm(high_consumption ~ ., data = train_df, family = binomial)
-  saveRDS(model_glm, "../models/glm_binomial.rds")
+  saveRDS(model_glm, "../models/glm_binomial/glm_binomial.rds")
 } else {
-  model_glm <- readRDS("../models/glm_binomial.rds")
+  model_glm <- readRDS("../models/glm_binomial/glm_binomial.rds")
 }
 ```
+
+The dataset is restricted to ten predictors covering weather conditions, building characteristics, and calendar effects, then split into 80% training and 20% test sets. The model is fitted with `glm()` using `family = binomial`, which models the log-odds of high consumption as a linear combination of predictors. The saved model is reloaded on subsequent knits to avoid refitting.
+
+### Model Results
 
 ```{r glm-binomial-performance}
 pred_prob  <- predict(model_glm, newdata = test_df, type = "response")
@@ -228,11 +236,9 @@ f1        <- 2 * precision * recall / (precision + recall)
 specificity <- tn / (tn + fp)
 ```
 
-### Coefficient Interpretation
-
 Coefficients from a binomial GLM are expressed as **odds ratios** (OR = exp(coefficient)): a value above 1 increases the odds of high consumption, below 1 decreases it, relative to the reference category.
 
-Key findings:
+Key findings from the coefficient table:
 
 - **Building type (house vs. flat):** The single strongest predictor. Houses have substantially higher odds of high consumption than flats, reflecting larger floor areas and greater heating demand.
 - **Ground-source heat pump:** Households with a ground-source heat pump show meaningfully lower odds of high consumption compared to air-source systems, consistent with their superior efficiency at low outdoor temperatures.
@@ -240,32 +246,7 @@ Key findings:
 - **Heating degree days / temperature:** Colder days increase the probability of high consumption, as expected from heating demand.
 - **Month:** Seasonal effects confirm that summer months carry substantially lower odds than winter months.
 
-### Model Diagnostics
-
-```{r glm-binomial-confmat, fig.height=4}
-conf_df <- data.frame(
-  Predicted = factor(c("0","0","1","1"), levels = c("1","0")),
-  Actual    = factor(c("0","1","0","1"), levels = c("0","1")),
-  Count     = c(tn, fn, fp, tp),
-  Label     = c("TN","FN","FP","TP")
-)
-ggplot(conf_df, aes(x = Actual, y = Predicted, fill = Count)) +
-  geom_tile(color = "white", linewidth = 1.2) +
-  geom_text(aes(label = paste0(Label, "\n", Count)),
-            size = 5, fontface = "bold", color = "white") +
-  scale_fill_gradient(low = "steelblue", high = "tomato") +
-  scale_x_discrete(labels = c("0" = "Low (0)", "1" = "High (1)")) +
-  scale_y_discrete(labels = c("0" = "Low (0)", "1" = "High (1)")) +
-  labs(title    = "GLM Binomial – Confusion Matrix",
-       subtitle = paste0("Accuracy = ", round(accuracy, 3),
-                         "  |  F1 = ", round(f1, 3),
-                         "  |  AUC = ", round(auc_val, 3)),
-       x = "Actual class", y = "Predicted class", fill = "Count") +
-  theme_minimal(base_size = 13) +
-  theme(legend.position = "none", panel.grid = element_blank())
-```
-
-The confusion matrix shows the model's classifications on the held-out test set. The model correctly identifies `r round(recall * 100, 1)`% of true high-consumption days (sensitivity) and `r round(specificity * 100, 1)`% of true low-consumption days (specificity). Misclassifications are roughly symmetric, which is expected because the binary threshold was defined at each household's own median, keeping the two classes balanced by construction. The remaining errors occur mainly on days where consumption is only marginally above or below average and therefore genuinely ambiguous.
+### Visual Evidence
 
 ```{r glm-binomial-or, fig.height=5}
 coef_summary <- coef(summary(model_glm))
@@ -319,7 +300,44 @@ ggplot(roc_df, aes(x = fpr, y = tpr)) +
 
 The ROC curve traces the model's sensitivity against its false positive rate as the classification threshold varies from 0 to 1. The dashed diagonal represents a model that predicts at random (AUC = 0.5). The further the blue curve bows toward the top-left corner, the better the model separates the two classes regardless of threshold choice. With an AUC of `r round(auc_val, 3)`, the model correctly ranks a randomly drawn high-consumption day above a randomly drawn low-consumption day `r round(auc_val * 100, 1)`% of the time, which is a meaningful improvement over chance.
 
-**Summary:** The GLM Binomial achieves an overall accuracy of `r round(accuracy * 100, 1)`% and an AUC of `r round(auc_val, 3)`. Building type and heat pump technology are the dominant structural drivers of whether a household-day is classified as high-consumption. Weather effects are present but secondary. The model provides a transparent and interpretable baseline for consumption classification and lays the groundwork for comparison with more flexible methods in the following sections.
+### Model Diagnostics
+
+```{r glm-binomial-confmat, fig.height=4}
+conf_df <- data.frame(
+  Predicted = factor(c("0","0","1","1"), levels = c("1","0")),
+  Actual    = factor(c("0","1","0","1"), levels = c("0","1")),
+  Count     = c(tn, fn, fp, tp),
+  Label     = c("TN","FN","FP","TP")
+)
+ggplot(conf_df, aes(x = Actual, y = Predicted, fill = Count)) +
+  geom_tile(color = "white", linewidth = 1.2) +
+  geom_text(aes(label = paste0(Label, "\n", Count)),
+            size = 5, fontface = "bold", color = "white") +
+  scale_fill_gradient(low = "steelblue", high = "tomato") +
+  scale_x_discrete(labels = c("0" = "Low (0)", "1" = "High (1)")) +
+  scale_y_discrete(labels = c("0" = "Low (0)", "1" = "High (1)")) +
+  labs(title    = "GLM Binomial – Confusion Matrix",
+       subtitle = paste0("Accuracy = ", round(accuracy, 3),
+                         "  |  F1 = ", round(f1, 3),
+                         "  |  AUC = ", round(auc_val, 3)),
+       x = "Actual class", y = "Predicted class", fill = "Count") +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "none", panel.grid = element_blank())
+```
+
+The confusion matrix shows the model's classifications on the held-out test set. The model correctly identifies `r round(recall * 100, 1)`% of true high-consumption days (sensitivity) and `r round(specificity * 100, 1)`% of true low-consumption days (specificity). Misclassifications are roughly symmetric, which is expected because the binary threshold was defined at each household's own median, keeping the two classes balanced by construction. The remaining errors occur mainly on days where consumption is only marginally above or below average and therefore genuinely ambiguous.
+
+### Key Findings
+
+- Overall classification accuracy is `r round(accuracy * 100, 1)`% on the held-out test set, with an AUC of `r round(auc_val, 3)`.
+- **Building type** is the dominant predictor: houses have substantially higher odds of high consumption than appartments, driven by larger floor areas and greater heating demand.
+- **Ground-source heat pumps** reduce the odds of high consumption relative to air-source systems, reflecting their higher seasonal efficiency.
+- **Weather effects** (heating degree days, temperature) operate as expected but are secondary to structural household characteristics.
+- The model is well-calibrated: sensitivity and specificity are nearly equal, reflecting the balanced binary outcome defined at each household's own median.
+
+### Conclusion
+
+The GLM Binomial achieves an overall accuracy of `r round(accuracy * 100, 1)`% and an AUC of `r round(auc_val, 3)`. Building type and heat pump technology are the dominant structural drivers of whether a household-day is classified as high-consumption. Weather effects are present but secondary. The model provides a transparent and interpretable baseline for consumption classification and lays the groundwork for comparison with more flexible methods in the following sections.
 
 ---
 
@@ -327,7 +345,11 @@ The ROC curve traces the model's sensitivity against its false positive rate as 
 
 *Lead: Emanuel Lemma*
 
+### Objective
+
 The Linear Model assumes that each predictor affects the response in a straight line. For energy consumption, this is often too rigid. The relationship between outdoor temperature and electricity use may accelerate sharply below a certain cold threshold, and living area may show diminishing returns at very large sizes. A **Generalised Additive Model (GAM)** relaxes this assumption by replacing fixed slopes with flexible smooth functions, while remaining fully interpretable through its component plots. Here we model `log_kWh_total`, the daily total electricity consumption on a log scale, using the same key predictors as the Linear Model. This allows a direct comparison of predictive performance and a visual check on whether non-linearity is actually present in the data.
+
+### Model Setup
 
 ```{r gam-prep}
 df_gam <- heapo |>
@@ -342,36 +364,21 @@ gam_test      <- df_gam[-gam_train_idx, ]
 ```
 
 ```{r gam-fit, cache=TRUE}
-if (!file.exists("../models/gam_model.rds")) {
+if (!file.exists("../models/gam/gam_model.rds")) {
   model_gam <- mgcv::gam(
     log_kWh_total ~ s(heating_degree_days) + s(temp_avg) + s(living_area) +
       building_type + heatpump_type,
     family = gaussian, data = gam_train
   )
-  saveRDS(model_gam, "../models/gam_model.rds")
+  saveRDS(model_gam, "../models/gam/gam_model.rds")
 } else {
-  model_gam <- readRDS("../models/gam_model.rds")
+  model_gam <- readRDS("../models/gam/gam_model.rds")
 }
 ```
 
-### Smooth Term Plots
+The model uses three continuous predictors as smooth terms and two categorical predictors as parametric terms. The smooth terms allow each continuous variable to enter the model with a flexible, data-driven shape. The model is fitted via the `mgcv` package using penalised regression splines with automatic smoothness selection.
 
-```{r gam-smooth-plots, fig.height=4}
-par(mfrow = c(1, 3), mar = c(4, 4, 3, 1))
-plot(model_gam, shade = TRUE, seWithMean = TRUE,
-     ylab = "Effect on log(kWh_total)", residuals = FALSE)
-par(mfrow = c(1, 1))
-```
-
-Each panel shows the estimated smooth function for one continuous predictor. The y-axis is the additive contribution to `log_kWh_total`, where positive values increase predicted consumption and negative values decrease it. The shaded band is the 95% confidence interval. The **effective degrees of freedom (edf)** reported in the summary indicates how curved the smooth is: edf = 1 means a straight line and higher values mean more complex shapes.
-
-The results are revealing:
-
-- **s(heating_degree_days), edf = 1.0:** The smooth collapsed to a perfect straight line. Heating demand has a strictly linear effect on log(kWh), meaning every additional degree-day adds the same proportional increase in consumption. No threshold effects or accelerations are present.
-- **s(temp_avg), edf = 7.0:** Highly non-linear. Temperature has a complex, season-dependent effect on consumption that cannot be captured with a single slope. This likely reflects the interplay between outdoor temperature, heating demand, and household behaviour across seasons.
-- **s(living_area), edf = 9.0:** The most non-linear term in the model. The consumption-area relationship is not monotone, meaning medium-sized homes may behave very differently from small or very large ones. This possibly reflects different heating system configurations or occupancy patterns.
-
-### Coefficient Interpretation
+### Model Results
 
 ```{r gam-coef}
 s_gam   <- summary(model_gam)
@@ -391,7 +398,22 @@ The parametric coefficients are additive shifts on the log scale. Converting wit
 - **Houses vs. appartments:** Houses consume **`r round((exp(coef(model_gam)["building_typehouse"]) - 1) * 100, 1)`% more** electricity per day on average. Given a median daily consumption of around 21 kWh, this corresponds to roughly `r round((exp(coef(model_gam)["building_typehouse"]) - 1) * median(gam_train$log_kWh_total |> exp()), 1)` additional kWh per day. This is a modest but statistically reliable difference that likely reflects greater floor area rather than less efficient behaviour.
 - **Ground-source vs. air-source heat pump:** Households with a ground-source heat pump consume **`r round((1 - exp(coef(model_gam)["heatpump_typeground-source"])) * 100, 1)`% less** electricity per day. Ground-source systems extract heat from the ground at a stable temperature year-round, making them significantly more efficient than air-source systems. Air-source systems struggle in very cold weather and must work harder to maintain indoor temperatures.
 
-### Predicted Consumption Along Key Dimensions
+The smooth terms reveal where non-linearity is present in the continuous predictors:
+
+- **s(heating_degree_days), edf = 1.0:** The smooth collapsed to a perfect straight line. Heating demand has a strictly linear effect on log(kWh), meaning every additional degree-day adds the same proportional increase in consumption. No threshold effects or accelerations are present.
+- **s(temp_avg), edf = 7.0:** Highly non-linear. Temperature has a complex, season-dependent effect on consumption that cannot be captured with a single slope. This likely reflects the interplay between outdoor temperature, heating demand, and household behaviour across seasons.
+- **s(living_area), edf = 9.0:** The most non-linear term in the model. The consumption-area relationship is not monotone, meaning medium-sized homes may behave very differently from small or very large ones. This possibly reflects different heating system configurations or occupancy patterns.
+
+### Visual Evidence
+
+```{r gam-smooth-plots, fig.height=4}
+par(mfrow = c(1, 3), mar = c(4, 4, 3, 1))
+plot(model_gam, shade = TRUE, seWithMean = TRUE,
+     ylab = "Effect on log(kWh_total)", residuals = FALSE)
+par(mfrow = c(1, 1))
+```
+
+Each panel shows the estimated smooth function for one continuous predictor. The y-axis is the additive contribution to `log_kWh_total`, where positive values increase predicted consumption and negative values decrease it. The shaded band is the 95% confidence interval. The **effective degrees of freedom (edf)** indicates how curved the smooth is: edf = 1 means a straight line and higher values mean more complex shapes.
 
 ```{r gam-pred-hdd, fig.height=4}
 hdd_grid <- expand.grid(
@@ -418,7 +440,7 @@ ggplot(hdd_grid, aes(x = heating_degree_days, y = exp(fit),
   theme_minimal()
 ```
 
-This plot isolates the non-linear effect of heating demand on electricity consumption for houses compared to appartments. The x-axis spans the full observed range of heating degree days, from warm summer days near zero to the coldest winter days. The key aspects to examine are whether consumption accelerates sharply at high HDD values, whether the gap between houses and appartments widens in winter, and whether the confidence bands widen at the extremes due to fewer extreme cold days in the training data.
+This plot isolates the effect of heating demand on electricity consumption for houses compared to appartments. The x-axis spans the full observed range of heating degree days, from warm summer days near zero to the coldest winter days. The key aspects to examine are whether consumption accelerates sharply at high HDD values, whether the gap between houses and appartments widens in winter, and whether the confidence bands widen at the extremes due to fewer extreme cold days in the training data.
 
 ```{r gam-pred-temp, fig.height=4}
 temp_grid <- expand.grid(
@@ -478,7 +500,7 @@ ggplot(resid_df, aes(x = fitted, y = residuals)) +
   theme_minimal()
 ```
 
-A well-fitting model shows residuals scattered randomly around zero — the orange smoother (loess) should be approximately flat. A curved smoother would indicate the model still misses a systematic pattern. A funnel shape (residual variance increasing with fitted values) would suggest heteroscedasticity: the model is less precise for high-consumption households, which is common when household-level effects are not explicitly modelled.
+A well-fitting model shows residuals scattered randomly around zero. The orange smoother (loess) should be approximately flat. A curved smoother would indicate the model still misses a systematic pattern. A funnel shape (residual variance increasing with fitted values) would suggest heteroscedasticity: the model is less precise for high-consumption households, which is common when household-level effects are not explicitly modelled.
 
 ```{r gam-performance}
 pred_gam    <- predict(model_gam, newdata = gam_test)
@@ -501,9 +523,20 @@ The most interpretable performance metric here is the **mean absolute error in k
 
 The **R² of `r round(r2_gam * 100, 1)`%** tells the same story from a different angle. The five predictors explain roughly a third of the day-to-day variation in consumption, and the remaining two-thirds is driven by factors not available in this dataset. For a client, this means the model is useful for segmentation and benchmarking such as flagging atypically high-consuming households, but should not be used as a precise daily forecast without household-level data.
 
-A note on why RMSE was not used: RMSE on the log scale (0.87) is mathematically correct but has no intuitive unit that a client can relate to. MAE in kWh is directly actionable, and R² communicates model quality in plain percentage terms.
+A note on why RMSE was not used: RMSE on the log scale is mathematically correct but has no intuitive unit that a client can relate to. MAE in kWh is directly actionable, and R² communicates model quality in plain percentage terms.
 
-**Summary:** The GAM reveals that temperature and living area have genuinely non-linear effects on electricity consumption, which a plain linear model would misrepresent. Heating degree days, however, turn out to be linear, suggesting the LM's treatment of that variable was already adequate. Houses consume `r round((exp(coef(model_gam)["building_typehouse"]) - 1) * 100, 1)`% more than appartments, and ground-source heat pumps consume `r round((1 - exp(coef(model_gam)["heatpump_typeground-source"])) * 100, 1)`% less than air-source systems. With an R² of `r round(r2_gam * 100, 1)`% and a mean prediction error of `r round(mae_kwh, 1)` kWh/day, the model performs moderately well for a purely weather- and building-based specification and will serve as the interpretable benchmark in the model comparison section.
+### Key Findings
+
+- **Temperature** has a highly non-linear effect on consumption (edf = 7.0): the relationship varies substantially across the seasonal range and cannot be captured by a single slope.
+- **Heating degree days** act linearly (edf = 1.0), confirming that the Linear Model's treatment of this variable was already adequate.
+- **Living area** shows the highest non-linearity (edf = 9.0), suggesting that medium-sized homes behave differently from small or large ones, likely due to heating system configuration and occupancy patterns.
+- Houses consume `r round((exp(coef(model_gam)["building_typehouse"]) - 1) * 100, 1)`% more electricity per day than appartments, all else equal.
+- Ground-source heat pumps consume `r round((1 - exp(coef(model_gam)["heatpump_typeground-source"])) * 100, 1)`% less electricity than air-source systems, reflecting their superior year-round efficiency.
+- The model achieves an R² of `r round(r2_gam * 100, 1)`% and a mean prediction error of `r round(mae_kwh, 1)` kWh/day on the held-out test set.
+
+### Conclusion
+
+The GAM reveals that temperature and living area have genuinely non-linear effects on electricity consumption, which a plain linear model would misrepresent. Heating degree days, however, turn out to be linear, suggesting the LM's treatment of that variable was already adequate. Houses consume `r round((exp(coef(model_gam)["building_typehouse"]) - 1) * 100, 1)`% more than appartments, and ground-source heat pumps consume `r round((1 - exp(coef(model_gam)["heatpump_typeground-source"])) * 100, 1)`% less than air-source systems. With an R² of `r round(r2_gam * 100, 1)`% and a mean prediction error of `r round(mae_kwh, 1)` kWh/day, the model performs moderately well for a purely weather- and building-based specification and will serve as the interpretable benchmark in the model comparison section.
 
 ---
 

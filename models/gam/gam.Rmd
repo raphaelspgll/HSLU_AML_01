@@ -1,0 +1,240 @@
+---
+title: "Generalised Additive Model (GAM)"
+subtitle: "HEAPO | Applied Machine Learning and Predictive Modelling 1 – FS 2026"
+author: "Emanuel Lemma"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    number_sections: false
+    theme: flatly
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width  = 8,
+  fig.height = 5
+)
+```
+
+```{r packages, message=FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(mgcv)
+```
+
+```{r load-data, include=FALSE}
+heapo <- readRDS("../../data_processed/heapo/heapo_modelling.rds")
+```
+
+---
+
+# Generalised Additive Model (GAM)
+
+*Lead: Emanuel Lemma*
+
+## Objective
+
+The Linear Model assumes that each predictor affects the response in a straight line. For energy consumption, this is often too rigid. The relationship between outdoor temperature and electricity use may accelerate sharply below a certain cold threshold, and living area may show diminishing returns at very large sizes. A **Generalised Additive Model (GAM)** relaxes this assumption by replacing fixed slopes with flexible smooth functions, while remaining fully interpretable through its component plots. Here we model `log_kWh_total`, the daily total electricity consumption on a log scale, using the same key predictors as the Linear Model. This allows a direct comparison of predictive performance and a visual check on whether non-linearity is actually present in the data.
+
+## Model Setup
+
+```{r gam-prep}
+df_gam <- heapo |>
+  select(log_kWh_total, heating_degree_days, temp_avg, living_area,
+         building_type, heatpump_type) |>
+  drop_na()
+
+set.seed(42)
+gam_train_idx <- sample(nrow(df_gam), 0.8 * nrow(df_gam))
+gam_train     <- df_gam[gam_train_idx, ]
+gam_test      <- df_gam[-gam_train_idx, ]
+```
+
+The dataset is split 80/20 into training and test sets. The GAM uses `log_kWh_total` as the continuous response and applies thin-plate regression splines to the three continuous predictors. Building type and heat pump type enter as parametric (linear) terms because they are categorical.
+
+```{r gam-fit, cache=TRUE}
+if (!file.exists("gam_model.rds")) {
+  model_gam <- mgcv::gam(
+    log_kWh_total ~ s(heating_degree_days) + s(temp_avg) + s(living_area) +
+      building_type + heatpump_type,
+    family = gaussian, data = gam_train
+  )
+  saveRDS(model_gam, "gam_model.rds")
+} else {
+  model_gam <- readRDS("gam_model.rds")
+}
+```
+
+## Model Results
+
+```{r gam-performance}
+pred_gam    <- predict(model_gam, newdata = gam_test)
+actual_log  <- gam_test$log_kWh_total
+actual_kwh  <- exp(actual_log)
+pred_kwh    <- exp(pred_gam)
+
+mae_kwh     <- mean(abs(actual_kwh - pred_kwh))
+median_kwh  <- median(actual_kwh)
+mae_pct     <- mae_kwh / median_kwh * 100
+r2_gam      <- 1 - sum((actual_log - pred_gam)^2) / sum((actual_log - mean(actual_log))^2)
+
+cat(sprintf(
+  "R\u00b2 (test):           %.1f%%\nMAE (kWh/day):      %.1f kWh\nMedian consumption: %.1f kWh/day\nMAE as %% of median: %.1f%%\n",
+  r2_gam * 100, mae_kwh, median_kwh, mae_pct
+))
+```
+
+### Coefficient Interpretation
+
+```{r gam-coef}
+s_gam   <- summary(model_gam)
+coef_p  <- s_gam$p.coef
+se_p    <- s_gam$se
+coef_df_gam <- data.frame(
+  term        = names(coef_p),
+  estimate    = round(coef_p, 4),
+  se          = round(se_p[names(coef_p)], 4),
+  effect_pct  = round((exp(coef_p) - 1) * 100, 1)
+)
+print(coef_df_gam)
+```
+
+The parametric coefficients are additive shifts on the log scale. Converting with `(exp(coef) - 1) x 100` gives the percentage difference in daily kWh relative to the reference category (appartment, air-source heat pump), all else equal:
+
+- **Houses vs. appartments:** Houses consume **`r round((exp(coef(model_gam)["building_typehouse"]) - 1) * 100, 1)`% more** electricity per day on average. Given a median daily consumption of around `r round(median_kwh, 0)` kWh, this corresponds to roughly `r round((exp(coef(model_gam)["building_typehouse"]) - 1) * median_kwh, 1)` additional kWh per day.
+- **Ground-source vs. air-source heat pump:** Households with a ground-source heat pump consume **`r round((1 - exp(coef(model_gam)["heatpump_typeground-source"])) * 100, 1)`% less** electricity per day. Ground-source systems extract heat from the ground at a stable temperature year-round, making them significantly more efficient than air-source systems in very cold weather.
+
+The smooth terms are summarised by their effective degrees of freedom (edf): edf = 1 means a straight line and higher values mean more complex shapes.
+
+- **s(heating_degree_days), edf = 1.0:** The smooth collapsed to a perfect straight line. Heating demand has a strictly linear effect on log(kWh).
+- **s(temp_avg), edf = 7.0:** Highly non-linear. Temperature has a complex, season-dependent effect that cannot be captured with a single slope.
+- **s(living_area), edf = 9.0:** The most non-linear term. The consumption-area relationship is not monotone, possibly reflecting different heating configurations across building sizes.
+
+## Visual Evidence
+
+### Smooth Term Plots
+
+```{r gam-smooth-plots, fig.height=4}
+par(mfrow = c(1, 3), mar = c(4, 4, 3, 1))
+plot(model_gam, shade = TRUE, seWithMean = TRUE,
+     ylab = "Effect on log(kWh_total)", residuals = FALSE)
+par(mfrow = c(1, 1))
+```
+
+Each panel shows the estimated smooth function for one continuous predictor. The y-axis is the additive contribution to `log_kWh_total`. The shaded band is the 95% confidence interval. The edf reported in the title of each panel summarises how non-linear the smooth is.
+
+### Predicted Consumption by Heating Demand
+
+```{r gam-pred-hdd, fig.height=4}
+hdd_grid <- expand.grid(
+  heating_degree_days = seq(min(gam_train$heating_degree_days),
+                            max(gam_train$heating_degree_days), length.out = 200),
+  temp_avg      = median(gam_train$temp_avg),
+  living_area   = median(gam_train$living_area),
+  building_type = levels(gam_train$building_type),
+  heatpump_type = levels(gam_train$heatpump_type)[1]
+)
+hdd_pred       <- predict(model_gam, newdata = hdd_grid, se.fit = TRUE)
+hdd_grid$fit   <- hdd_pred$fit
+hdd_grid$se    <- hdd_pred$se.fit
+
+ggplot(hdd_grid, aes(x = heating_degree_days, y = exp(fit),
+                     color = building_type, fill = building_type)) +
+  geom_ribbon(aes(ymin = exp(fit - 1.96 * se), ymax = exp(fit + 1.96 * se)),
+              alpha = 0.15, color = NA) +
+  geom_line(linewidth = 1) +
+  labs(title    = "GAM – Predicted Daily Consumption by Heating Demand",
+       subtitle = "Temperature and living area held at median; air-source heat pump",
+       x = "Heating Degree Days", y = "Predicted kWh/day",
+       color = "Building type", fill = "Building type") +
+  theme_minimal()
+```
+
+This plot isolates the effect of heating demand on electricity consumption for houses compared to appartments. The key features to examine are whether consumption accelerates at high HDD values, whether the gap between building types widens in winter, and whether confidence bands widen at the extremes due to fewer extreme cold days in the training data.
+
+### Predicted Consumption by Average Temperature
+
+```{r gam-pred-temp, fig.height=4}
+temp_grid <- expand.grid(
+  temp_avg            = seq(min(gam_train$temp_avg),
+                            max(gam_train$temp_avg), length.out = 200),
+  heating_degree_days = median(gam_train$heating_degree_days),
+  living_area         = median(gam_train$living_area),
+  building_type       = levels(gam_train$building_type),
+  heatpump_type       = levels(gam_train$heatpump_type)[1]
+)
+temp_pred       <- predict(model_gam, newdata = temp_grid, se.fit = TRUE)
+temp_grid$fit   <- temp_pred$fit
+temp_grid$se    <- temp_pred$se.fit
+
+ggplot(temp_grid, aes(x = temp_avg, y = exp(fit),
+                      color = building_type, fill = building_type)) +
+  geom_ribbon(aes(ymin = exp(fit - 1.96 * se), ymax = exp(fit + 1.96 * se)),
+              alpha = 0.15, color = NA) +
+  geom_line(linewidth = 1) +
+  labs(title    = "GAM – Predicted Daily Consumption by Average Temperature",
+       subtitle = "Other predictors held at median / reference level",
+       x = "Average Temperature (°C)", y = "Predicted kWh/day",
+       color = "Building type", fill = "Building type") +
+  theme_minimal()
+```
+
+This plot traces predicted consumption across the full temperature range. A monotone decreasing curve confirms that colder days drive higher consumption through heating demand. A U-shape at the warm end would indicate a summer cooling effect. The width of the confidence band reveals where the model is most uncertain.
+
+## Model Diagnostics
+
+### Observed vs. Fitted
+
+```{r gam-obs-vs-fitted, fig.height=4}
+fit_df <- data.frame(
+  observed = gam_train$log_kWh_total,
+  fitted   = fitted(model_gam)
+)
+ggplot(fit_df, aes(x = fitted, y = observed)) +
+  geom_point(alpha = 0.1, size = 0.6, color = "steelblue") +
+  geom_abline(intercept = 0, slope = 1, color = "tomato", linetype = "dashed") +
+  labs(title = "GAM – Observed vs. Fitted",
+       x = "Fitted log(kWh_total)", y = "Observed log(kWh_total)") +
+  theme_minimal()
+```
+
+The dashed line is the ideal 1:1 line. A perfectly calibrated model scatters all points symmetrically along it. Systematic deviations indicate that the model consistently over- or under-estimates in certain consumption ranges.
+
+### Residuals vs. Fitted
+
+```{r gam-residuals, fig.height=4}
+resid_df <- data.frame(
+  fitted    = fitted(model_gam),
+  residuals = residuals(model_gam)
+)
+ggplot(resid_df, aes(x = fitted, y = residuals)) +
+  geom_point(alpha = 0.1, size = 0.6, color = "steelblue") +
+  geom_hline(yintercept = 0, color = "tomato", linetype = "dashed") +
+  geom_smooth(method = "loess", se = FALSE, color = "orange", linewidth = 0.8) +
+  labs(title = "GAM – Residuals vs. Fitted",
+       x = "Fitted log(kWh_total)", y = "Residuals") +
+  theme_minimal()
+```
+
+A well-fitting model shows residuals scattered randomly around zero. The orange smoother (loess) should be approximately flat. A curved smoother indicates a systematic pattern the model still misses. A funnel shape suggests heteroscedasticity, which is common when household-level effects are not explicitly modelled.
+
+## Key Findings
+
+- Temperature has a highly non-linear effect on consumption (edf = 7.0), which a plain LM would misrepresent.
+- Living area is the most non-linear predictor (edf = 9.0), suggesting that mid-sized homes behave differently from very small or very large ones.
+- Heating degree days, by contrast, have a purely linear effect (edf = 1.0).
+- Houses consume `r round((exp(coef(model_gam)["building_typehouse"]) - 1) * 100, 1)`% more electricity per day than appartments, all else equal.
+- Ground-source heat pumps consume `r round((1 - exp(coef(model_gam)["heatpump_typeground-source"])) * 100, 1)`% less electricity per day than air-source systems.
+- R² on the test set: `r round(r2_gam * 100, 1)`%. MAE: `r round(mae_kwh, 1)` kWh/day against a median of `r round(median_kwh, 1)` kWh/day.
+
+## Conclusion
+
+The GAM reveals genuine non-linearities in the temperature and living area effects that a plain Linear Model would miss. Heating degree days, however, turn out to be linear, suggesting the LM handles that variable adequately. With an R² of `r round(r2_gam * 100, 1)`% and a mean prediction error of `r round(mae_kwh, 1)` kWh/day, the model explains roughly a third of daily consumption variability using only weather and building characteristics. The remaining two-thirds is driven by household-specific behaviour that this dataset does not capture. The model is well suited for client-facing segmentation and benchmarking tasks, but should not be used as a precise daily forecast without additional household-level inputs.
