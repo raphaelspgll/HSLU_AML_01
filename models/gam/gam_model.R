@@ -37,7 +37,7 @@ model_gam <- gam(
   data   = gam_train
 )
 
-saveRDS(model_gam, "models/gam_model.rds")
+saveRDS(model_gam, "models/gam/gam_model.rds")
 
 # ------------------------------------------------------------
 # 3. Model summary

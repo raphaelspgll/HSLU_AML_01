@@ -194,11 +194,11 @@ test_df   <- df_glm[-train_idx, ]
 ```
 
 ```{r glm-binomial-fit, cache=TRUE}
-if (!file.exists("../models/glm_binomial.rds")) {
+if (!file.exists("../models/glm_binomial/glm_binomial.rds")) {
   model_glm <- glm(high_consumption ~ ., data = train_df, family = binomial)
-  saveRDS(model_glm, "../models/glm_binomial.rds")
+  saveRDS(model_glm, "../models/glm_binomial/glm_binomial.rds")
 } else {
-  model_glm <- readRDS("../models/glm_binomial.rds")
+  model_glm <- readRDS("../models/glm_binomial/glm_binomial.rds")
 }
 ```
 
@@ -342,15 +342,15 @@ gam_test      <- df_gam[-gam_train_idx, ]
 ```
 
 ```{r gam-fit, cache=TRUE}
-if (!file.exists("../models/gam_model.rds")) {
+if (!file.exists("../models/gam/gam_model.rds")) {
   model_gam <- mgcv::gam(
     log_kWh_total ~ s(heating_degree_days) + s(temp_avg) + s(living_area) +
       building_type + heatpump_type,
     family = gaussian, data = gam_train
   )
-  saveRDS(model_gam, "../models/gam_model.rds")
+  saveRDS(model_gam, "../models/gam/gam_model.rds")
 } else {
-  model_gam <- readRDS("../models/gam_model.rds")
+  model_gam <- readRDS("../models/gam/gam_model.rds")
 }
 ```
 
