@@ -31,3 +31,7 @@ R/*.html
 # knitr cache and figure directories
 R/*_cache/
 R/*_files/
+
+# report knitr cache and figure directories
+report/*_cache/
+report/*_files/
