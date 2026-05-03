@@ -34,10 +34,13 @@ library(lubridate)
 library(knitr)
 library(kableExtra)
 library(scales)
+library(broom)      # tidy model output
+library(car)        # VIF
 library(mgcv)       # GAM
 library(nnet)       # Neural Network
 library(e1071)      # SVM
 library(caret)      # Cross-validation
+library(kernlab)    # SVM kernels
 ```
 
 ```{r load-data, include=FALSE}
@@ -149,31 +152,196 @@ The three plots together motivate the modelling strategy: log-transforming the r
 
 *Lead: Tharrmeehan Krishnathasan*
 
-<!-- Fit LM only to a continuous response variable.
-     If the response is an "amount" (positive-only), use log(response).
-     Make the model complex for fair comparison: include interactions and/or non-linearities. -->
+```{r import-lm, echo=FALSE, message=FALSE, warning=FALSE}
+heapo_lm <- readRDS("../models/linear_model/heapo_lm.rds")
 
-```{r lm-fit, cache=TRUE}
-# Simple interpretable LM
-# lm_simple <- lm(log(response) ~ predictor1 + predictor2 + ..., data = heapo)
-# saveRDS(lm_simple, "../models/lm_simple.rds")
-# lm_simple <- readRDS("../models/lm_simple.rds")
-
-# Complex LM for fair comparison (interactions, polynomial terms)
-# lm_complex <- lm(log(response) ~ predictor1 * predictor2 + poly(predictor3, 2) + ..., data = heapo)
-# saveRDS(lm_complex, "../models/lm_complex.rds")
-# lm_complex <- readRDS("../models/lm_complex.rds")
+heapo_mlm_simple <- lm(
+  log_kWh_total ~ heating_degree_days +
+    sunshine_hours +
+    humidity_avg +
+    living_area +
+    n_residents +
+    building_type +
+    heatpump_type,
+  data = heapo
+)
 ```
 
-```{r lm-summary}
-# summary(lm_simple)
+### Objective
+
+The aim of this analysis is to model daily household energy consumption ($\text{log\_kWh\_total}$), the natural logarithm of total daily kilowatt-hour usage. Log-transforming energy consumption is standard practice: it is strictly positive, right-skewed on the original scale, and approximately normal after transformation, making linear regression appropriate.
+
+Predictors include weather conditions (heating degree days, sunshine hours, humidity), building characteristics (building type, living area, heat pump type), and household composition (number of residents). By including interaction terms, the model also captures how the sensitivity to cold weather differs across building and heat pump types.
+
+### Model Setup
+
+Two models are estimated:
+
+**Simple MLR** — all seven predictors with main effects only. This serves as an interpretable baseline capturing the additive relationships between predictors and log energy consumption:
+
+$$
+\log(\text{kWh}_i) = \beta_0 + \beta_1\,\text{HDD}_i + \beta_2\,\text{Sunshine}_i + \cdots + \beta_7\,\text{HeatpumpType}_i + \varepsilon_i
+$$
+
+**Extended MLR** — adds two domain-motivated interaction terms:
+
+- $\text{heating\_degree\_days} \times \text{heatpump\_type}$: different heat pump technologies have different efficiencies in cold conditions, so the effect of cold on consumption should vary by pump type.
+- $\text{heating\_degree\_days} \times \text{building\_type}$: well-insulated houses are less sensitive to outdoor temperature than poorly-insulated ones.
+
+All coefficients are on the log scale: a coefficient of 0.05 means a 5% multiplicative change in kWh for a one-unit increase in the predictor.
+
+Note that the panel structure of the data (multiple daily observations per household) means the i.i.d. assumption of standard OLS is not fully met — standard errors may be slightly understated due to within-household correlation.
+
+### Model Results
+
+```{r lm-coef-table, echo=FALSE}
+tidy(heapo_lm) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    estimate  = round(estimate, 4),
+    std.error = round(std.error, 4),
+    statistic = round(statistic, 2),
+    p.value   = signif(p.value, 3)
+  ) %>%
+  knitr::kable(
+    col.names = c("Predictor", "Estimate", "Std. Error", "t value", "p value"),
+    caption   = "Extended MLR: coefficient estimates"
+  )
 ```
 
-### Coefficient Interpretation
+All predictors are statistically significant at the 0.001 level, with the exception of `humidity_avg` (p = 0.165), which does not contribute meaningfully once the other variables are included. Key effects on log energy consumption, holding all other variables constant:
 
-<!-- Interpret the coefficients in plain language.
-     Example: "A one-unit increase in X is associated with a Y% change in response,
-     holding all other variables constant." -->
+**Heating degree days** (β = 0.021, p < 0.001): Each additional HDD increases log consumption by ~2.1% for air-source pump households in flats — the baseline group. This is the reference effect before interaction adjustments.
+
+**Sunshine hours** (β = −0.015, p < 0.001): An additional sunshine hour reduces consumption by ~1.5%, reflecting lower heating demand on brighter days.
+
+**Number of residents** (β = 0.134, p < 0.001): Each additional resident increases consumption by ~14.3% ($e^{0.134} - 1$), the second strongest effect after the temperature-building interaction.
+
+**Building type — house** (β = 0.220, p < 0.001): Houses consume ~24.6% more than flats at the baseline temperature, even before accounting for their greater sensitivity to cold (see interaction below).
+
+**Heat pump type — ground-source** (β = −0.143, p < 0.001): Ground-source pump households consume ~13.3% less than air-source households at the baseline temperature.
+
+**Interaction: HDD × house** (β = 0.039, p < 0.001): Houses are substantially *more* sensitive to cold than flats — each additional HDD increases log consumption by an additional 3.9% for house households. This is the largest interaction effect and confirms that houses are less thermally efficient.
+
+**Interaction: HDD × ground-source** (β = −0.003, p < 0.001): Ground-source pump households are slightly *less* sensitive to cold than air-source households, consistent with the higher efficiency of ground-source systems at low outdoor temperatures.
+
+### Visual Evidence
+
+The coefficient plot below summarises the direction and significance of all predictors in the extended model. Coefficients whose 95% confidence intervals do not cross zero are statistically distinguishable from no effect.
+
+```{r lm-coef-plot, echo=FALSE, fig.width=7, fig.height=7, out.width="90%", fig.align="center"}
+cis <- confint(heapo_lm)
+
+coef_df <- tibble(
+  term     = names(coef(heapo_lm)),
+  estimate = coef(heapo_lm),
+  lower    = cis[, 1],
+  upper    = cis[, 2]
+) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(significant = !(lower < 0 & upper > 0))
+
+ggplot(coef_df, aes(x = estimate, y = reorder(term, estimate), color = significant)) +
+  geom_point(size = 2.5) +
+  geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.3) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
+  scale_color_manual(
+    values = c("FALSE" = "grey60", "TRUE" = "steelblue"),
+    labels = c("n.s.", "p < 0.05")
+  ) +
+  theme_minimal(base_size = 13) +
+  labs(
+    title    = "Extended MLR: Coefficient Estimates with 95% CIs",
+    subtitle = "Coefficients on log scale — positive = higher consumption",
+    x        = "Coefficient estimate",
+    y        = NULL,
+    color    = NULL
+  )
+```
+
+The scatterplot of observed versus fitted values on the log scale illustrates the model's predictive fit. Points near the diagonal indicate accurate predictions; systematic deviations would suggest model misspecification.
+
+```{r lm-obs-vs-fit, echo=FALSE, fig.height=5}
+fit_df <- tibble(
+  fitted   = fitted(heapo_lm),
+  observed = heapo$log_kWh_total[as.integer(names(fitted(heapo_lm)))]
+)
+
+ggplot(fit_df, aes(x = fitted, y = observed)) +
+  geom_point(alpha = 0.15, size = 0.8) +
+  geom_abline(slope = 1, intercept = 0, color = "steelblue", linetype = "dashed") +
+  theme_minimal(base_size = 13) +
+  labs(
+    title = "Observed vs. Fitted (log kWh)",
+    x     = "Fitted values",
+    y     = "Observed values"
+  )
+```
+
+### Model Diagnostics
+
+```{r lm-diagnostics, echo=FALSE, fig.height=8}
+par(mfrow = c(2, 2))
+plot(heapo_lm)
+par(mfrow = c(1, 1))
+```
+
+- **Residuals vs Fitted:** Checks linearity. A horizontal band with no systematic pattern is ideal.
+- **Q-Q Plot:** Checks normality of residuals. Points near the diagonal indicate normality; heavy tails would signal departure.
+- **Scale-Location:** Checks homoscedasticity (constant variance). A flat, evenly spread line is ideal.
+- **Residuals vs Leverage:** Identifies high-leverage observations that disproportionately influence the fit.
+
+```{r lm-vif, echo=FALSE}
+vif_vals <- vif(heapo_lm)
+data.frame(
+  Predictor = names(vif_vals),
+  VIF       = round(as.numeric(vif_vals), 2)
+) %>%
+  knitr::kable(caption = "Variance Inflation Factors (VIF) — extended model")
+```
+
+Most predictors have VIF below 3, indicating no problematic multicollinearity. The exception is `heating_degree_days` (VIF = 61.55) and its interaction with `building_typehouse` (VIF = 61.44). These elevated values arise directly from the interaction term — both terms share the same underlying variable — and are therefore expected and do not invalidate the model or inflate coefficient uncertainty in practice.
+
+```{r lm-model-comparison, echo=FALSE}
+rmse <- function(model) sqrt(mean(residuals(model)^2))
+
+tibble(
+  Model     = c("Simple MLR (main effects)", "Extended MLR (+ interactions)"),
+  `Adj. R²` = c(
+    round(summary(heapo_mlm_simple)$adj.r.squared, 4),
+    round(summary(heapo_lm)$adj.r.squared, 4)
+  ),
+  RMSE = c(
+    round(rmse(heapo_mlm_simple), 4),
+    round(rmse(heapo_lm), 4)
+  )
+) %>%
+  knitr::kable(caption = "LM model comparison")
+```
+
+The simple model achieves an adjusted R² of 0.2727 (RMSE = 0.8794). Adding the two interaction terms improves this to 0.2743 (RMSE = 0.8785) — a real but modest gain. This confirms the interaction terms are meaningful while also highlighting that the overall explanatory power of a linear model is limited on this dataset.
+
+### Key Findings
+
+**Heating degree days is the dominant weather driver:** Cold weather is the primary positive predictor of energy consumption, with an effect that is further amplified in houses (interaction β = 0.039, p < 0.001) — confirming that houses are thermally less efficient than flats.
+
+**Household size has the strongest marginal effect:** With β = 0.134, each additional resident increases daily consumption by ~14.3%, making it the largest single-predictor effect in the model after the building type interaction.
+
+**Houses consume substantially more, especially in winter:** Both the baseline offset (β = 0.220, house vs. flat) and the temperature interaction (β = 0.039) point in the same direction — houses face higher base consumption and are more sensitive to cold.
+
+**Ground-source heat pumps are more efficient and more stable:** They consume ~13.3% less at baseline and respond less to temperature swings (interaction β = −0.003), consistent with the known efficiency advantage of ground-source systems.
+
+**Humidity is not a useful predictor:** After controlling for other variables, `humidity_avg` is not statistically significant (p = 0.165) and contributes negligible explanatory power.
+
+**Overall explanatory power is limited:** The extended model explains only ~27.4% of the variance in log daily consumption (adj. R² = 0.2743, RMSE = 0.879 on log scale). On the original kWh scale this corresponds to a residual standard error of approximately $e^{0.879} \approx 2.4\times$, meaning predictions can be off by more than a factor of two.
+
+### Conclusion
+
+The linear model successfully identifies the key structural and weather-related drivers of daily household energy consumption and provides clear, interpretable coefficient estimates. All predictors except humidity are statistically significant, and the interaction terms meaningfully capture the heterogeneous effect of cold weather across building and pump types.
+
+However, the model is of **limited usefulness for prediction**. An adjusted R² of 0.27 means the model leaves ~73% of the variance in daily consumption unexplained. At the household-day level, predictions are too imprecise to serve as a reliable forecasting tool. The likely cause is the strong household-level heterogeneity that a cross-sectional linear model cannot capture — different households have very different baseline consumption levels regardless of the measured predictors.
+
+The model is better suited for **inference and understanding drivers** than for prediction. It provides a statistically well-grounded description of which factors are associated with higher consumption and by how much, which is valuable for policy and planning contexts. For operational forecasting, more flexible models with household-level effects (e.g., mixed models, GAMs, or tree-based methods) would be needed.
 
 ---
 
@@ -595,21 +763,203 @@ The GAM reveals that temperature and living area have genuinely non-linear effec
 ---
 
 ## Support Vector Machine (SVM) {#svm}
-*Lead: Tharrmeehan Krishnathasan*
-<!-- SVM can be fitted to continuous, count, or binary responses.
-     Use the same response variable as NN or a GLM for fair comparison. -->
 
-```{r svm-fit, cache=TRUE}
-# svm_model <- svm(response ~ predictor1 + predictor2 + ...,
-#                  data = heapo, kernel = "radial", cost = 1, gamma = 0.1)
-# saveRDS(svm_model, "../models/svm_model.rds")
-#svm_model <- readRDS("../models/svm_model.rds")
+*Lead: Tharrmeehan Krishnathasan*
+
+```{r import-svm, echo=FALSE, message=FALSE, warning=FALSE}
+svm_caret <- readRDS("../models/svm/heapo_svm.rds")
+
+q75 <- quantile(heapo$log_kWh_total, 0.75)
+
+heapo_svm_data <- heapo %>%
+  mutate(
+    high_consumption = as.factor(
+      ifelse(log_kWh_total >= q75, "high", "normal")
+    )
+  ) %>%
+  select(
+    high_consumption,
+    heating_degree_days,
+    sunshine_hours,
+    humidity_avg,
+    living_area,
+    n_residents,
+    building_type,
+    heatpump_type
+  ) %>%
+  na.omit()
+
+set.seed(42)
+train_idx  <- createDataPartition(heapo_svm_data$high_consumption, p = 0.8, list = FALSE)
+train_data <- heapo_svm_data[train_idx, ]
+test_data  <- heapo_svm_data[-train_idx, ]
+test_x     <- test_data %>% select(-high_consumption)
+test_y     <- test_data$high_consumption
+
+pred_best <- predict(svm_caret, test_x)
+cm_best   <- confusionMatrix(pred_best, test_y, positive = "high")
+
+set.seed(42)
+svm_baseline  <- svm(
+  high_consumption ~ .,
+  data   = train_data,
+  kernel = "radial",
+  cost   = 1,
+  scale  = TRUE
+)
+pred_baseline <- predict(svm_baseline, test_x)
+cm_baseline   <- confusionMatrix(pred_baseline, test_y, positive = "high")
+
+best_C     <- svm_caret$bestTune$C
+best_sigma <- round(svm_caret$bestTune$sigma, 4)
 ```
 
-### Coefficient Interpretation
+### Objective
 
-<!-- SVMs are also black-box. Comment on support vectors, kernel choice, and
-     what the model implies about the decision boundary / prediction surface. -->
+The aim of this analysis is to classify each day as a *high-consumption day* (top 25% of daily kWh usage) or a *normal day* — a binary classification problem. This framing is practically useful: identifying high-load days in advance allows grid operators and energy providers to plan capacity and issue consumption alerts.
+
+A Support Vector Machine (SVM) is employed because it can capture complex, non-linear decision boundaries via kernel functions, without requiring distributional assumptions on the predictors. Model performance is evaluated on a held-out test set using accuracy, sensitivity, specificity, and F1 score.
+
+### Data Preparation
+
+The response variable, `high_consumption`, is derived from `log_kWh_total` using the 75th percentile as a threshold. Days above this threshold are labelled *high*; all others are *normal*. The threshold corresponds to 3.541 on the log scale (approximately 34.5 kWh per day). This data-driven cutoff identifies the 25% of days with the highest energy demand, which are disproportionately responsible for grid stress events.
+
+After removing missing values, the dataset contains 93,686 observations: 23,440 high-consumption days (25.0%) and 70,246 normal days (75.0%). The original `log_kWh_total` is excluded from the predictors to prevent data leakage — the SVM must identify high-load days from weather conditions and household characteristics alone.
+
+The data are split into training (74,949 rows) and test (18,737 rows) sets using stratified 80/20 sampling, preserving the 25/75 class ratio in both subsets. All numeric predictors are standardised before training, as SVMs are sensitive to feature scale.
+
+```{r svm-class-balance, echo=FALSE}
+prop.table(table(train_data$high_consumption)) %>%
+  as.data.frame() %>%
+  rename(Class = Var1, Proportion = Freq) %>%
+  mutate(Proportion = round(Proportion, 3)) %>%
+  knitr::kable(caption = "Class balance in the training set")
+```
+
+### Model Setup
+
+Two SVM models are estimated using a radial basis function (RBF) kernel. The RBF kernel maps data into a high-dimensional space, enabling non-linear decision boundaries — well-suited to energy consumption patterns that interact across weather and household variables.
+
+**Baseline SVM:** Cost = 1, gamma = default (1 / number of features). This serves as a reference point for the tuned model.
+
+**Tuned SVM:** 5-fold cross-validation is used to search over a grid of `C` ∈ {1, 10, 100} and `sigma` ∈ {0.01, 0.1, 1/7}. `C` controls the penalty for misclassification (higher = tighter fit); `sigma` is the inverse bandwidth of the RBF kernel (higher = more local boundaries). Cross-validation is parallelised across cores via `doParallel`. The best parameter combination maximises cross-validation accuracy on the training set.
+
+The tuned model uses the following best parameters: C = 100, sigma = 0.1429 (equal to 1/7, the default gamma in `e1071`). These were selected from a 3×3 grid and achieved the highest cross-validation accuracy of 0.8304 (Kappa = 0.4859).
+
+### Model Results
+
+```{r svm-eval-table, echo=FALSE}
+extract_metrics <- function(cm, model_name) {
+  tibble(
+    Model       = model_name,
+    Accuracy    = round(cm$overall["Accuracy"], 4),
+    Sensitivity = round(cm$byClass["Sensitivity"], 4),
+    Specificity = round(cm$byClass["Specificity"], 4),
+    `F1 Score`  = round(cm$byClass["F1"], 4)
+  )
+}
+
+bind_rows(
+  extract_metrics(cm_baseline, "Baseline SVM (C=1, default sigma)"),
+  extract_metrics(
+    cm_best,
+    paste0("Tuned SVM (C=", best_C, ", sigma=", best_sigma, ")")
+  )
+) %>%
+  knitr::kable(caption = "SVM model comparison on test set")
+```
+
+The tuned SVM (C = 100, sigma = 0.1429) achieves an accuracy of **83.2%** on the test set, compared to 82.2% for the baseline — a modest improvement. However, accuracy alone is misleading here because a naive classifier that always predicts *normal* would achieve 75.0% (the majority class proportion). The true gain over this baseline is therefore only ~8 percentage points.
+
+The more important metrics for this task are:
+
+**Sensitivity: 0.4834** — the model correctly identifies only 48.3% of actual high-consumption days. More than half of all high-load days are missed. This is a significant limitation for an early-warning application where false negatives carry higher operational costs.
+
+**Specificity: 0.9481** — normal days are classified correctly 94.8% of the time. The model is conservative: it flags fewer high-consumption days than actually occur (1,598 predicted high vs. 2,502 actual high in the test set).
+
+**F1 Score: 0.5899** — the harmonic mean of precision and recall for the high class reflects the imbalance between high specificity and low sensitivity.
+
+**Kappa: 0.4905** — a moderate level of agreement beyond chance, improving on the baseline (0.4602) but still below the 0.6 threshold typically considered *substantial* agreement.
+
+The tuned model is selected as the final model based on the highest cross-validation accuracy on the training set.
+
+### Visual Evidence
+
+The confusion matrix heatmap shows the distribution of predictions versus actual labels. Correct predictions lie on the diagonal; off-diagonal cells represent misclassifications. A concentration of observations on the diagonal confirms strong overall performance.
+
+```{r svm-conf-matrix-plot, echo=FALSE, fig.height=4, fig.width=5}
+cm_mat <- as.table(cm_best$table)
+
+cm_df <- as.data.frame(cm_mat) %>%
+  rename(Predicted = Prediction, Actual = Reference)
+
+ggplot(cm_df, aes(x = Actual, y = Predicted, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), size = 5) +
+  scale_fill_gradient(low = "#f0f4f8", high = "steelblue") +
+  theme_minimal(base_size = 13) +
+  labs(
+    title = "Confusion Matrix — Tuned SVM",
+    fill  = "Count"
+  )
+```
+
+The bar chart below compares sensitivity and specificity across the baseline and tuned models, illustrating how cross-validation tuning shifts the trade-off between detecting high-consumption days and avoiding false alarms.
+
+```{r svm-metric-comparison, echo=FALSE, fig.height=4, fig.width=7}
+metrics_df <- bind_rows(
+  extract_metrics(cm_baseline, "Baseline"),
+  extract_metrics(cm_best, "Tuned")
+) %>%
+  select(Model, Sensitivity, Specificity) %>%
+  tidyr::pivot_longer(cols = c(Sensitivity, Specificity), names_to = "Metric", values_to = "Value")
+
+ggplot(metrics_df, aes(x = Metric, y = Value, fill = Model)) +
+  geom_col(position = "dodge") +
+  scale_fill_manual(values = c("Baseline" = "grey70", "Tuned" = "steelblue")) +
+  scale_y_continuous(limits = c(0, 1)) +
+  theme_minimal(base_size = 13) +
+  labs(
+    title = "Sensitivity and Specificity: Baseline vs. Tuned SVM",
+    x     = NULL,
+    y     = "Value",
+    fill  = "Model"
+  )
+```
+
+### Model Diagnostics
+
+SVM diagnostics focus on generalisation performance and the validity of modelling choices rather than distributional assumptions.
+
+**CV tuning results:** Across all 9 combinations, CV accuracy ranged from 0.8071 (C=10, sigma=0.01) to 0.8304 (C=100, sigma=0.1429). The top four combinations all involve sigma ≥ 0.1, suggesting the model benefits from a moderately local kernel. The gain from increasing C from 10 to 100 at sigma=0.1429 is small (0.8268 → 0.8304), indicating diminishing returns from further penalising misclassification.
+
+**Class separability:** Sensitivity of 48.3% reveals that the available predictors (weather conditions and household characteristics) do not reliably separate the two classes. Many high-consumption days fall in the same feature space as normal days, creating an irreducible overlap that no kernel or parameter choice can overcome.
+
+**Tuning stability:** The best parameter combination (C=100, sigma=0.1429) sits at the top-right corner of the grid, raising the question of whether a larger C or sigma would further improve results. However, given the flattening improvement from C=10 to C=100 and the domain knowledge that the classes genuinely overlap, additional tuning is unlikely to produce meaningful sensitivity gains.
+
+**Comparison with baseline:** The tuned model improves accuracy (82.2% → 83.2%) and sensitivity (46.2% → 48.3%) over the default parameterisation. The improvement is real but modest, consistent with the view that the bottleneck is feature informativeness rather than model configuration.
+
+### Key Findings
+
+**The SVM achieves reasonable accuracy but low sensitivity:** At 83.2% accuracy, the model clearly outperforms always predicting the majority class (75.0%). However, sensitivity of 48.3% means it misses more than half of all actual high-consumption days — the most operationally important class.
+
+**High specificity reflects a conservative classifier:** Specificity of 94.8% shows the model rarely raises false alarms on normal days, but this comes at the cost of missing many genuine high-load events.
+
+**Cross-validation tuning yields real but limited improvement:** Moving from default parameters to C=100, sigma=0.1429 improves sensitivity from 46.2% to 48.3% and accuracy from 82.2% to 83.2%. The gain is consistent but small, confirming that further tuning alone cannot resolve the core problem.
+
+**The predictor set is the bottleneck:** Weather conditions and static household characteristics (building type, living area, residents, heat pump type) capture only part of what drives high-consumption days. The strong day-to-day within-household variation that drives a day over the 34.5 kWh threshold is not fully explained by the available features.
+
+**Feature leakage is correctly avoided:** By excluding `log_kWh_total`, all results reflect genuine out-of-sample discriminative ability from operationally observable inputs.
+
+### Conclusion
+
+The SVM demonstrates that weather conditions and household characteristics carry real signal for identifying high-consumption days, achieving ~8 percentage points above the naive majority-class baseline. The model is well-specified and the tuning is sound.
+
+However, the model is of **limited practical usefulness as a standalone early-warning system**. A sensitivity of 48.3% means that in a deployment context, more than half of high-load days would go undetected. For capacity planning or demand-response triggering, this miss rate is likely too high to be operationally reliable.
+
+The root cause is not the model choice — it is the available feature set. High and normal consumption days overlap substantially in the weather-and-household feature space, and no kernel function or regularisation choice can separate what is genuinely overlapping in the data. Meaningful improvement would require richer features: lagged consumption, day-of-week and seasonal indicators, occupancy patterns, or appliance-level data.
+
+If the threshold for flagging is lowered (accepting more false alarms to capture more true positives), the model could play a supporting role in probabilistic forecasting pipelines. But at the default threshold, it should not be used as the sole basis for high-consumption day decisions.
 
 ---
 
