@@ -110,7 +110,7 @@ All predictors are statistically significant at the 0.001 level, with the except
 
 The coefficient plot below summarises the direction and significance of all predictors in the extended model. Coefficients whose 95% confidence intervals do not cross zero are statistically distinguishable from no effect.
 
-```{r lm-coef-plot, echo=FALSE, fig.height=7}
+```{r lm-coef-plot, echo=FALSE, fig.width=7, fig.height=7, out.width="90%", fig.align="center"}
 cis <- confint(heapo_lm)
 
 coef_df <- tibble(
