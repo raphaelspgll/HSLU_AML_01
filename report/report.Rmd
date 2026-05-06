@@ -18,10 +18,10 @@ subtitle: Applied Machine Learning and Predictive Modelling 1 – FS 2026
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
-  echo    = TRUE,
+  echo = TRUE,
   message = FALSE,
   warning = FALSE,
-  fig.width  = 8,
+  fig.width = 8,
   fig.height = 5
 )
 ```
@@ -34,14 +34,14 @@ library(lubridate)
 library(knitr)
 library(kableExtra)
 library(scales)
-library(broom)      # tidy model output
-library(car)        # VIF
-library(mgcv)       # GAM
-library(nnet)       # Neural Network
+library(broom) # tidy model output
+library(car) # VIF
+library(mgcv) # GAM
+library(nnet) # Neural Network
 library(ROCR)
-library(e1071)      # SVM
-library(caret)      # Cross-validation
-library(kernlab)    # SVM kernels
+library(e1071) # SVM
+library(caret) # Cross-validation
+library(kernlab) # SVM kernels
 ```
 
 ```{r load-data, include=FALSE}
@@ -96,8 +96,11 @@ heapo %>%
   ggplot(aes(x = Month, y = kWh_total)) +
   geom_boxplot(fill = "steelblue", alpha = 0.7, outlier.size = 0.2) +
   scale_y_continuous(labels = comma) +
-  labs(title = "Daily Electricity Consumption by Month",
-       x = NULL, y = "kWh per day") +
+  labs(
+    title = "Daily Electricity Consumption by Month",
+    x = NULL,
+    y = "kWh per day"
+  ) +
   theme_minimal()
 ```
 
@@ -114,9 +117,12 @@ heapo %>%
   geom_point(alpha = 0.08, size = 0.5, color = "steelblue") +
   geom_smooth(method = "loess", color = "tomato", se = FALSE, linewidth = 1) +
   scale_y_continuous(labels = comma) +
-  labs(title = "Heating Degree Days vs. Daily Consumption",
-       subtitle = "Random subsample of 15,000 observations",
-       x = "Heating Degree Days (HDD)", y = "kWh per day") +
+  labs(
+    title = "Heating Degree Days vs. Daily Consumption",
+    subtitle = "Random subsample of 15,000 observations",
+    x = "Heating Degree Days (HDD)",
+    y = "kWh per day"
+  ) +
   theme_minimal()
 ```
 
@@ -130,8 +136,11 @@ heapo %>%
   geom_boxplot(alpha = 0.7, outlier.size = 0.2, show.legend = FALSE) +
   scale_y_continuous(labels = comma) +
   scale_fill_manual(values = c("steelblue", "tomato")) +
-  labs(title = "Daily Consumption by Building Type",
-       x = NULL, y = "kWh per day") +
+  labs(
+    title = "Daily Consumption by Building Type",
+    x = NULL,
+    y = "kWh per day"
+  ) +
   theme_minimal()
 ```
 
@@ -199,14 +208,14 @@ Note that the panel structure of the data (multiple daily observations per house
 tidy(heapo_lm) %>%
   filter(term != "(Intercept)") %>%
   mutate(
-    estimate  = round(estimate, 4),
+    estimate = round(estimate, 4),
     std.error = round(std.error, 4),
     statistic = round(statistic, 2),
-    p.value   = signif(p.value, 3)
+    p.value = signif(p.value, 3)
   ) %>%
   knitr::kable(
     col.names = c("Predictor", "Estimate", "Std. Error", "t value", "p value"),
-    caption   = "Extended MLR: coefficient estimates"
+    caption = "Extended MLR: coefficient estimates"
   )
 ```
 
@@ -234,15 +243,18 @@ The coefficient plot below summarises the direction and significance of all pred
 cis <- confint(heapo_lm)
 
 coef_df <- tibble(
-  term     = names(coef(heapo_lm)),
+  term = names(coef(heapo_lm)),
   estimate = coef(heapo_lm),
-  lower    = cis[, 1],
-  upper    = cis[, 2]
+  lower = cis[, 1],
+  upper = cis[, 2]
 ) %>%
   filter(term != "(Intercept)") %>%
   mutate(significant = !(lower < 0 & upper > 0))
 
-ggplot(coef_df, aes(x = estimate, y = reorder(term, estimate), color = significant)) +
+ggplot(
+  coef_df,
+  aes(x = estimate, y = reorder(term, estimate), color = significant)
+) +
   geom_point(size = 2.5) +
   geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.3) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
@@ -252,11 +264,11 @@ ggplot(coef_df, aes(x = estimate, y = reorder(term, estimate), color = significa
   ) +
   theme_minimal(base_size = 13) +
   labs(
-    title    = "Extended MLR: Coefficient Estimates with 95% CIs",
+    title = "Extended MLR: Coefficient Estimates with 95% CIs",
     subtitle = "Coefficients on log scale — positive = higher consumption",
-    x        = "Coefficient estimate",
-    y        = NULL,
-    color    = NULL
+    x = "Coefficient estimate",
+    y = NULL,
+    color = NULL
   )
 ```
 
@@ -264,18 +276,23 @@ The scatterplot of observed versus fitted values on the log scale illustrates th
 
 ```{r lm-obs-vs-fit, echo=FALSE, fig.height=5}
 fit_df <- tibble(
-  fitted   = fitted(heapo_lm),
+  fitted = fitted(heapo_lm),
   observed = heapo$log_kWh_total[as.integer(names(fitted(heapo_lm)))]
 )
 
 ggplot(fit_df, aes(x = fitted, y = observed)) +
   geom_point(alpha = 0.15, size = 0.8) +
-  geom_abline(slope = 1, intercept = 0, color = "steelblue", linetype = "dashed") +
+  geom_abline(
+    slope = 1,
+    intercept = 0,
+    color = "steelblue",
+    linetype = "dashed"
+  ) +
   theme_minimal(base_size = 13) +
   labs(
     title = "Observed vs. Fitted (log kWh)",
-    x     = "Fitted values",
-    y     = "Observed values"
+    x = "Fitted values",
+    y = "Observed values"
   )
 ```
 
@@ -296,7 +313,7 @@ par(mfrow = c(1, 1))
 vif_vals <- vif(heapo_lm)
 data.frame(
   Predictor = names(vif_vals),
-  VIF       = round(as.numeric(vif_vals), 2)
+  VIF = round(as.numeric(vif_vals), 2)
 ) %>%
   knitr::kable(caption = "Variance Inflation Factors (VIF) — extended model")
 ```
@@ -307,7 +324,7 @@ Most predictors have VIF below 3, indicating no problematic multicollinearity. T
 rmse <- function(model) sqrt(mean(residuals(model)^2))
 
 tibble(
-  Model     = c("Simple MLR (main effects)", "Extended MLR (+ interactions)"),
+  Model = c("Simple MLR (main effects)", "Extended MLR (+ interactions)"),
   `Adj. R²` = c(
     round(summary(heapo_mlm_simple)$adj.r.squared, 4),
     round(summary(heapo_lm)$adj.r.squared, 4)
@@ -351,12 +368,12 @@ The model is better suited for **inference and understanding drivers** than for 
 *Lead: Raphaël Spagolla*
 
 ```{r import-poisson, echo=FALSE, cache=TRUE}
-dat_count      <- readRDS("../data_processed/poisson/dat_count.rds")
-mod_pois       <- readRDS("../models/poisson_glm/mod_pois.rds")
+dat_count <- readRDS("../data_processed/poisson/dat_count.rds")
+mod_pois <- readRDS("../models/poisson_glm/mod_pois.rds")
 mod_quasi_pois <- readRDS("../models/poisson_glm/mod_quasi.rds")
-rr_table       <- read.csv("../models/poisson_glm/coeff_rate_ratios.csv")
-dispersion     <- readRDS("../models/poisson_glm/dispersion_val.rds")
-comp           <- read.csv("../models/poisson_glm/quasi_vs_pois_se_pvals.csv")
+rr_table <- read.csv("../models/poisson_glm/coeff_rate_ratios.csv")
+dispersion <- readRDS("../models/poisson_glm/dispersion_val.rds")
+comp <- read.csv("../models/poisson_glm/quasi_vs_pois_se_pvals.csv")
 ```
 
 ### Objective
@@ -415,17 +432,21 @@ The *scatterplot of high-consumption days versus average temperature* reveals a 
 ```{r glm-poisson-plots, echo=FALSE, fig.height=4, fig.show='hold', out.width='50%'}
 ggplot(dat_count, aes(x = building_type, y = n_high_days)) +
   geom_boxplot() +
-  labs(title = "High-consumption days by building type",
-       x = "Building type",
-       y = "Number of high-consumption days") +
+  labs(
+    title = "High-consumption days by building type",
+    x = "Building type",
+    y = "Number of high-consumption days"
+  ) +
   theme_minimal()
 
 ggplot(dat_count, aes(x = temp_avg, y = n_high_days)) +
   geom_point(alpha = 0.3) +
   geom_smooth(method = "loess") +
-  labs(title = "High-consumption days vs temperature",
-       x = "Average temperature",
-       y = "High-consumption days") +
+  labs(
+    title = "High-consumption days vs temperature",
+    x = "Average temperature",
+    y = "High-consumption days"
+  ) +
   theme_minimal()
 ```
 
@@ -435,56 +456,63 @@ The *rate-ratio plot* below summarises all model effects on a log scale. *House 
 coef_summary <- coef(summary(mod_pois))
 
 coef_df <- data.frame(
-  term    = rownames(coef_summary),
+  term = rownames(coef_summary),
   estimate = coef_summary[, "Estimate"],
-  se      = coef_summary[, "Std. Error"],
+  se = coef_summary[, "Std. Error"],
   p_value = coef_summary[, "Pr(>|z|)"]
 )
 
 coef_df <- coef_df[coef_df$term != "(Intercept)", ]
 
-coef_df$rate_ratio  <- exp(coef_df$estimate)
-coef_df$ci_low      <- exp(coef_df$estimate - 1.96 * coef_df$se)
-coef_df$ci_high     <- exp(coef_df$estimate + 1.96 * coef_df$se)
+coef_df$rate_ratio <- exp(coef_df$estimate)
+coef_df$ci_low <- exp(coef_df$estimate - 1.96 * coef_df$se)
+coef_df$ci_high <- exp(coef_df$estimate + 1.96 * coef_df$se)
 coef_df$significant <- coef_df$p_value < 0.05
 
-coef_df$term <- dplyr::recode(coef_df$term,
-  "temp_avg"                   = "Temperature",
-  "living_area"                = "Living area",
-  "building_typehouse"         = "House (vs flat)",
+coef_df$term <- dplyr::recode(
+  coef_df$term,
+  "temp_avg" = "Temperature",
+  "living_area" = "Living area",
+  "building_typehouse" = "House (vs flat)",
   "heatpump_typeground-source" = "Ground-source heat pump",
-  "has_floor_heating1"         = "Floor heating",
-  "n_residents"                = "Number of residents",
-  "share_weekend"              = "Weekend share",
-  "heating_degree_days"        = "Heating degree days"
+  "has_floor_heating1" = "Floor heating",
+  "n_residents" = "Number of residents",
+  "share_weekend" = "Weekend share",
+  "heating_degree_days" = "Heating degree days"
 )
 
-ggplot(coef_df, aes(x = rate_ratio,
-                    y = reorder(term, rate_ratio),
-                    color = significant)) +
+ggplot(
+  coef_df,
+  aes(x = rate_ratio, y = reorder(term, rate_ratio), color = significant)
+) +
   geom_point(size = 2.5) +
   geom_errorbarh(aes(xmin = ci_low, xmax = ci_high), height = 0.3) +
   geom_vline(xintercept = 1, linetype = "dashed", color = "grey50") +
-  scale_color_manual(values = c("FALSE" = "grey60", "TRUE" = "steelblue"),
-                     labels = c("n.s.", "p < 0.05")) +
+  scale_color_manual(
+    values = c("FALSE" = "grey60", "TRUE" = "steelblue"),
+    labels = c("n.s.", "p < 0.05")
+  ) +
   scale_x_log10() +
-  labs(title = "Rate Ratios with 95% Confidence Intervals",
-       x = "Rate Ratio (log scale)",
-       y = NULL,
-       color = NULL) +
+  labs(
+    title = "Rate Ratios with 95% Confidence Intervals",
+    x = "Rate Ratio (log scale)",
+    y = NULL,
+    color = NULL
+  ) +
   theme_minimal(base_size = 13)
 ```
 
 ### Model Diagnostics
 
 ```{r diagnostics, echo=FALSE}
-s_m_p     <- summary(mod_pois)
+s_m_p <- summary(mod_pois)
 disp_pois <- s_m_p$deviance / s_m_p$df.residual
 
 s_m_q <- summary(mod_quasi_pois)
-phi_q <- sum(residuals(mod_quasi_pois, type = "pearson")^2) / df.residual(mod_quasi_pois)
+phi_q <- sum(residuals(mod_quasi_pois, type = "pearson")^2) /
+  df.residual(mod_quasi_pois)
 
-p_pois  <- coef(summary(mod_pois))[, 4]
+p_pois <- coef(summary(mod_pois))[, 4]
 p_quasi <- coef(summary(mod_quasi_pois))[, 4]
 ```
 
@@ -495,7 +523,7 @@ We therefore refit the model using a *quasi-Poisson* family, which retains ident
 The table and plot below show the SE inflation across all predictors. The effect is proportional — predictors with larger SEs to begin with (e.g., *weekend share*, *house vs flat*) show the largest absolute increase, while those with very small SEs (e.g., *living area*, *number of residents*) are inflated by a smaller absolute amount but the same factor $\sqrt{\hat{\phi}}$.
 
 ```{r quasi-se-plot, echo=FALSE, fig.height=4}
-pois_tidy  <- tidy(mod_pois)       %>% select(term, estimate, std.error, p.value)
+pois_tidy <- tidy(mod_pois) %>% select(term, estimate, std.error, p.value)
 quasi_tidy <- tidy(mod_quasi_pois) %>% select(term, std.error, p.value)
 
 comp_table <- pois_tidy %>%
@@ -508,17 +536,18 @@ comp_table <- pois_tidy %>%
     by = "term"
   ) %>%
   mutate(
-    term = dplyr::recode(term,
-      "temp_avg"                   = "Temperature",
-      "living_area"                = "Living area",
-      "building_typehouse"         = "House (vs flat)",
+    term = dplyr::recode(
+      term,
+      "temp_avg" = "Temperature",
+      "living_area" = "Living area",
+      "building_typehouse" = "House (vs flat)",
       "heatpump_typeground-source" = "Ground-source heat pump",
-      "has_floor_heating1"         = "Floor heating",
-      "n_residents"                = "Number of residents",
-      "share_weekend"              = "Weekend share",
-      "heating_degree_days"        = "Heating degree days"
+      "has_floor_heating1" = "Floor heating",
+      "n_residents" = "Number of residents",
+      "share_weekend" = "Weekend share",
+      "heating_degree_days" = "Heating degree days"
     ),
-    se_pois  = round(se_pois, 4),
+    se_pois = round(se_pois, 4),
     se_quasi = round(se_quasi, 4)
   )
 
@@ -527,8 +556,8 @@ comp_long <- comp_table %>%
   arrange(se_diff) %>%
   mutate(term = factor(term, levels = term)) %>%
   pivot_longer(
-    cols      = c(se_pois, se_quasi),
-    names_to  = "model",
+    cols = c(se_pois, se_quasi),
+    names_to = "model",
     values_to = "se"
   ) %>%
   mutate(model = ifelse(model == "se_pois", "Poisson", "Quasi-Poisson"))
@@ -536,10 +565,16 @@ comp_long <- comp_table %>%
 ggplot(comp_long, aes(x = se, y = term, colour = model)) +
   geom_line(aes(group = term), colour = "grey70", linewidth = 0.5) +
   geom_point(size = 2.5) +
-  scale_colour_manual(values = c("Poisson" = "steelblue", "Quasi-Poisson" = "tomato")) +
+  scale_colour_manual(
+    values = c("Poisson" = "steelblue", "Quasi-Poisson" = "tomato")
+  ) +
   geom_vline(xintercept = 0, linetype = "dashed", colour = "grey50") +
-  labs(title = "Standard errors: Poisson vs quasi-Poisson",
-       x = "Standard error", y = NULL, colour = "Model") +
+  labs(
+    title = "Standard errors: Poisson vs quasi-Poisson",
+    x = "Standard error",
+    y = NULL,
+    colour = "Model"
+  ) +
   theme_minimal(base_size = 12)
 ```
 
@@ -548,26 +583,33 @@ ggplot(comp_long, aes(x = se, y = term, colour = model)) +
 To assess predictive accuracy, we compare fitted values against observed counts and report the Root Mean Squared Error (RMSE). The observed-vs-fitted plot is rendered as a hexbin to handle overplotting given the large number of observations.
 
 ```{r goodness-of-fit, echo=FALSE, fig.height=4}
-dat_count$fitted_pois  <- fitted(mod_pois)
+dat_count$fitted_pois <- fitted(mod_pois)
 dat_count$fitted_quasi <- fitted(mod_quasi_pois)
 
-rmse_pois  <- sqrt(mean((dat_count$n_high_days - dat_count$fitted_pois)^2))
+rmse_pois <- sqrt(mean((dat_count$n_high_days - dat_count$fitted_pois)^2))
 rmse_quasi <- sqrt(mean((dat_count$n_high_days - dat_count$fitted_quasi)^2))
 
 knitr::kable(
   data.frame(
     Model = c("Poisson", "Quasi-Poisson"),
-    RMSE  = round(c(rmse_pois, rmse_quasi), 3)
+    RMSE = round(c(rmse_pois, rmse_quasi), 3)
   ),
   caption = "Root Mean Squared Error for Poisson and quasi-Poisson models."
 )
 
 ggplot(dat_count, aes(x = fitted_pois, y = n_high_days)) +
   geom_point(alpha = 0.2, size = 0.8) +
-  geom_abline(slope = 1, intercept = 0, colour = "steelblue", linetype = "dashed") +
-  labs(title = "Observed vs fitted values (Poisson GLM)",
-       x = "Fitted values",
-       y = "Observed n_high_days") +
+  geom_abline(
+    slope = 1,
+    intercept = 0,
+    colour = "steelblue",
+    linetype = "dashed"
+  ) +
+  labs(
+    title = "Observed vs fitted values (Poisson GLM)",
+    x = "Fitted values",
+    y = "Observed n_high_days"
+  ) +
   theme_minimal()
 ```
 
@@ -597,18 +639,27 @@ Can we predict whether a given household-day will see above-average electricity 
 set.seed(42)
 
 df_glm <- heapo |>
-  select(high_consumption, heating_degree_days, temp_avg, living_area,
-         building_type, heatpump_type, has_floor_heating,
-         n_residents, is_weekend, month) |>
+  select(
+    high_consumption,
+    heating_degree_days,
+    temp_avg,
+    living_area,
+    building_type,
+    heatpump_type,
+    has_floor_heating,
+    n_residents,
+    is_weekend,
+    month
+  ) |>
   mutate(
     high_consumption = as.integer(high_consumption),
-    month            = as.factor(month)
+    month = as.factor(month)
   ) |>
   drop_na()
 
 train_idx <- sample(nrow(df_glm), 0.8 * nrow(df_glm))
-train_df  <- df_glm[train_idx, ]
-test_df   <- df_glm[-train_idx, ]
+train_df <- df_glm[train_idx, ]
+test_df <- df_glm[-train_idx, ]
 ```
 
 ```{r glm-binomial-fit, cache=TRUE}
@@ -625,28 +676,31 @@ The dataset is restricted to ten predictors covering weather conditions, buildin
 ### Model Results
 
 ```{r glm-binomial-performance}
-pred_prob  <- predict(model_glm, newdata = test_df, type = "response")
+pred_prob <- predict(model_glm, newdata = test_df, type = "response")
 pred_class <- ifelse(pred_prob >= 0.5, 1L, 0L)
-actual     <- test_df$high_consumption
+actual <- test_df$high_consumption
 
-conf_mat  <- table(Predicted = pred_class, Actual = actual)
-accuracy  <- mean(pred_class == actual)
+conf_mat <- table(Predicted = pred_class, Actual = actual)
+accuracy <- mean(pred_class == actual)
 
 compute_auc <- function(actual, prob) {
   ord <- order(prob, decreasing = TRUE)
   act <- actual[ord]
-  n1  <- sum(act == 1); n0 <- sum(act == 0)
+  n1 <- sum(act == 1)
+  n0 <- sum(act == 0)
   tpr <- c(0, cumsum(act == 1) / n1)
   fpr <- c(0, cumsum(act == 0) / n0)
   sum(diff(fpr) * (tpr[-1] + tpr[-length(tpr)]) / 2)
 }
 
-auc_val   <- compute_auc(actual, pred_prob)
-tp <- conf_mat["1","1"]; tn <- conf_mat["0","0"]
-fp <- conf_mat["1","0"]; fn <- conf_mat["0","1"]
+auc_val <- compute_auc(actual, pred_prob)
+tp <- conf_mat["1", "1"]
+tn <- conf_mat["0", "0"]
+fp <- conf_mat["1", "0"]
+fn <- conf_mat["0", "1"]
 precision <- tp / (tp + fp)
-recall    <- tp / (tp + fn)
-f1        <- 2 * precision * recall / (precision + recall)
+recall <- tp / (tp + fn)
+f1 <- 2 * precision * recall / (precision + recall)
 specificity <- tn / (tn + fp)
 ```
 
@@ -665,30 +719,38 @@ Key findings from the coefficient table:
 ```{r glm-binomial-or, fig.height=5}
 coef_summary <- coef(summary(model_glm))
 coef_df <- data.frame(
-  term     = rownames(coef_summary),
+  term = rownames(coef_summary),
   estimate = coef_summary[, "Estimate"],
-  se       = coef_summary[, "Std. Error"],
-  p_value  = coef_summary[, "Pr(>|z|)"]
+  se = coef_summary[, "Std. Error"],
+  p_value = coef_summary[, "Pr(>|z|)"]
 ) |>
   filter(term != "(Intercept)") |>
   mutate(
-    odds_ratio  = exp(estimate),
-    ci_low      = exp(estimate - 1.96 * se),
-    ci_high     = exp(estimate + 1.96 * se),
+    odds_ratio = exp(estimate),
+    ci_low = exp(estimate - 1.96 * se),
+    ci_high = exp(estimate + 1.96 * se),
     significant = p_value < 0.05
   ) |>
   arrange(odds_ratio)
 
-ggplot(coef_df, aes(x = odds_ratio, y = reorder(term, odds_ratio),
-                    color = significant)) +
+ggplot(
+  coef_df,
+  aes(x = odds_ratio, y = reorder(term, odds_ratio), color = significant)
+) +
   geom_point(size = 2.5) +
   geom_errorbarh(aes(xmin = ci_low, xmax = ci_high), height = 0.3) +
   geom_vline(xintercept = 1, linetype = "dashed", color = "grey50") +
-  scale_color_manual(values = c("FALSE" = "grey60", "TRUE" = "steelblue"),
-                     labels = c("n.s.", "p < 0.05")) +
+  scale_color_manual(
+    values = c("FALSE" = "grey60", "TRUE" = "steelblue"),
+    labels = c("n.s.", "p < 0.05")
+  ) +
   scale_x_log10() +
-  labs(title = "GLM Binomial – Odds Ratios (95% CI)",
-       x = "Odds Ratio (log scale)", y = NULL, color = NULL) +
+  labs(
+    title = "GLM Binomial – Odds Ratios (95% CI)",
+    x = "Odds Ratio (log scale)",
+    y = NULL,
+    color = NULL
+  ) +
   theme_minimal()
 ```
 
@@ -698,17 +760,23 @@ Each point shows the estimated odds ratio for one predictor, with 95% confidence
 roc_df <- (function(actual, prob) {
   ord <- order(prob, decreasing = TRUE)
   act <- actual[ord]
-  n1  <- sum(act == 1); n0 <- sum(act == 0)
-  data.frame(fpr = c(0, cumsum(act == 0) / n0),
-             tpr = c(0, cumsum(act == 1) / n1))
+  n1 <- sum(act == 1)
+  n0 <- sum(act == 0)
+  data.frame(
+    fpr = c(0, cumsum(act == 0) / n0),
+    tpr = c(0, cumsum(act == 1) / n1)
+  )
 })(actual, pred_prob)
 
 ggplot(roc_df, aes(x = fpr, y = tpr)) +
   geom_line(color = "steelblue", linewidth = 1) +
   geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey50") +
-  labs(title    = "GLM Binomial – ROC Curve",
-       subtitle = paste0("AUC = ", round(auc_val, 3)),
-       x = "False Positive Rate", y = "True Positive Rate") +
+  labs(
+    title = "GLM Binomial – ROC Curve",
+    subtitle = paste0("AUC = ", round(auc_val, 3)),
+    x = "False Positive Rate",
+    y = "True Positive Rate"
+  ) +
   theme_minimal()
 ```
 
@@ -718,23 +786,36 @@ The ROC curve traces the model's sensitivity against its false positive rate as 
 
 ```{r glm-binomial-confmat, fig.height=4}
 conf_df <- data.frame(
-  Predicted = factor(c("0","0","1","1"), levels = c("1","0")),
-  Actual    = factor(c("0","1","0","1"), levels = c("0","1")),
-  Count     = c(tn, fn, fp, tp),
-  Label     = c("TN","FN","FP","TP")
+  Predicted = factor(c("0", "0", "1", "1"), levels = c("1", "0")),
+  Actual = factor(c("0", "1", "0", "1"), levels = c("0", "1")),
+  Count = c(tn, fn, fp, tp),
+  Label = c("TN", "FN", "FP", "TP")
 )
 ggplot(conf_df, aes(x = Actual, y = Predicted, fill = Count)) +
   geom_tile(color = "white", linewidth = 1.2) +
-  geom_text(aes(label = paste0(Label, "\n", Count)),
-            size = 5, fontface = "bold", color = "white") +
+  geom_text(
+    aes(label = paste0(Label, "\n", Count)),
+    size = 5,
+    fontface = "bold",
+    color = "white"
+  ) +
   scale_fill_gradient(low = "steelblue", high = "tomato") +
   scale_x_discrete(labels = c("0" = "Low (0)", "1" = "High (1)")) +
   scale_y_discrete(labels = c("0" = "Low (0)", "1" = "High (1)")) +
-  labs(title    = "GLM Binomial – Confusion Matrix",
-       subtitle = paste0("Accuracy = ", round(accuracy, 3),
-                         "  |  F1 = ", round(f1, 3),
-                         "  |  AUC = ", round(auc_val, 3)),
-       x = "Actual class", y = "Predicted class", fill = "Count") +
+  labs(
+    title = "GLM Binomial – Confusion Matrix",
+    subtitle = paste0(
+      "Accuracy = ",
+      round(accuracy, 3),
+      "  |  F1 = ",
+      round(f1, 3),
+      "  |  AUC = ",
+      round(auc_val, 3)
+    ),
+    x = "Actual class",
+    y = "Predicted class",
+    fill = "Count"
+  ) +
   theme_minimal(base_size = 13) +
   theme(legend.position = "none", panel.grid = element_blank())
 ```
@@ -767,22 +848,32 @@ The Linear Model assumes that each predictor affects the response in a straight 
 
 ```{r gam-prep}
 df_gam <- heapo |>
-  select(log_kWh_total, heating_degree_days, temp_avg, living_area,
-         building_type, heatpump_type) |>
+  select(
+    log_kWh_total,
+    heating_degree_days,
+    temp_avg,
+    living_area,
+    building_type,
+    heatpump_type
+  ) |>
   drop_na()
 
 set.seed(42)
 gam_train_idx <- sample(nrow(df_gam), 0.8 * nrow(df_gam))
-gam_train     <- df_gam[gam_train_idx, ]
-gam_test      <- df_gam[-gam_train_idx, ]
+gam_train <- df_gam[gam_train_idx, ]
+gam_test <- df_gam[-gam_train_idx, ]
 ```
 
 ```{r gam-fit, cache=TRUE}
 if (!file.exists("../models/gam/gam_model.rds")) {
   model_gam <- mgcv::gam(
-    log_kWh_total ~ s(heating_degree_days) + s(temp_avg) + s(living_area) +
-      building_type + heatpump_type,
-    family = gaussian, data = gam_train
+    log_kWh_total ~ s(heating_degree_days) +
+      s(temp_avg) +
+      s(living_area) +
+      building_type +
+      heatpump_type,
+    family = gaussian,
+    data = gam_train
   )
   saveRDS(model_gam, "../models/gam/gam_model.rds")
 } else {
@@ -795,14 +886,14 @@ The model uses three continuous predictors as smooth terms and two categorical p
 ### Model Results
 
 ```{r gam-coef}
-s_gam   <- summary(model_gam)
-coef_p  <- s_gam$p.coef
-se_p    <- s_gam$se
+s_gam <- summary(model_gam)
+coef_p <- s_gam$p.coef
+se_p <- s_gam$se
 coef_df_gam <- data.frame(
-  term        = names(coef_p),
-  estimate    = round(coef_p, 4),
-  se          = round(se_p[names(coef_p)], 4),
-  effect_pct  = round((exp(coef_p) - 1) * 100, 1)
+  term = names(coef_p),
+  estimate = round(coef_p, 4),
+  se = round(se_p[names(coef_p)], 4),
+  effect_pct = round((exp(coef_p) - 1) * 100, 1)
 )
 print(coef_df_gam)
 ```
@@ -822,8 +913,13 @@ The smooth terms reveal where non-linearity is present in the continuous predict
 
 ```{r gam-smooth-plots, fig.height=4}
 par(mfrow = c(1, 3), mar = c(4, 4, 3, 1))
-plot(model_gam, shade = TRUE, seWithMean = TRUE,
-     ylab = "Effect on log(kWh_total)", residuals = FALSE)
+plot(
+  model_gam,
+  shade = TRUE,
+  seWithMean = TRUE,
+  ylab = "Effect on log(kWh_total)",
+  residuals = FALSE
+)
 par(mfrow = c(1, 1))
 ```
 
@@ -831,26 +927,43 @@ Each panel shows the estimated smooth function for one continuous predictor. The
 
 ```{r gam-pred-hdd, fig.height=4}
 hdd_grid <- expand.grid(
-  heating_degree_days = seq(min(gam_train$heating_degree_days),
-                            max(gam_train$heating_degree_days), length.out = 200),
-  temp_avg      = median(gam_train$temp_avg),
-  living_area   = median(gam_train$living_area),
+  heating_degree_days = seq(
+    min(gam_train$heating_degree_days),
+    max(gam_train$heating_degree_days),
+    length.out = 200
+  ),
+  temp_avg = median(gam_train$temp_avg),
+  living_area = median(gam_train$living_area),
   building_type = levels(gam_train$building_type),
   heatpump_type = levels(gam_train$heatpump_type)[1]
 )
-hdd_pred       <- predict(model_gam, newdata = hdd_grid, se.fit = TRUE)
-hdd_grid$fit   <- hdd_pred$fit
-hdd_grid$se    <- hdd_pred$se.fit
+hdd_pred <- predict(model_gam, newdata = hdd_grid, se.fit = TRUE)
+hdd_grid$fit <- hdd_pred$fit
+hdd_grid$se <- hdd_pred$se.fit
 
-ggplot(hdd_grid, aes(x = heating_degree_days, y = exp(fit),
-                     color = building_type, fill = building_type)) +
-  geom_ribbon(aes(ymin = exp(fit - 1.96 * se), ymax = exp(fit + 1.96 * se)),
-              alpha = 0.15, color = NA) +
+ggplot(
+  hdd_grid,
+  aes(
+    x = heating_degree_days,
+    y = exp(fit),
+    color = building_type,
+    fill = building_type
+  )
+) +
+  geom_ribbon(
+    aes(ymin = exp(fit - 1.96 * se), ymax = exp(fit + 1.96 * se)),
+    alpha = 0.15,
+    color = NA
+  ) +
   geom_line(linewidth = 1) +
-  labs(title    = "GAM – Predicted Daily Consumption by Heating Demand",
-       subtitle = "Temperature and living area held at median; air-source heat pump",
-       x = "Heating Degree Days", y = "Predicted kWh/day",
-       color = "Building type", fill = "Building type") +
+  labs(
+    title = "GAM – Predicted Daily Consumption by Heating Demand",
+    subtitle = "Temperature and living area held at median; air-source heat pump",
+    x = "Heating Degree Days",
+    y = "Predicted kWh/day",
+    color = "Building type",
+    fill = "Building type"
+  ) +
   theme_minimal()
 ```
 
@@ -858,26 +971,38 @@ This plot isolates the effect of heating demand on electricity consumption for h
 
 ```{r gam-pred-temp, fig.height=4}
 temp_grid <- expand.grid(
-  temp_avg            = seq(min(gam_train$temp_avg),
-                            max(gam_train$temp_avg), length.out = 200),
+  temp_avg = seq(
+    min(gam_train$temp_avg),
+    max(gam_train$temp_avg),
+    length.out = 200
+  ),
   heating_degree_days = median(gam_train$heating_degree_days),
-  living_area         = median(gam_train$living_area),
-  building_type       = levels(gam_train$building_type),
-  heatpump_type       = levels(gam_train$heatpump_type)[1]
+  living_area = median(gam_train$living_area),
+  building_type = levels(gam_train$building_type),
+  heatpump_type = levels(gam_train$heatpump_type)[1]
 )
-temp_pred       <- predict(model_gam, newdata = temp_grid, se.fit = TRUE)
-temp_grid$fit   <- temp_pred$fit
-temp_grid$se    <- temp_pred$se.fit
+temp_pred <- predict(model_gam, newdata = temp_grid, se.fit = TRUE)
+temp_grid$fit <- temp_pred$fit
+temp_grid$se <- temp_pred$se.fit
 
-ggplot(temp_grid, aes(x = temp_avg, y = exp(fit),
-                      color = building_type, fill = building_type)) +
-  geom_ribbon(aes(ymin = exp(fit - 1.96 * se), ymax = exp(fit + 1.96 * se)),
-              alpha = 0.15, color = NA) +
+ggplot(
+  temp_grid,
+  aes(x = temp_avg, y = exp(fit), color = building_type, fill = building_type)
+) +
+  geom_ribbon(
+    aes(ymin = exp(fit - 1.96 * se), ymax = exp(fit + 1.96 * se)),
+    alpha = 0.15,
+    color = NA
+  ) +
   geom_line(linewidth = 1) +
-  labs(title    = "GAM – Predicted Daily Consumption by Average Temperature",
-       subtitle = "Other predictors held at median / reference level",
-       x = "Average Temperature (°C)", y = "Predicted kWh/day",
-       color = "Building type", fill = "Building type") +
+  labs(
+    title = "GAM – Predicted Daily Consumption by Average Temperature",
+    subtitle = "Other predictors held at median / reference level",
+    x = "Average Temperature (°C)",
+    y = "Predicted kWh/day",
+    color = "Building type",
+    fill = "Building type"
+  ) +
   theme_minimal()
 ```
 
@@ -888,13 +1013,16 @@ This plot traces predicted consumption across the full temperature range. A mono
 ```{r gam-obs-vs-fitted, fig.height=4}
 fit_df <- data.frame(
   observed = gam_train$log_kWh_total,
-  fitted   = fitted(model_gam)
+  fitted = fitted(model_gam)
 )
 ggplot(fit_df, aes(x = fitted, y = observed)) +
   geom_point(alpha = 0.1, size = 0.6, color = "steelblue") +
   geom_abline(intercept = 0, slope = 1, color = "tomato", linetype = "dashed") +
-  labs(title = "GAM – Observed vs. Fitted",
-       x = "Fitted log(kWh_total)", y = "Observed log(kWh_total)") +
+  labs(
+    title = "GAM – Observed vs. Fitted",
+    x = "Fitted log(kWh_total)",
+    y = "Observed log(kWh_total)"
+  ) +
   theme_minimal()
 ```
 
@@ -902,34 +1030,41 @@ The dashed line is the ideal 1:1 line. A perfectly calibrated model would scatte
 
 ```{r gam-residuals, fig.height=4}
 resid_df <- data.frame(
-  fitted    = fitted(model_gam),
+  fitted = fitted(model_gam),
   residuals = residuals(model_gam)
 )
 ggplot(resid_df, aes(x = fitted, y = residuals)) +
   geom_point(alpha = 0.1, size = 0.6, color = "steelblue") +
   geom_hline(yintercept = 0, color = "tomato", linetype = "dashed") +
   geom_smooth(method = "loess", se = FALSE, color = "orange", linewidth = 0.8) +
-  labs(title = "GAM – Residuals vs. Fitted",
-       x = "Fitted log(kWh_total)", y = "Residuals") +
+  labs(
+    title = "GAM – Residuals vs. Fitted",
+    x = "Fitted log(kWh_total)",
+    y = "Residuals"
+  ) +
   theme_minimal()
 ```
 
 A well-fitting model shows residuals scattered randomly around zero. The orange smoother (loess) should be approximately flat. A curved smoother would indicate the model still misses a systematic pattern. A funnel shape (residual variance increasing with fitted values) would suggest heteroscedasticity: the model is less precise for high-consumption households, which is common when household-level effects are not explicitly modelled.
 
 ```{r gam-performance}
-pred_gam    <- predict(model_gam, newdata = gam_test)
-actual_log  <- gam_test$log_kWh_total
-actual_kwh  <- exp(actual_log)
-pred_kwh    <- exp(pred_gam)
+pred_gam <- predict(model_gam, newdata = gam_test)
+actual_log <- gam_test$log_kWh_total
+actual_kwh <- exp(actual_log)
+pred_kwh <- exp(pred_gam)
 
-mae_kwh     <- mean(abs(actual_kwh - pred_kwh))
-median_kwh  <- median(actual_kwh)
-mae_pct     <- mae_kwh / median_kwh * 100
-r2_gam      <- 1 - sum((actual_log - pred_gam)^2) / sum((actual_log - mean(actual_log))^2)
+mae_kwh <- mean(abs(actual_kwh - pred_kwh))
+median_kwh <- median(actual_kwh)
+mae_pct <- mae_kwh / median_kwh * 100
+r2_gam <- 1 -
+  sum((actual_log - pred_gam)^2) / sum((actual_log - mean(actual_log))^2)
 
 cat(sprintf(
   "R\u00b2 (test):          %.1f%%\nMAE (kWh/day):     %.1f kWh\nMedian consumption: %.1f kWh/day\nMAE as %% of median: %.1f%%\n",
-  r2_gam * 100, mae_kwh, median_kwh, mae_pct
+  r2_gam * 100,
+  mae_kwh,
+  median_kwh,
+  mae_pct
 ))
 ```
 
@@ -958,8 +1093,8 @@ The GAM reveals that temperature and living area have genuinely non-linear effec
 *Lead: Raphaël Spagolla*
 
 ```{r import-NN, echo=FALSE, message=FALSE, warning=FALSE}
-mod_nn      <- readRDS("../models/neural_network/mod_nn_nnet.rds")
-test_nn     <- readRDS("../data_processed/splits/nn/test_nn.rds")
+mod_nn <- readRDS("../models/neural_network/mod_nn_nnet.rds")
+test_nn <- readRDS("../data_processed/splits/nn/test_nn.rds")
 pred_prob_1 <- readRDS("../data_processed/splits/nn/nn_pred_prob.rds")
 ```
 
@@ -999,13 +1134,18 @@ Overall, the chosen specification reflects a trade-off between predictive perfor
 The neural network achieves an accuracy of approximately 0.77, indicating solid predictive performance and a clear improvement over a naive classifier $(\approx 0.50)$ given the balanced dataset. This suggests that the model captures meaningful structure in the data.
 
 ```{r nn-results, echo=FALSE}
-truth      <- test_nn$high_consumption
-pred_class <- factor(ifelse(pred_prob_1 >= 0.5, "1", "0"), levels = levels(truth))
+truth <- test_nn$high_consumption
+pred_class <- factor(
+  ifelse(pred_prob_1 >= 0.5, "1", "0"),
+  levels = levels(truth)
+)
 
-cm  <- table(Predicted = pred_class, Actual = truth)
+cm <- table(Predicted = pred_class, Actual = truth)
 acc <- mean(pred_class == truth)
-tp  <- cm["1", "1"]; tn <- cm["0", "0"]
-fp  <- cm["1", "0"]; fn <- cm["0", "1"]
+tp <- cm["1", "1"]
+tn <- cm["0", "0"]
+fp <- cm["1", "0"]
+fn <- cm["0", "1"]
 sensitivity <- tp / (tp + fn)
 specificity <- tn / (tn + fp)
 
@@ -1015,8 +1155,8 @@ perf_roc <- ROCR::performance(pred_roc, "tpr", "fpr")
 
 knitr::kable(
   data.frame(
-    Model       = "Neural Network",
-    Accuracy    = round(acc, 3),
+    Model = "Neural Network",
+    Accuracy = round(acc, 3),
     Sensitivity = round(sensitivity, 3),
     Specificity = round(specificity, 3)
   ),
@@ -1037,7 +1177,7 @@ The *predicted probability plot* illustrates how the neural network separates th
 
 The *confusion matrix* provides a direct summary of classification performance. Most observations lie on the diagonal, confirming a high number of correct predictions for both classes. Nevertheless, errors occur in both directions, highlighting that class separation is not complete.
 
-```{r nn_plots_side_by_side, echo=False, fig.width=10, fig.height=4}
+```{r nn_plots_side_by_side, echo=FALSE, fig.width=10, fig.height=4}
 # ----------------------------------------
 # Combined plot: Probabilities + Confusion Matrix
 # ----------------------------------------
@@ -1066,7 +1206,9 @@ legend(
 cm_mat <- as.matrix(cm)
 
 image(
-  1:2, 1:2, cm_mat,
+  1:2,
+  1:2,
+  cm_mat,
   axes = FALSE,
   xlab = "Actual",
   ylab = "Predicted",
@@ -1082,12 +1224,12 @@ text(
   labels = cm_mat
 )
 
-par(mfrow = c(1,1))
+par(mfrow = c(1, 1))
 ```
 
 The *ROC curve* further evaluates model performance across all possible classification thresholds. The curve lies clearly above the diagonal reference line, indicating strong discriminative ability and performance well above random classification. The steep initial increase suggests that high true positive rates can be achieved with relatively low false positive rates, while the flattening at higher values reflects diminishing gains.
 
-```{r nn_roc, echo=False, fig.width=6, fig.height=5}
+```{r nn_roc, echo=FALSE, fig.width=6, fig.height=5}
 plot(
   perf_roc,
   lwd = 2,
@@ -1161,27 +1303,24 @@ heapo_svm_data <- heapo %>%
   na.omit()
 
 set.seed(42)
-train_idx  <- createDataPartition(heapo_svm_data$high_consumption, p = 0.8, list = FALSE)
+train_idx <- createDataPartition(
+  heapo_svm_data$high_consumption,
+  p = 0.8,
+  list = FALSE
+)
 train_data <- heapo_svm_data[train_idx, ]
-test_data  <- heapo_svm_data[-train_idx, ]
-test_x     <- test_data %>% select(-high_consumption)
-test_y     <- test_data$high_consumption
+test_data <- heapo_svm_data[-train_idx, ]
+test_x <- test_data %>% select(-high_consumption)
+test_y <- test_data$high_consumption
 
 pred_best <- predict(svm_caret, test_x)
-cm_best   <- confusionMatrix(pred_best, test_y, positive = "high")
+cm_best <- confusionMatrix(pred_best, test_y, positive = "high")
 
-set.seed(42)
-svm_baseline  <- svm(
-  high_consumption ~ .,
-  data   = train_data,
-  kernel = "radial",
-  cost   = 1,
-  scale  = TRUE
-)
+svm_baseline <- readRDS("../models/svm/heapo_svm_baseline.rds")
 pred_baseline <- predict(svm_baseline, test_x)
-cm_baseline   <- confusionMatrix(pred_baseline, test_y, positive = "high")
+cm_baseline <- confusionMatrix(pred_baseline, test_y, positive = "high")
 
-best_C     <- svm_caret$bestTune$C
+best_C <- svm_caret$bestTune$C
 best_sigma <- round(svm_caret$bestTune$sigma, 4)
 ```
 
@@ -1222,11 +1361,11 @@ The tuned model uses the following best parameters: C = 100, sigma = 0.1429 (equ
 ```{r svm-eval-table, echo=FALSE}
 extract_metrics <- function(cm, model_name) {
   tibble(
-    Model       = model_name,
-    Accuracy    = round(cm$overall["Accuracy"], 4),
+    Model = model_name,
+    Accuracy = round(cm$overall["Accuracy"], 4),
     Sensitivity = round(cm$byClass["Sensitivity"], 4),
     Specificity = round(cm$byClass["Specificity"], 4),
-    `F1 Score`  = round(cm$byClass["F1"], 4)
+    `F1 Score` = round(cm$byClass["F1"], 4)
   )
 }
 
@@ -1271,7 +1410,7 @@ ggplot(cm_df, aes(x = Actual, y = Predicted, fill = Freq)) +
   theme_minimal(base_size = 13) +
   labs(
     title = "Confusion Matrix — Tuned SVM",
-    fill  = "Count"
+    fill = "Count"
   )
 ```
 
@@ -1283,7 +1422,11 @@ metrics_df <- bind_rows(
   extract_metrics(cm_best, "Tuned")
 ) %>%
   select(Model, Sensitivity, Specificity) %>%
-  tidyr::pivot_longer(cols = c(Sensitivity, Specificity), names_to = "Metric", values_to = "Value")
+  tidyr::pivot_longer(
+    cols = c(Sensitivity, Specificity),
+    names_to = "Metric",
+    values_to = "Value"
+  )
 
 ggplot(metrics_df, aes(x = Metric, y = Value, fill = Model)) +
   geom_col(position = "dodge") +
@@ -1292,9 +1435,9 @@ ggplot(metrics_df, aes(x = Metric, y = Value, fill = Model)) +
   theme_minimal(base_size = 13) +
   labs(
     title = "Sensitivity and Specificity: Baseline vs. Tuned SVM",
-    x     = NULL,
-    y     = "Value",
-    fill  = "Model"
+    x = NULL,
+    y = "Value",
+    fill = "Model"
   )
 ```
 
