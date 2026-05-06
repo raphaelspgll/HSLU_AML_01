@@ -26,63 +26,16 @@ set.seed(1234)
 ```
 
 
-# Neural Network
+## Neural Network (NN) {#nn}
+*Lead: Raphaël Spagolla*
 
 ```{r import-NN, echo=FALSE, message=FALSE, warning=FALSE}
-library(dplyr)
-library(caret)
-library(nnet)
-library(ROCR)
-
-# Load model
-mod_nn <- readRDS("../models/neural_network/mod_nn_nnet.rds")
-
-# Load and prepare data (same steps as pipeline, but no side effects)
-dat <- readRDS("../data_processed/heapo/heapo_modelling.rds")
-
-dat_nn <- dat %>%
-  select(
-    high_consumption,
-    heating_degree_days, temp_avg,
-    living_area, building_type, heatpump_type,
-    has_floor_heating, n_residents, is_weekend
-  ) %>%
-  mutate(
-    high_consumption  = as.factor(high_consumption),
-    building_type     = as.factor(building_type),
-    heatpump_type     = as.factor(heatpump_type),
-    has_floor_heating = as.factor(has_floor_heating),
-    is_weekend        = as.factor(is_weekend)
-  )
-
-dat_nn$high_consumption <- droplevels(dat_nn$high_consumption)
-
-# Reproducible split (same seed as pipeline)
-set.seed(42)
-idx_train <- createDataPartition(dat_nn$high_consumption, p = 0.8, list = FALSE)
-train <- dat_nn[idx_train, ]
-test  <- dat_nn[-idx_train, ]
-
-# Encode + scale
-y_test      <- test$high_consumption
-x_train_raw <- train %>% select(-high_consumption)
-x_test_raw  <- test  %>% select(-high_consumption)
-
-x_train_mm <- model.matrix(~ ., data = x_train_raw)[, -1]
-x_test_mm  <- model.matrix(~ ., data = x_test_raw)[, -1]
-
-train_means <- apply(x_train_mm, 2, mean)
-train_sds   <- apply(x_train_mm, 2, sd)
-train_sds[train_sds == 0] <- 1
-
-x_test_scaled <- scale(x_test_mm, center = train_means, scale = train_sds)
-test_nn <- as.data.frame(x_test_scaled)
-test_nn$high_consumption <- y_test
-colnames(test_nn) <- make.names(colnames(test_nn))
-test_nn$high_consumption <- as.factor(test_nn$high_consumption)
+mod_nn      <- readRDS("../models/neural_network/mod_nn_nnet.rds")
+test_nn     <- readRDS("../data_processed/splits/nn/test_nn.rds")
+pred_prob_1 <- readRDS("../data_processed/splits/nn/nn_pred_prob.rds")
 ```
 
-## Objective
+### Objective
 
 The aim of this analysis is to predict whether an observation corresponds to a high-consumption event (high_consumption), a binary outcome taking values 0 or 1. This is a classification problem, where the focus is on accurately distinguishing between high- and low-consumption cases.
 
@@ -90,7 +43,7 @@ From a practical perspective, reliable classification of high-consumption events
 
 A neural network is employed to capture potentially complex and non-linear relationships between consumption and predictors, including weather conditions, building characteristics, and household composition. Model performance is evaluated based on predictive accuracy and classification metrics derived from test data.
 
-## Data Preparation
+### Data Preparation
 
 The dataset consists of 99,838 observations and includes variables related to weather conditions, building characteristics, and household composition. The response variable, *high_consumption*, is binary and approximately balanced between the two classes.
 
@@ -98,7 +51,7 @@ To ensure valid model evaluation, the data is split into training (80%) and test
 
 Categorical variables are transformed into dummy variables using one-hot encoding, allowing them to be used as inputs in the neural network. In addition, all predictors are scaled based on the training data. This step is important for neural networks, as it improves numerical stability and facilitates efficient training. The same transformations are then applied to the test set to ensure consistency and prevent data leakage.
 
-## Model setup
+### Model setup
 
 ```{r nn-modell, echo=TRUE}
 cat(deparse(formula(mod_nn)), "\n\n")
@@ -113,69 +66,50 @@ To improve generalisation, weight decay (set to 0.001) is included as a regulari
 
 Overall, the chosen specification reflects a trade-off between predictive performance and model stability, favouring a parsimonious architecture that performs reliably on unseen data.
 
-## Model Results
+### Model Results
 
 The neural network achieves an accuracy of approximately 0.77, indicating solid predictive performance and a clear improvement over a naive classifier $(\approx 0.50)$ given the balanced dataset. This suggests that the model captures meaningful structure in the data.
 
-```{r}
-# Compute predictions from loaded model
-pred_prob <- predict(mod_nn, newdata = test_nn, type = "raw")
-
-if (is.matrix(pred_prob)) {
-  if ("1" %in% colnames(pred_prob)) {
-    pred_prob_1 <- pred_prob[, "1"]
-  } else {
-    pred_prob_1 <- pred_prob[, ncol(pred_prob)]
-  }
-} else {
-  pred_prob_1 <- pred_prob
-}
-
-pred_class <- ifelse(pred_prob_1 >= 0.5, "1", "0")
-pred_class <- factor(pred_class, levels = levels(test_nn$high_consumption))
+```{r nn-results, echo=FALSE}
 truth      <- test_nn$high_consumption
+pred_class <- factor(ifelse(pred_prob_1 >= 0.5, "1", "0"), levels = levels(truth))
 
 cm  <- table(Predicted = pred_class, Actual = truth)
 acc <- mean(pred_class == truth)
-
-tp <- cm["1", "1"];  tn <- cm["0", "0"]
-fp <- cm["1", "0"];  fn <- cm["0", "1"]
-
+tp  <- cm["1", "1"]; tn <- cm["0", "0"]
+fp  <- cm["1", "0"]; fn <- cm["0", "1"]
 sensitivity <- tp / (tp + fn)
 specificity <- tn / (tn + fp)
 
-# ROC object (used by the plots below)
+# ROC object (used by plots below)
 pred_roc <- ROCR::prediction(pred_prob_1, truth)
 perf_roc <- ROCR::performance(pred_roc, "tpr", "fpr")
 
-# Display metrics table
-results_nn <- data.frame(
-  model       = "Neural Network",
-  accuracy    = round(acc, 3),
-  sensitivity = round(sensitivity, 3),
-  specificity = round(specificity, 3)
-)
-
 knitr::kable(
-  results_nn,
-  digits = 3,
-  col.names = c("Model", "Accuracy", "Sensitivity", "Specificity"),
+  data.frame(
+    Model       = "Neural Network",
+    Accuracy    = round(acc, 3),
+    Sensitivity = round(sensitivity, 3),
+    Specificity = round(specificity, 3)
+  ),
   caption = "Neural Network Performance Metrics"
 )
 ```
+
+
 Sensitivity (0.803) exceeds specificity (0.737), indicating that the model is more effective at identifying high-consumption events than low-consumption cases. This suggests that patterns associated with high consumption are more strongly captured by the available predictors. While this may be advantageous in contexts where detecting high-consumption events is particularly important, it also implies a slightly higher rate of false positives.
 
 Overall, the confusion matrix shows that the majority of observations are correctly classified, with most predictions concentrated along the diagonal. However, misclassifications occur in both directions, indicating that some observations share similar characteristics across classes.
 
 These results indicate good overall classification performance, although some variability remains unexplained, likely due to overlap in predictor patterns between the two classes.
 
-## Visual Evidence
+### Visual Evidence
 
 The *predicted probability plot* illustrates how the neural network separates the two classes. Observations belonging to the high-consumption class tend to have higher predicted probabilities, while low-consumption cases are concentrated at lower values. However, noticeable overlap in the mid-range indicates that some observations cannot be clearly distinguished, which explains the presence of classification errors.
 
 The *confusion matrix* provides a direct summary of classification performance. Most observations lie on the diagonal, confirming a high number of correct predictions for both classes. Nevertheless, errors occur in both directions, highlighting that class separation is not complete.
 
-```{r nn_plots_side_by_side, echo=FALSE, fig.width=10, fig.height=4}
+```{r nn_plots_side_by_side, echo=False, fig.width=10, fig.height=4}
 # ----------------------------------------
 # Combined plot: Probabilities + Confusion Matrix
 # ----------------------------------------
@@ -225,7 +159,7 @@ par(mfrow = c(1,1))
 
 The *ROC curve* further evaluates model performance across all possible classification thresholds. The curve lies clearly above the diagonal reference line, indicating strong discriminative ability and performance well above random classification. The steep initial increase suggests that high true positive rates can be achieved with relatively low false positive rates, while the flattening at higher values reflects diminishing gains.
 
-```{r nn_roc, echo=FALSE, fig.width=6, fig.height=5}
+```{r nn_roc, echo=False, fig.width=6, fig.height=5}
 plot(
   perf_roc,
   lwd = 2,
@@ -237,7 +171,7 @@ plot(
 abline(a = 0, b = 1, lty = 2)
 ```
 
-## Model Diagnostics
+### Model Diagnostics
 
 Neural network diagnostics focus on predictive performance rather than distributional assumptions. The chosen architecture (8–3–1) provides a balance between flexibility and overfitting, allowing the model to capture non-linear relationships while maintaining stable generalisation.
 
@@ -247,7 +181,7 @@ The ROC curve confirms consistent performance across classification thresholds a
 
 Alternative network configurations were explored to assess the impact of model complexity. Increasing the number of hidden neurons led to slight improvements in training performance but did not translate into meaningful gains in test accuracy, indicating potential overfitting. Simpler architectures achieved comparable results with greater stability, supporting the choice of the 8–3–1 specification.
 
-## Key Findings
+### Key Findings
 
 * The neural network achieves solid predictive performance, with an accuracy of approximately 77%, clearly outperforming a naive baseline.
 
@@ -259,7 +193,7 @@ Alternative network configurations were explored to assess the impact of model c
 
 * Increasing model complexity does not lead to substantial improvements, suggesting that performance is primarily constrained by the available features rather than the model itself.
 
-## Conclusion
+### Conclusion
 
 The neural network achieves solid predictive performance and successfully captures non-linear relationships in the data. With an accuracy of approximately 77%, it provides a meaningful improvement over baseline classification and demonstrates good overall discriminative ability.
 
@@ -268,4 +202,5 @@ However, the presence of overlap in predicted probabilities indicates that the m
 From a practical perspective, the model can serve as a useful decision-support tool for identifying high-consumption events, although predictions should be interpreted with some caution due to remaining classification uncertainty.
 
 Further improvements are more likely to come from enhanced feature engineering or the inclusion of additional relevant variables rather than increasing model complexity. In addition, more robust evaluation methods, such as cross-validation, could provide more stable performance estimates and reduce dependence on a single train–test split.
+
 
