@@ -38,6 +38,7 @@ library(broom)      # tidy model output
 library(car)        # VIF
 library(mgcv)       # GAM
 library(nnet)       # Neural Network
+library(ROCR)
 library(e1071)      # SVM
 library(caret)      # Cross-validation
 library(kernlab)    # SVM kernels
@@ -382,9 +383,6 @@ The log-link guarantees positive fitted values and supports a multiplicative int
 To facilitate interpretation, coefficients are exponentiated and presented as *rate ratios*. These indicate multiplicative changes in the expected rate of high-consumption days.
 
 ```{r RR-mod-poisson, echo=FALSE, message=FALSE, warning=FALSE}
-library(broom)
-library(dplyr)
-
 tidy(mod_pois) %>%
   mutate(rate_ratio = exp(estimate)) %>%
   select(term, rate_ratio, p.value) %>%
@@ -937,11 +935,6 @@ The GAM reveals that temperature and living area have genuinely non-linear effec
 *Lead: Raphaël Spagolla*
 
 ```{r import-NN, echo=FALSE, message=FALSE, warning=FALSE}
-library(dplyr)
-library(caret)
-library(nnet)
-library(ROCR)
-
 # Load model
 mod_nn <- readRDS("../models/neural_network/mod_nn_nnet.rds")
 
