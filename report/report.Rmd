@@ -350,7 +350,7 @@ The model is better suited for **inference and understanding drivers** than for 
 
 *Lead: Raphaël Spagolla*
 
-```{r import-poisson, echo=FALSE, message=FALSE, warning=FALSE}
+```{r import-poisson, echo=TRUE, message=FALSE, warning=FALSE}
 mod_pois  <- readRDS("../models/poisson_glm/mod_pois.rds")
 mod_quasi_pois <- readRDS("../models/poisson_glm/mod_quasi.rds")
 dat_count <- readRDS("../data_processed/poisson/dat_count.rds")
@@ -382,7 +382,7 @@ The log-link guarantees positive fitted values and supports a multiplicative int
 
 To facilitate interpretation, coefficients are exponentiated and presented as *rate ratios*. These indicate multiplicative changes in the expected rate of high-consumption days.
 
-```{r RR-mod-poisson, echo=FALSE, message=FALSE, warning=FALSE}
+```{r RR-mod-poisson, echo=TRUE, message=FALSE, warning=FALSE}
 tidy(mod_pois) %>%
   mutate(rate_ratio = exp(estimate)) %>%
   select(term, rate_ratio, p.value) %>%
@@ -410,7 +410,7 @@ The *boxplot by building type* shows a clear separation between apartments and h
 
 The *scatterplot of high-consumption days versus average temperature* reveals a strong negative pattern. At lower temperatures, high-consumption days are often high (with many observations in the upper range), whereas at warmer temperatures the observations concentrate at much lower counts. The smooth trend line decreases steadily with temperature and flattens at higher temperatures, suggesting that high-consumption days become less common as conditions get warmer.
 
-```{r glm-poisson-plots, fig.height=4, echo=FALSE, fig.show='hold', out.width='50%'}
+```{r glm-poisson-plots, fig.height=4, echo=TRUE, fig.show='hold', out.width='50%'}
 ggplot(dat_count, aes(x = building_type, y = n_high_days)) +
   geom_boxplot() +
   labs(title = "High-consumption days by building type",
@@ -430,7 +430,7 @@ ggplot(dat_count, aes(x = temp_avg, y = n_high_days)) +
 Finally, the *rate-ratio coefficient plot with 95% confidence intervals* summarises the direction and strength of the model effects. The building type effect stands out visually, with the rate ratio for *House (vs flat)* far above 1, indicating a much higher expected rate in houses. *Temperature* and *weekend share* are clearly below 1, consistent with lower expected rates as temperature increases and when the share of weekend days is higher. *Number of residents* and *floor heating* lie slightly above 1, indicating moderate increases in the expected rate. In contrast, effects such as *heating degree days* and *living area* lie close to 1 with confidence intervals overlapping 1, suggesting weak or uncertain contributions once the other variables are accounted for.
 
 
-```{r glm-poisson-rr-plot, fig.height=5, echo=FALSE}
+```{r glm-poisson-rr-plot, fig.height=5, echo=TRUE}
 coef_summary <- coef(summary(mod_pois))
 
 coef_df <- data.frame(
@@ -517,7 +517,7 @@ knitr::kable(
 
 ### Model Diagnostics
 
-```{r, echo=FALSE}
+```{r, echo=TRUE}
 # Poisson diagnostics
 s_m_p <- summary(mod_pois)
 disp_pois <- s_m_p$deviance / s_m_p$df.residual
@@ -934,7 +934,7 @@ The GAM reveals that temperature and living area have genuinely non-linear effec
 ## Neural Network (NN) {#nn}
 *Lead: Raphaël Spagolla*
 
-```{r import-NN, echo=FALSE, message=FALSE, warning=FALSE}
+```{r import-NN, echo=TRUE, message=FALSE, warning=FALSE}
 # Load model
 mod_nn <- readRDS("../models/neural_network/mod_nn_nnet.rds")
 
@@ -1018,7 +1018,7 @@ Overall, the chosen specification reflects a trade-off between predictive perfor
 
 The neural network achieves an accuracy of approximately 0.77, indicating solid predictive performance and a clear improvement over a naive classifier $(\approx 0.50)$ given the balanced dataset. This suggests that the model captures meaningful structure in the data.
 
-```{r}
+```{r nn-results, echo=TRUE}
 # Compute predictions from loaded model
 pred_prob <- predict(mod_nn, newdata = test_nn, type = "raw")
 
@@ -1076,7 +1076,7 @@ The *predicted probability plot* illustrates how the neural network separates th
 
 The *confusion matrix* provides a direct summary of classification performance. Most observations lie on the diagonal, confirming a high number of correct predictions for both classes. Nevertheless, errors occur in both directions, highlighting that class separation is not complete.
 
-```{r nn_plots_side_by_side, echo=FALSE, fig.width=10, fig.height=4}
+```{r nn_plots_side_by_side, echo=TRUE, fig.width=10, fig.height=4}
 # ----------------------------------------
 # Combined plot: Probabilities + Confusion Matrix
 # ----------------------------------------
@@ -1126,7 +1126,7 @@ par(mfrow = c(1,1))
 
 The *ROC curve* further evaluates model performance across all possible classification thresholds. The curve lies clearly above the diagonal reference line, indicating strong discriminative ability and performance well above random classification. The steep initial increase suggests that high true positive rates can be achieved with relatively low false positive rates, while the flattening at higher values reflects diminishing gains.
 
-```{r nn_roc, echo=FALSE, fig.width=6, fig.height=5}
+```{r nn_roc, echo=TRUE, fig.width=6, fig.height=5}
 plot(
   perf_roc,
   lwd = 2,
