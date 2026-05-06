@@ -347,25 +347,218 @@ The model is better suited for **inference and understanding drivers** than for 
 
 ## GLM – Poisson {#glm-poisson}
 
-*Lead: *Lead: Raphaël Spagolla**
+*Lead: Raphaël Spagolla*
 
-<!-- Fit GLM Poisson to a count response variable (non-negative integers). -->
-
-```{r glm-poisson-fit, cache=TRUE}
-# glm_poisson <- glm(count_response ~ predictor1 + predictor2 + ...,
-#                    family = poisson(link = "log"), data = heapo)
-# saveRDS(glm_poisson, "../models/glm_poisson.rds")
-#glm_poisson <- readRDS("../models/glm_poisson.rds")
+```{r import-poisson, echo=FALSE, message=FALSE, warning=FALSE}
+mod_pois  <- readRDS("../models/poisson_glm/mod_pois.rds")
+mod_quasi_pois <- readRDS("../models/poisson_glm/mod_quasi.rds")
+dat_count <- readRDS("../data_processed/poisson/dat_count.rds")
 ```
 
-```{r glm-poisson-summary}
-# summary(glm_poisson)
+### Objective
+
+The aim of this analysis is to model the number of high-consumption days per household-month ($n_{high\ days}$). This variable represents count data, taking non-negative integer values.
+
+A Poisson Generalised Linear Model (GLM) is used, as it is appropriate for modelling count outcomes. By including an offset for the number of observed days, the model estimates rates, allowing interpretation of results in terms of relative changes (rate ratios).
+
+### Model setup
+
+```{r poisson-modell, echo=TRUE}
+cat(deparse(formula(mod_pois)), "\n\n")
+mod_pois$call
 ```
 
-### Coefficient Interpretation
+The response variable is the number of high-consumption days per household-month ($n_{high\ days}$). Since this outcome is a count of events observed over a period of time, it takes non-negative integer values. Because the number of observed days can vary slightly across household–months, the model includes the logarithm of the observed days $(\log(n_{days}))$ as an offset. This adjustment effectively converts the outcome into a rate—high-consumption days per observed day—so that observations remain comparable even when exposure differs between months.
 
-<!-- Exponentiate coefficients: exp(coef) gives the multiplicative effect on the count.
-     Example: "A one-unit increase in X multiplies the expected count by exp(coef) = Y." -->
+To model these rates, a Poisson Generalised Linear Model (GLM) with a log-link is fitted:
+
+$$
+\log(\mathbb{E}[Y_i]) = \beta_0 + \beta_1 X_{1i} + \cdots + \beta_p X_{pi} + \log(n\_days_i)
+$$
+The log-link guarantees positive fitted values and supports a multiplicative interpretation of effects. This modelling choice is appropriate because the response is count data, and the Poisson framework naturally accommodates non-negative outcomes while allowing the variance to depend on the mean.
+
+### Model Results
+
+To facilitate interpretation, coefficients are exponentiated and presented as *rate ratios*. These indicate multiplicative changes in the expected rate of high-consumption days.
+
+```{r RR-mod-poisson, echo=FALSE, message=FALSE, warning=FALSE}
+library(broom)
+library(dplyr)
+
+tidy(mod_pois) %>%
+  mutate(rate_ratio = exp(estimate)) %>%
+  select(term, rate_ratio, p.value) %>%
+  filter(term != "(Intercept)")
+```
+
+The results are interpreted in terms of *percentage changes in the expected rate*, holding all other variables constant.
+
+**Building type (house vs flat):**  Households living in houses have a rate of high-consumption days that is approximately 363% higher than those living in flats \((4.632 - 1) \times 100\%\). This is the strongest effect in the model, indicating that building characteristics are a key driver of consumption patterns.
+
+**Average temperature:**  The rate ratio of 0.915 implies that a one-unit increase in temperature is associated with a 8.5% decrease in the expected rate of high-consumption days \((1 - 0.915) \times 100\%\). This reflects reduced heating needs at higher temperatures.
+
+**Number of residents:**  Each additional household member increases the expected rate by approximately 8.9% \((1.089 - 1) \times 100\%\). This suggests that household size has a consistent positive effect on energy consumption.
+
+**Living area:**  The rate ratio of 1.001 indicates a *small positive effect*, where each additional unit of living area increases the expected rate by about 0.09%. While the per-unit effect is small, it can accumulate for larger dwellings.
+
+Overall, structural and household characteristics (building type, size, and number of residents) exhibit the strongest effects, while temperature captures an important but smaller environmental influence.
+
+
+### Visual Evidence
+
+To complement the model output, the plots below provide direct visual support for the main relationships in the data.
+
+The *boxplot by building type* shows a clear separation between apartments and houses. Apartments have a low median number of high-consumption days and a relatively tight spread, while houses display a much higher median and substantially greater variability. The distribution for houses also extends to much larger values, indicating that high-consumption days are both more frequent and more heterogeneous among households living in houses.
+
+The *scatterplot of high-consumption days versus average temperature* reveals a strong negative pattern. At lower temperatures, high-consumption days are often high (with many observations in the upper range), whereas at warmer temperatures the observations concentrate at much lower counts. The smooth trend line decreases steadily with temperature and flattens at higher temperatures, suggesting that high-consumption days become less common as conditions get warmer.
+
+```{r glm-poisson-plots, fig.height=4, echo=FALSE, fig.show='hold', out.width='50%'}
+ggplot(dat_count, aes(x = building_type, y = n_high_days)) +
+  geom_boxplot() +
+  labs(title = "High-consumption days by building type",
+       x = "Building type",
+       y = "Number of high-consumption days") +
+  theme_minimal()
+
+ggplot(dat_count, aes(x = temp_avg, y = n_high_days)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(method = "loess") +
+  labs(title = "High-consumption days vs temperature",
+       x = "Average temperature",
+       y = "High-consumption days") +
+  theme_minimal()
+```
+
+Finally, the *rate-ratio coefficient plot with 95% confidence intervals* summarises the direction and strength of the model effects. The building type effect stands out visually, with the rate ratio for *House (vs flat)* far above 1, indicating a much higher expected rate in houses. *Temperature* and *weekend share* are clearly below 1, consistent with lower expected rates as temperature increases and when the share of weekend days is higher. *Number of residents* and *floor heating* lie slightly above 1, indicating moderate increases in the expected rate. In contrast, effects such as *heating degree days* and *living area* lie close to 1 with confidence intervals overlapping 1, suggesting weak or uncertain contributions once the other variables are accounted for.
+
+
+```{r glm-poisson-rr-plot, fig.height=5, echo=FALSE}
+coef_summary <- coef(summary(mod_pois))
+
+coef_df <- data.frame(
+  term     = rownames(coef_summary),
+  estimate = coef_summary[, "Estimate"],
+  se       = coef_summary[, "Std. Error"],
+  p_value  = coef_summary[, "Pr(>|z|)"]
+)
+
+coef_df <- coef_df[coef_df$term != "(Intercept)", ]
+
+coef_df$rate_ratio  <- exp(coef_df$estimate)
+coef_df$ci_low      <- exp(coef_df$estimate - 1.96 * coef_df$se)
+coef_df$ci_high     <- exp(coef_df$estimate + 1.96 * coef_df$se)
+coef_df$significant <- coef_df$p_value < 0.05
+
+coef_df$term <- dplyr::recode(coef_df$term,
+  "temp_avg" = "Temperature",
+  "living_area" = "Living area",
+  "building_typehouse" = "House (vs flat)",
+  "heatpump_typeground-source" = "Ground-source heat pump",
+  "has_floor_heating1" = "Floor heating",
+  "n_residents" = "Number of residents",
+  "share_weekend" = "Weekend share",
+  "heating_degree_days" = "Heating degree days"
+)
+
+ggplot(coef_df, aes(x = rate_ratio,
+                    y = reorder(term, rate_ratio),
+                    color = significant)) +
+  geom_point(size = 2.5) +
+  geom_errorbarh(aes(xmin = ci_low, xmax = ci_high), height = 0.3) +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "grey50") +
+  scale_color_manual(values = c("FALSE" = "grey60", "TRUE" = "steelblue"),
+                     labels = c("n.s.", "p < 0.05")) +
+  scale_x_log10() +
+  labs(title = "Rate Ratios with 95% Confidence Intervals",
+       x = "Rate Ratio (log scale)",
+       y = NULL,
+       color = NULL) +
+  theme_minimal(base_size = 13)
+```
+```{r, echo=FALSE}
+# Wald CI on log scale -> exponentiate for RR CI
+est <- coef(mod_pois)
+se  <- sqrt(diag(vcov(mod_pois)))
+
+z <- qnorm(0.975)
+ci_low  <- est - z * se
+ci_high <- est + z * se
+
+rr      <- exp(est)
+rr_low  <- exp(ci_low)
+rr_high <- exp(ci_high)
+
+# pick the key terms you want to report
+key_terms <- c("building_typehouse", "temp_avg", "n_residents")
+
+ci_table <- data.frame(
+  term = key_terms,
+  RR = rr[key_terms],
+  CI_low = rr_low[key_terms],
+  CI_high = rr_high[key_terms],
+  row.names = NULL
+)
+
+# pretty rounding for printing in the report
+ci_table$RR      <- round(ci_table$RR, 3)
+ci_table$CI_low  <- round(ci_table$CI_low, 3)
+ci_table$CI_high <- round(ci_table$CI_high, 3)
+
+# after you create ci_table
+ci_table$term <- c("House (vs flat)", "Temperature", "Number of residents")
+
+knitr::kable(
+  ci_table,
+  longtable = TRUE,
+  escape = TRUE,
+  
+  col.names = c("Predictor", "RR", "95% CI (low)", "95% CI (high)"),
+  caption = "Key effects: rate ratios with 95% Wald confidence intervals."
+)
+```
+
+### Model Diagnostics
+
+```{r, echo=FALSE}
+# Poisson diagnostics
+s_m_p <- summary(mod_pois)
+disp_pois <- s_m_p$deviance / s_m_p$df.residual
+
+# Quasi-Poisson diagnostics
+s_m_q <- summary(mod_quasi_pois)
+
+# dispersion estimate (phi) for quasi-Poisson via Pearson residuals
+phi_q <- sum(residuals(mod_quasi_pois, type = "pearson")^2) / df.residual(mod_quasi_pois)
+
+# p-value helper (works for both models)
+p_pois  <- coef(summary(mod_pois))[,4]
+p_quasi <- coef(summary(mod_quasi_pois))[,4]
+```
+
+A key assumption of the Poisson GLM is *equidispersion*, i.e., that the conditional variance equals the conditional mean. We assess this by comparing the *residual deviance* to the *residual degrees of freedom*. For the fitted Poisson model, the residual deviance is `r round(s_m_p$deviance, 1)` on `r s_m_p$df.residual` df, yielding a deviance/df ratio of `r round(disp_pois, 2)`. Since this ratio is clearly larger than 1, there is strong evidence of *overdispersion*, meaning that the Poisson model would tend to *underestimate standard errors* and potentially overstate statistical significance.
+
+We therefore refit the model using a *quasi-Poisson* family. This keeps the same mean structure (and thus the same *rate-ratio interpretation*), but inflates standard errors to reflect the extra-Poisson variability. The estimated dispersion for the quasi-Poisson fit is ($\hat{\phi}$ =) `r round(phi_q, 2)`, confirming substantial extra-Poisson variation. As a consequence, inference becomes more conservative: for example, *share_weekend* changes from significant under the Poisson model (p = `r signif(p_pois["share_weekend"], 2)`) to non-significant under the quasi-Poisson model (p = `r signif(p_quasi["share_weekend"], 2)`).
+
+### Key Findings
+
+**Building type is the dominant factor:** Households living in houses have a substantially higher rate of high-consumption days compared to flats, indicating strong structural differences in energy usage.
+
+**Temperature reduces consumption frequency:** Higher average temperatures are associated with fewer high-consumption days, consistent with lower heating demand.
+
+**Household size increases consumption:** Each additional resident leads to a higher rate of high-consumption days, reflecting increased overall energy usage.
+
+**Dwelling size has a smaller positive effect:** Larger living areas are associated with slightly higher consumption frequency, though the effect per unit is modest.
+
+**Some effects weaken after adjustment:** After accounting for overdispersion, certain variables (e.g., weekend share) are no longer statistically significant, highlighting the importance of using robust inference.
+
+### Conclusion
+
+The Poisson GLM provides a clear understanding of the factors influencing the rate of high-consumption days, highlighting the importance of structural characteristics and household composition.
+
+However, strong overdispersion indicates that the Poisson model underestimates variability, making standard inference unreliable.
+
+While the quasi-Poisson model improves inference, a negative binomial model could be considered as a more appropriate alternative for handling overdispersion.
+
 
 ---
 
@@ -743,55 +936,61 @@ The GAM reveals that temperature and living area have genuinely non-linear effec
 ## Neural Network (NN) {#nn}
 *Lead: Raphaël Spagolla*
 
----
-# title: "Neural Network"
-# author: "Raphael Spagolla"
-# date: "2026 03 04"
-output:
-  html_document:
-    toc: true
-    toc_float: true
-    toc_depth: 3
-    number_sections: true
-    theme: flatly
-    code_folding: hide
-  pdf_document:
-    toc: true
-    toc_depth: '3'
-subtitle: Applied Machine Learning and Predictive Modelling 1 – FS 2026
----
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(
-  echo = TRUE,
-  message = FALSE,
-  warning = FALSE
-)
-library(ggplot2)
-set.seed(1234)
-```
-
-
-# Neural Network
-
-```{r import-NN, message=FALSE, warning=FALSE, include=FALSE}
-source("../R/neural_network/01_nn_pipeline.R")
-```
-
-```{r import-nn, echo=TRUE, eval=FALSE}
-
+```{r import-NN, echo=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(caret)
 library(nnet)
+library(ROCR)
 
-mod_nn <- nnet(
-  high_consumption ~ .,
-  data = train_nn,
-  size = 3,
-  decay = 0.001,
-  maxit = 300,
-  trace = FALSE
-)
+# Load model
+mod_nn <- readRDS("../models/neural_network/mod_nn_nnet.rds")
+
+# Load and prepare data (same steps as pipeline, but no side effects)
+dat <- readRDS("../data_processed/heapo/heapo_modelling.rds")
+
+dat_nn <- dat %>%
+  select(
+    high_consumption,
+    heating_degree_days, temp_avg,
+    living_area, building_type, heatpump_type,
+    has_floor_heating, n_residents, is_weekend
+  ) %>%
+  mutate(
+    high_consumption  = as.factor(high_consumption),
+    building_type     = as.factor(building_type),
+    heatpump_type     = as.factor(heatpump_type),
+    has_floor_heating = as.factor(has_floor_heating),
+    is_weekend        = as.factor(is_weekend)
+  )
+
+dat_nn$high_consumption <- droplevels(dat_nn$high_consumption)
+
+# Reproducible split (same seed as pipeline)
+set.seed(42)
+idx_train <- createDataPartition(dat_nn$high_consumption, p = 0.8, list = FALSE)
+train <- dat_nn[idx_train, ]
+test  <- dat_nn[-idx_train, ]
+
+# Encode + scale
+y_test      <- test$high_consumption
+x_train_raw <- train %>% select(-high_consumption)
+x_test_raw  <- test  %>% select(-high_consumption)
+
+x_train_mm <- model.matrix(~ ., data = x_train_raw)[, -1]
+x_test_mm  <- model.matrix(~ ., data = x_test_raw)[, -1]
+
+train_means <- apply(x_train_mm, 2, mean)
+train_sds   <- apply(x_train_mm, 2, sd)
+train_sds[train_sds == 0] <- 1
+
+x_test_scaled <- scale(x_test_mm, center = train_means, scale = train_sds)
+test_nn <- as.data.frame(x_test_scaled)
+test_nn$high_consumption <- y_test
+colnames(test_nn) <- make.names(colnames(test_nn))
+test_nn$high_consumption <- as.factor(test_nn$high_consumption)
 ```
 
-## Objective
+### Objective
 
 The aim of this analysis is to predict whether an observation corresponds to a high-consumption event (high_consumption), a binary outcome taking values 0 or 1. This is a classification problem, where the focus is on accurately distinguishing between high- and low-consumption cases.
 
@@ -799,7 +998,7 @@ From a practical perspective, reliable classification of high-consumption events
 
 A neural network is employed to capture potentially complex and non-linear relationships between consumption and predictors, including weather conditions, building characteristics, and household composition. Model performance is evaluated based on predictive accuracy and classification metrics derived from test data.
 
-## Data Preparation
+### Data Preparation
 
 The dataset consists of 99,838 observations and includes variables related to weather conditions, building characteristics, and household composition. The response variable, *high_consumption*, is binary and approximately balanced between the two classes.
 
@@ -807,7 +1006,12 @@ To ensure valid model evaluation, the data is split into training (80%) and test
 
 Categorical variables are transformed into dummy variables using one-hot encoding, allowing them to be used as inputs in the neural network. In addition, all predictors are scaled based on the training data. This step is important for neural networks, as it improves numerical stability and facilitates efficient training. The same transformations are then applied to the test set to ensure consistency and prevent data leakage.
 
-## Model setup
+### Model setup
+
+```{r nn-modell, echo=TRUE}
+cat(deparse(formula(mod_nn)), "\n\n")
+mod_nn$call
+```
 
 The neural network is specified with an architecture of (8–3–1), consisting of eight input nodes, one hidden layer with three neurons, and a single output neuron for binary classification. This relatively simple structure is chosen to balance model flexibility with the risk of overfitting, allowing the network to capture non-linear relationships without introducing unnecessary complexity.
 
@@ -817,12 +1021,48 @@ To improve generalisation, weight decay (set to 0.001) is included as a regulari
 
 Overall, the chosen specification reflects a trade-off between predictive performance and model stability, favouring a parsimonious architecture that performs reliably on unseen data.
 
-## Model Results
+### Model Results
 
 The neural network achieves an accuracy of approximately 0.77, indicating solid predictive performance and a clear improvement over a naive classifier $(\approx 0.50)$ given the balanced dataset. This suggests that the model captures meaningful structure in the data.
 
 ```{r}
-results_nn <- read.csv("../models/neural_network/nn_test_metrics.csv")
+# Compute predictions from loaded model
+pred_prob <- predict(mod_nn, newdata = test_nn, type = "raw")
+
+if (is.matrix(pred_prob)) {
+  if ("1" %in% colnames(pred_prob)) {
+    pred_prob_1 <- pred_prob[, "1"]
+  } else {
+    pred_prob_1 <- pred_prob[, ncol(pred_prob)]
+  }
+} else {
+  pred_prob_1 <- pred_prob
+}
+
+pred_class <- ifelse(pred_prob_1 >= 0.5, "1", "0")
+pred_class <- factor(pred_class, levels = levels(test_nn$high_consumption))
+truth      <- test_nn$high_consumption
+
+cm  <- table(Predicted = pred_class, Actual = truth)
+acc <- mean(pred_class == truth)
+
+tp <- cm["1", "1"];  tn <- cm["0", "0"]
+fp <- cm["1", "0"];  fn <- cm["0", "1"]
+
+sensitivity <- tp / (tp + fn)
+specificity <- tn / (tn + fp)
+
+# ROC object (used by the plots below)
+pred_roc <- ROCR::prediction(pred_prob_1, truth)
+perf_roc <- ROCR::performance(pred_roc, "tpr", "fpr")
+
+# Display metrics table
+results_nn <- data.frame(
+  model       = "Neural Network",
+  accuracy    = round(acc, 3),
+  sensitivity = round(sensitivity, 3),
+  specificity = round(specificity, 3)
+)
 
 knitr::kable(
   results_nn,
@@ -837,7 +1077,7 @@ Overall, the confusion matrix shows that the majority of observations are correc
 
 These results indicate good overall classification performance, although some variability remains unexplained, likely due to overlap in predictor patterns between the two classes.
 
-## Visual Evidence
+### Visual Evidence
 
 The *predicted probability plot* illustrates how the neural network separates the two classes. Observations belonging to the high-consumption class tend to have higher predicted probabilities, while low-consumption cases are concentrated at lower values. However, noticeable overlap in the mid-range indicates that some observations cannot be clearly distinguished, which explains the presence of classification errors.
 
@@ -905,7 +1145,7 @@ plot(
 abline(a = 0, b = 1, lty = 2)
 ```
 
-## Model Diagnostics
+### Model Diagnostics
 
 Neural network diagnostics focus on predictive performance rather than distributional assumptions. The chosen architecture (8–3–1) provides a balance between flexibility and overfitting, allowing the model to capture non-linear relationships while maintaining stable generalisation.
 
@@ -915,7 +1155,7 @@ The ROC curve confirms consistent performance across classification thresholds a
 
 Alternative network configurations were explored to assess the impact of model complexity. Increasing the number of hidden neurons led to slight improvements in training performance but did not translate into meaningful gains in test accuracy, indicating potential overfitting. Simpler architectures achieved comparable results with greater stability, supporting the choice of the 8–3–1 specification.
 
-## Key Findings
+### Key Findings
 
 * The neural network achieves solid predictive performance, with an accuracy of approximately 77%, clearly outperforming a naive baseline.
 
@@ -927,7 +1167,7 @@ Alternative network configurations were explored to assess the impact of model c
 
 * Increasing model complexity does not lead to substantial improvements, suggesting that performance is primarily constrained by the available features rather than the model itself.
 
-## Conclusion
+### Conclusion
 
 The neural network achieves solid predictive performance and successfully captures non-linear relationships in the data. With an accuracy of approximately 77%, it provides a meaningful improvement over baseline classification and demonstrates good overall discriminative ability.
 
@@ -936,6 +1176,8 @@ However, the presence of overlap in predicted probabilities indicates that the m
 From a practical perspective, the model can serve as a useful decision-support tool for identifying high-consumption events, although predictions should be interpreted with some caution due to remaining classification uncertainty.
 
 Further improvements are more likely to come from enhanced feature engineering or the inclusion of additional relevant variables rather than increasing model complexity. In addition, more robust evaluation methods, such as cross-validation, could provide more stable performance estimates and reduce dependence on a single train–test split.
+
+
 
 ---
 
