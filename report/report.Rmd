@@ -1,6 +1,6 @@
 ---
 title: "Household Energy Consumption Analysis"
-author: "Tharrmeehan Krishnathasan, Raphaël Spagolla, Emanuel Lemma"
+author: "Emanuel Lemma, Raphaël Spagolla, Tharrmeehan Krishnathasan"
 date: "`r Sys.Date()`"
 output:
   html_document:
