@@ -24,14 +24,13 @@ knitr::opts_chunk$set(
 library(ggplot2)
 set.seed(1234)
 ```
+# Poisson GLM
+
 ```{r import-poisson, echo=FALSE, message=FALSE, warning=FALSE}
-# Load both models (adjust paths if needed)
 mod_pois  <- readRDS("../models/poisson_glm/mod_pois.rds")
 mod_quasi_pois <- readRDS("../models/poisson_glm/mod_quasi.rds")
 dat_count <- readRDS("../data_processed/poisson/dat_count.rds")
 ```
-
-# Poisson GLM
 
 ## Objective
 
@@ -40,6 +39,11 @@ The aim of this analysis is to model the number of high-consumption days per hou
 A Poisson Generalised Linear Model (GLM) is used, as it is appropriate for modelling count outcomes. By including an offset for the number of observed days, the model estimates rates, allowing interpretation of results in terms of relative changes (rate ratios).
 
 ## Model setup
+
+```{r poisson-modell, echo=TRUE}
+cat(deparse(formula(mod_pois)), "\n\n")
+mod_pois$call
+```
 
 The response variable is the number of high-consumption days per household-month ($n_{high\ days}$). Since this outcome is a count of events observed over a period of time, it takes non-negative integer values. Because the number of observed days can vary slightly across household–months, the model includes the logarithm of the observed days $(\log(n_{days}))$ as an offset. This adjustment effectively converts the outcome into a rate—high-consumption days per observed day—so that observations remain comparable even when exposure differs between months.
 

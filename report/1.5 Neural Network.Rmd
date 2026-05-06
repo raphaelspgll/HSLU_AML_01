@@ -3,9 +3,6 @@
 # author: "Raphael Spagolla"
 # date: "2026 03 04"
 output:
-  pdf_document:
-    toc: true
-    toc_depth: '3'
   html_document:
     toc: true
     toc_float: true
@@ -13,6 +10,9 @@ output:
     number_sections: true
     theme: flatly
     code_folding: hide
+  pdf_document:
+    toc: true
+    toc_depth: '3'
 subtitle: Applied Machine Learning and Predictive Modelling 1 – FS 2026
 ---
 ```{r setup, include=FALSE}
@@ -24,11 +24,63 @@ knitr::opts_chunk$set(
 library(ggplot2)
 set.seed(1234)
 ```
-```{r import-NN, message=FALSE, warning=FALSE, include=FALSE}
-source("../R/neural_network/01_nn_pipeline.R")
-```
+
 
 # Neural Network
+
+```{r import-NN, echo=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(caret)
+library(nnet)
+library(ROCR)
+
+# Load model
+mod_nn <- readRDS("../models/neural_network/mod_nn_nnet.rds")
+
+# Load and prepare data (same steps as pipeline, but no side effects)
+dat <- readRDS("../data_processed/heapo/heapo_modelling.rds")
+
+dat_nn <- dat %>%
+  select(
+    high_consumption,
+    heating_degree_days, temp_avg,
+    living_area, building_type, heatpump_type,
+    has_floor_heating, n_residents, is_weekend
+  ) %>%
+  mutate(
+    high_consumption  = as.factor(high_consumption),
+    building_type     = as.factor(building_type),
+    heatpump_type     = as.factor(heatpump_type),
+    has_floor_heating = as.factor(has_floor_heating),
+    is_weekend        = as.factor(is_weekend)
+  )
+
+dat_nn$high_consumption <- droplevels(dat_nn$high_consumption)
+
+# Reproducible split (same seed as pipeline)
+set.seed(42)
+idx_train <- createDataPartition(dat_nn$high_consumption, p = 0.8, list = FALSE)
+train <- dat_nn[idx_train, ]
+test  <- dat_nn[-idx_train, ]
+
+# Encode + scale
+y_test      <- test$high_consumption
+x_train_raw <- train %>% select(-high_consumption)
+x_test_raw  <- test  %>% select(-high_consumption)
+
+x_train_mm <- model.matrix(~ ., data = x_train_raw)[, -1]
+x_test_mm  <- model.matrix(~ ., data = x_test_raw)[, -1]
+
+train_means <- apply(x_train_mm, 2, mean)
+train_sds   <- apply(x_train_mm, 2, sd)
+train_sds[train_sds == 0] <- 1
+
+x_test_scaled <- scale(x_test_mm, center = train_means, scale = train_sds)
+test_nn <- as.data.frame(x_test_scaled)
+test_nn$high_consumption <- y_test
+colnames(test_nn) <- make.names(colnames(test_nn))
+test_nn$high_consumption <- as.factor(test_nn$high_consumption)
+```
 
 ## Objective
 
@@ -48,6 +100,11 @@ Categorical variables are transformed into dummy variables using one-hot encodin
 
 ## Model setup
 
+```{r nn-modell, echo=TRUE}
+cat(deparse(formula(mod_nn)), "\n\n")
+mod_nn$call
+```
+
 The neural network is specified with an architecture of (8–3–1), consisting of eight input nodes, one hidden layer with three neurons, and a single output neuron for binary classification. This relatively simple structure is chosen to balance model flexibility with the risk of overfitting, allowing the network to capture non-linear relationships without introducing unnecessary complexity.
 
 A non-linear activation function is applied in the hidden layer, enabling the model to learn complex patterns in the data. The output layer produces predicted probabilities for the high-consumption class.
@@ -60,8 +117,44 @@ Overall, the chosen specification reflects a trade-off between predictive perfor
 
 The neural network achieves an accuracy of approximately 0.77, indicating solid predictive performance and a clear improvement over a naive classifier $(\approx 0.50)$ given the balanced dataset. This suggests that the model captures meaningful structure in the data.
 
-```{r, echo=FALSE}
-results_nn <- read.csv("../models/neural_network/nn_test_metrics.csv")
+```{r}
+# Compute predictions from loaded model
+pred_prob <- predict(mod_nn, newdata = test_nn, type = "raw")
+
+if (is.matrix(pred_prob)) {
+  if ("1" %in% colnames(pred_prob)) {
+    pred_prob_1 <- pred_prob[, "1"]
+  } else {
+    pred_prob_1 <- pred_prob[, ncol(pred_prob)]
+  }
+} else {
+  pred_prob_1 <- pred_prob
+}
+
+pred_class <- ifelse(pred_prob_1 >= 0.5, "1", "0")
+pred_class <- factor(pred_class, levels = levels(test_nn$high_consumption))
+truth      <- test_nn$high_consumption
+
+cm  <- table(Predicted = pred_class, Actual = truth)
+acc <- mean(pred_class == truth)
+
+tp <- cm["1", "1"];  tn <- cm["0", "0"]
+fp <- cm["1", "0"];  fn <- cm["0", "1"]
+
+sensitivity <- tp / (tp + fn)
+specificity <- tn / (tn + fp)
+
+# ROC object (used by the plots below)
+pred_roc <- ROCR::prediction(pred_prob_1, truth)
+perf_roc <- ROCR::performance(pred_roc, "tpr", "fpr")
+
+# Display metrics table
+results_nn <- data.frame(
+  model       = "Neural Network",
+  accuracy    = round(acc, 3),
+  sensitivity = round(sensitivity, 3),
+  specificity = round(specificity, 3)
+)
 
 knitr::kable(
   results_nn,
