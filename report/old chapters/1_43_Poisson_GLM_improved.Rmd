@@ -1,0 +1,147 @@
+---
+output:
+  pdf_document:
+    toc: false
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+    theme: flatly
+    code_folding: hide
+subtitle: Applied Machine Learning and Predictive Modelling 1 – FS 2026
+---
+
+```{r setup-poisson, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  cache   = TRUE
+)
+library(ggplot2)
+library(dplyr)
+set.seed(1234)
+```
+
+## Poisson GLM {#poisson}
+*Lead: Raphaël Spagolla*
+
+### Objective
+
+We model the **number of high-consumption days** per household per month — a non-negative integer outcome — using a Poisson GLM. An offset of `log(n_days)` accounts for months with different numbers of observed days, so the model estimates **rates** rather than raw counts.
+
+### Data Preparation & Exploration
+
+```{r import-poisson, cache=TRUE}
+dat_count  <- readRDS("../data_processed/poisson/dat_count.rds")
+mod_pois   <- readRDS("../models/poisson_glm/mod_pois.rds")
+mod_quasi  <- readRDS("../models/poisson_glm/mod_quasi.rds")
+rr_table   <- read.csv("../models/poisson_glm/coeff_rate_ratios.csv")
+dispersion <- readRDS("../models/poisson_glm/dispersion_val.rds")
+comp       <- read.csv("../models/poisson_glm/quasi_vs_pois_se_pvals.csv")
+```
+
+```{r eda-plots, fig.width=10, fig.height=3.2}
+par(mfrow = c(1, 2), mar = c(4, 4, 2.5, 1))
+
+hist(
+  dat_count$n_high_days,
+  breaks = 32,
+  main   = "Distribution of n_high_days",
+  xlab   = "High-consumption days / household-month",
+  ylab   = "Frequency",
+  col    = "steelblue", border = "white"
+)
+
+plot(
+  dat_count$temp_avg, dat_count$n_high_days,
+  pch = 16, cex = 0.3, col = rgb(0, 0, 0, 0.15),
+  main = "n_high_days vs average temperature",
+  xlab = "Monthly avg. temperature (°C)",
+  ylab = "n_high_days"
+)
+par(mfrow = c(1, 1))
+```
+
+The dataset contains **`r nrow(dat_count)`** household-month observations. The count ranges from 0 to `r max(dat_count$n_high_days)`, with `r round(mean(dat_count$n_high_days == 0)*100, 1)`% zero observations. Colder months are associated with more high-consumption days, consistent with the Poisson GLM approach.
+
+### Model Specification
+
+```{r model-formula}
+mod_pois$call
+```
+
+Predictors include weather variables (`heating_degree_days`, `temp_avg`), household characteristics (`living_area`, `building_type`, `heatpump_type`, `has_floor_heating`, `n_residents`), and `share_weekend`. The log link ensures all predictions are non-negative, and coefficients are interpreted as **log rate ratios**.
+
+### Results & Coefficient Interpretation
+
+```{r coeff-table}
+knitr::kable(
+  rr_table,
+  digits  = 3,
+  caption = "Poisson GLM — Rate ratios exp(β) with 95% Wald CI"
+)
+```
+
+```{r coeff-plot, fig.width=8, fig.height=4.5}
+rr_plot <- rr_table %>%
+  filter(term != "(Intercept)") %>%
+  mutate(term = reorder(term, rate_ratio))
+
+ggplot(rr_plot, aes(x = rate_ratio, y = term)) +
+  geom_vline(xintercept = 1, linetype = "dashed", colour = "grey50") +
+  geom_errorbarh(aes(xmin = rr_ci_low, xmax = rr_ci_high),
+                 height = 0.3, colour = "steelblue") +
+  geom_point(size = 2.5, colour = "steelblue") +
+  labs(title = "Rate ratios with 95% Wald CI (Poisson GLM)",
+       x = "Rate ratio (exp(β))", y = NULL) +
+  theme_bw(base_size = 11)
+```
+
+Coefficients are interpreted **multiplicatively** due to the log link. Key findings:
+
+- **Temperature** (`temp_avg`): rate ratio below 1 — each additional °C reduces the expected rate by ~8%, all else equal.
+- **Heating degree days**: rate ratio > 1 — more heating demand drives higher consumption counts.
+- **Living area**: larger homes show a higher rate of high-consumption days, consistent with greater overall energy demand.
+- Predictors whose 95% CI **excludes 1** are statistically significant at the 5% level.
+
+### Overdispersion Check
+
+A core Poisson assumption is that variance equals the mean. We check this via the dispersion ratio (residual deviance / residual df):
+
+```{r overdispersion}
+summ_p <- summary(mod_pois)
+knitr::kable(
+  data.frame(
+    Metric = c("Residual deviance", "Residual df", "Dispersion ratio"),
+    Value  = c(round(summ_p$deviance, 2), summ_p$df.residual, round(dispersion, 3))
+  ),
+  caption = "Overdispersion diagnostic"
+)
+```
+
+The estimated dispersion is **`r round(dispersion, 3)`**. `r if(dispersion > 1.5) "This substantially exceeds 1, indicating overdispersion — a quasi-Poisson model is therefore used for inference." else "This is close to 1, so the equidispersion assumption is approximately met."`
+
+### Quasi-Poisson Comparison
+
+```{r quasi-se-plot, fig.width=8, fig.height=3.8}
+comp_long <- comp %>%
+  filter(term != "(Intercept)") %>%
+  mutate(term = reorder(term, se_quasi))
+
+ggplot(comp_long, aes(y = term)) +
+  geom_point(aes(x = se_pois,  colour = "Poisson"),       size = 2.5) +
+  geom_point(aes(x = se_quasi, colour = "Quasi-Poisson"), size = 2.5) +
+  scale_colour_manual(values = c("Poisson" = "steelblue", "Quasi-Poisson" = "tomato"),
+                      name = "Model") +
+  labs(title = "Standard errors: Poisson vs quasi-Poisson",
+       x = "Standard error", y = NULL) +
+  theme_bw(base_size = 11)
+```
+
+The quasi-Poisson model produces **identical coefficients** but inflates standard errors by $\sqrt{\hat\phi}$ ($\hat\phi =$ `r round(summary(mod_quasi)$dispersion, 3)`), yielding more conservative p-values. `r if(summary(mod_quasi)$dispersion > 1.5) "The inflation is clearly visible above; inference should rely on the quasi-Poisson results." else "The adjustment is minor, confirming standard Poisson inference is reliable here."`
+
+### Conclusion
+
+Weather (especially temperature) and household size are the strongest drivers of high-consumption frequency, consistent with domain knowledge. The offset ensures fair rate comparisons across months. `r if(dispersion > 1.5) "Given overdispersion, the quasi-Poisson model is preferred for inference, but point estimates remain unchanged." else "The standard Poisson assumptions are approximately met, supporting the model's validity."` These results can guide targeted energy-efficiency interventions for households with structural or environmental risk factors.
