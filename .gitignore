@@ -35,3 +35,6 @@ R/*_files/
 # report knitr cache and figure directories
 report/*_cache/
 report/*_files/
+
+# compiled report output
+report/report.html
