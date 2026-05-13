@@ -110,8 +110,7 @@ canton of Zurich. The modelling subset was restricted to the period 2022-01-01
 through 2024-02-29 and limited to households with at least 95% daily coverage to
 exclude partially observed installations. It was then randomly sampled to a
 maximum of 100,000 observations to comply with the course data size limit. The
-final dataset contains `r nrow(heapo)` household-days across `r
-length(unique(heapo$Household_ID))` households.
+final dataset contains `r nrow(heapo)` household-days across `r length(unique(heapo$Household_ID))` households.
 
 ---
 
@@ -743,8 +742,7 @@ p_quasi <- coef(summary(mod_quasi_pois))[, 4]
 A key assumption of the Poisson GLM is *equidispersion*, i.e., that the
 conditional variance equals the conditional mean. We assess this by comparing
 the residual deviance to the residual degrees of freedom. For the fitted Poisson
-model, the residual deviance is `r round(s_m_p$deviance, 1)` on `r
-s_m_p$df.residual` df, yielding a ratio of `r round(disp_pois, 2)`. Since this
+model, the residual deviance is `r round(s_m_p$deviance, 1)` on `r s_m_p$df.residual` df, yielding a ratio of `r round(disp_pois, 2)`. Since this
 substantially exceeds 1, there is strong evidence of *overdispersion* — the
 Poisson model underestimates standard errors and overstates statistical
 significance.
@@ -754,8 +752,7 @@ identical point estimates but inflates standard errors by $\sqrt{\hat{\phi}}$
 ($\hat{\phi}$ = `r round(phi_q, 2)`), yielding more conservative and reliable
 inference. The most visible consequence is that *weekend share* shifts from
 significant under Poisson (p = `r signif(p_pois["share_weekend"], 2)`) to
-clearly non-significant under quasi-Poisson (p = `r
-signif(p_quasi["share_weekend"], 2)`), indicating that this effect should not be
+clearly non-significant under quasi-Poisson (p = `r signif(p_quasi["share_weekend"], 2)`), indicating that this effect should not be
 over-interpreted.
 
 The table and plot below show the SE inflation across all predictors. The effect
@@ -1278,17 +1275,13 @@ with `(exp(coef) - 1) × 100` gives the **percentage difference in daily kWh**
 relative to the reference category (appartment, air-source heat pump), all else
 equal:
 
-- **Houses vs. appartments:** Houses consume **`r
-  round((exp(coef(model_gam)["building_typehouse"]) - 1) * 100, 1)`% more**
+- **Houses vs. appartments:** Houses consume **`r round((exp(coef(model_gam)["building_typehouse"]) - 1) * 100, 1)`% more**
   electricity per day on average. Given a median daily consumption of around 21
-  kWh, this corresponds to roughly `r
-  round((exp(coef(model_gam)["building_typehouse"]) - 1) *
-  median(gam_train$log_kWh_total |> exp()), 1)` additional kWh per day. This is
+  kWh, this corresponds to roughly `r round((exp(coef(model_gam)["building_typehouse"]) - 1) * median(gam_train$log_kWh_total |> exp()), 1)` additional kWh per day. This is
   a modest but statistically reliable difference that likely reflects greater
   floor area rather than less efficient behaviour.
 - **Ground-source vs. air-source heat pump:** Households with a ground-source
-  heat pump consume **`r round((1 - exp(coef(model_gam)["heatpump_typeground-
-  source"])) * 100, 1)`% less** electricity per day. Ground-source systems
+  heat pump consume **`r round((1 - exp(coef(model_gam)["heatpump_typeground-source"])) * 100, 1)`% less** electricity per day. Ground-source systems
   extract heat from the ground at a stable temperature year-round, making them
   significantly more efficient than air-source systems. Air-source systems
   struggle in very cold weather and must work harder to maintain indoor
@@ -1497,9 +1490,7 @@ cat(sprintf(
 ```
 
 The most interpretable performance metric here is the **mean absolute error in
-kWh**. On average, the model's daily consumption forecasts are off by **`r
-round(mae_kwh, 1)` kWh**, against a median household consumption of **`r
-round(median_kwh, 1)` kWh/day**. This means a typical prediction error of about
+kWh**. On average, the model's daily consumption forecasts are off by **`r round(mae_kwh, 1)` kWh**, against a median household consumption of **`r round(median_kwh, 1)` kWh/day**. This means a typical prediction error of about
 **`r round(mae_pct, 0)`%** of a household's usual daily consumption. The model
 captures broad patterns such as cold days, large houses, and heat pump type, but
 cannot account for individual household behaviour like occupancy, working from
@@ -1540,10 +1531,8 @@ actionable, and R² communicates model quality in plain percentage terms.
 The GAM reveals that temperature and living area have genuinely non-linear
 effects on electricity consumption, which a plain linear model would
 misrepresent. Heating degree days, however, turn out to be linear, suggesting
-the LM's treatment of that variable was already adequate. Houses consume `r
-round((exp(coef(model_gam)["building_typehouse"]) - 1) * 100, 1)`% more than
-appartments, and ground-source heat pumps consume `r round((1 -
-exp(coef(model_gam)["heatpump_typeground-source"])) * 100, 1)`% less than air-
+the LM's treatment of that variable was already adequate. Houses consume `r round((exp(coef(model_gam)["building_typehouse"]) - 1) * 100, 1)`% more than
+appartments, and ground-source heat pumps consume `r round((1 - exp(coef(model_gam)["heatpump_typeground-source"])) * 100, 1)`% less than air-
 source systems. With an R² of `r round(r2_gam * 100, 1)`% and a mean prediction
 error of `r round(mae_kwh, 1)` kWh/day, the model performs moderately well for a
 purely weather- and building-based specification and will serve as the
