@@ -224,8 +224,9 @@ suited to its statistical family. The Linear Model and Generalised Additive
 Model are fitted to `log_kWh_total`, the log-transformed daily electricity
 consumption. The GLM Binomial classifies household-days as high or low
 consumption relative to each household's own median. The Support Vector Machine
-and Neural Network classify days as high consumption using the global 75th
-percentile of daily kWh as the threshold (top 25% of usage). The GLM Poisson
+classifies days as high consumption using the global 75th percentile of daily
+kWh as the threshold (top 25% of usage). The Neural Network uses each
+household's own median as its high-consumption threshold. The GLM Poisson
 models the monthly count of high-consumption days per household, capturing
 longer-term demand patterns at a coarser aggregation. Model performance is
 evaluated in the comparison section: regression models are compared via
@@ -1476,23 +1477,23 @@ actual_log <- gam_test$log_kWh_total
 actual_kwh <- exp(actual_log)
 pred_kwh <- exp(pred_gam)
 
-mae_kwh <- mean(abs(actual_kwh - pred_kwh))
+gam_mae_kwh <- mean(abs(actual_kwh - pred_kwh))
 median_kwh <- median(actual_kwh)
-mae_pct <- mae_kwh / median_kwh * 100
+mae_pct <- gam_mae_kwh / median_kwh * 100
 r2_gam <- 1 -
   sum((actual_log - pred_gam)^2) / sum((actual_log - mean(actual_log))^2)
 
 cat(sprintf(
   "R\u00b2 (test):          %.1f%%\nMAE (kWh/day):     %.1f kWh\nMedian consumption: %.1f kWh/day\nMAE as %% of median: %.1f%%\n",
   r2_gam * 100,
-  mae_kwh,
+  gam_mae_kwh,
   median_kwh,
   mae_pct
 ))
 ```
 
 The most interpretable performance metric here is the **mean absolute error in
-kWh**. On average, the model's daily consumption forecasts are off by **`r round(mae_kwh, 1)` kWh**, against a median household consumption of **`r round(median_kwh, 1)` kWh/day**. This means a typical prediction error of about
+kWh**. On average, the model's daily consumption forecasts are off by **`r round(gam_mae_kwh, 1)` kWh**, against a median household consumption of **`r round(median_kwh, 1)` kWh/day**. This means a typical prediction error of about
 **`r round(mae_pct, 0)`%** of a household's usual daily consumption. The model
 captures broad patterns such as cold days, large houses, and heat pump type, but
 cannot account for individual household behaviour like occupancy, working from
@@ -1526,7 +1527,7 @@ actionable, and R² communicates model quality in plain percentage terms.
   electricity than air-source systems, reflecting their superior year-round
   efficiency.
 - The model achieves an R² of `r round(r2_gam * 100, 1)`% and a mean prediction
-  error of `r round(mae_kwh, 1)` kWh/day on the held-out test set.
+  error of `r round(gam_mae_kwh, 1)` kWh/day on the held-out test set.
 
 ### Conclusion
 
@@ -1536,7 +1537,7 @@ misrepresent. Heating degree days, however, turn out to be linear, suggesting
 the LM's treatment of that variable was already adequate. Houses consume `r round((exp(coef(model_gam)["building_typehouse"]) - 1) * 100, 1)`% more than
 appartments, and ground-source heat pumps consume `r round((1 - exp(coef(model_gam)["heatpump_typeground-source"])) * 100, 1)`% less than air-
 source systems. With an R² of `r round(r2_gam * 100, 1)`% and a mean prediction
-error of `r round(mae_kwh, 1)` kWh/day, the model performs moderately well for a
+error of `r round(gam_mae_kwh, 1)` kWh/day, the model performs moderately well for a
 purely weather- and building-based specification and will serve as the
 interpretable benchmark in the model comparison section.
 
