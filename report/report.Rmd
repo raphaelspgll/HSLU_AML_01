@@ -442,31 +442,83 @@ the interaction term — both terms share the same underlying variable — and a
 therefore expected and do not invalidate the model or inflate coefficient
 uncertainty in practice.
 
-```{r lm-model-comparison, echo=FALSE}
-mae_kwh <- function(model) {
-  actual_kwh <- exp(model$model[[1]])
-  pred_kwh <- exp(fitted(model))
-  mean(abs(actual_kwh - pred_kwh))
-}
+```{r lm-cv, echo=FALSE, cache=TRUE, message=FALSE, warning=FALSE}
+df_lm_cv <- heapo %>%
+  select(
+    log_kWh_total,
+    heating_degree_days,
+    sunshine_hours,
+    humidity_avg,
+    living_area,
+    n_residents,
+    building_type,
+    heatpump_type
+  ) %>%
+  na.omit() %>%
+  as.data.frame()
 
+set.seed(42)
+folds_lm <- caret::createFolds(df_lm_cv$log_kWh_total, k = 5, list = TRUE)
+
+cv_lm <- lapply(folds_lm, function(test_idx) {
+  train <- df_lm_cv[-test_idx, ]
+  test <- df_lm_cv[test_idx, ]
+
+  simple_fit <- lm(
+    log_kWh_total ~ heating_degree_days +
+      sunshine_hours +
+      humidity_avg +
+      living_area +
+      n_residents +
+      building_type +
+      heatpump_type,
+    data = train
+  )
+  ext_fit <- lm(
+    log_kWh_total ~ heating_degree_days *
+      building_type +
+      heating_degree_days * heatpump_type +
+      sunshine_hours +
+      humidity_avg +
+      living_area +
+      n_residents,
+    data = train
+  )
+
+  actual_kwh <- exp(test$log_kWh_total)
+  list(
+    simple_mae = mean(abs(
+      actual_kwh - exp(predict(simple_fit, newdata = test))
+    )),
+    ext_mae = mean(abs(actual_kwh - exp(predict(ext_fit, newdata = test))))
+  )
+})
+
+lm_simple_cv_mae <- mean(sapply(cv_lm, `[[`, "simple_mae"))
+lm_ext_cv_mae <- mean(sapply(cv_lm, `[[`, "ext_mae"))
+```
+
+```{r lm-model-comparison, echo=FALSE}
 tibble(
   Model = c("Simple MLR (main effects)", "Extended MLR (+ interactions)"),
   `Adj. R²` = c(
     round(summary(heapo_mlm_simple)$adj.r.squared, 4),
     round(summary(heapo_lm)$adj.r.squared, 4)
   ),
-  `MAE (kWh/day)` = c(
-    round(mae_kwh(heapo_mlm_simple), 2),
-    round(mae_kwh(heapo_lm), 2)
+  `CV MAE (kWh/day)` = c(
+    round(lm_simple_cv_mae, 2),
+    round(lm_ext_cv_mae, 2)
   )
 ) %>%
-  knitr::kable(caption = "LM model comparison")
+  knitr::kable(
+    caption = "LM model comparison — Adj. R² on full data; MAE from 5-fold CV"
+  )
 ```
 
 The simple model achieves an adjusted R² of `r round(summary(heapo_mlm_simple)$adj.r.squared, 4)`. Adding the two interaction
-terms improves this to `r round(summary(heapo_lm)$adj.r.squared, 4)` — a real but modest gain. The MAE in kWh/day
-(back-transformed from log scale) provides the most interpretable error measure:
-predictions are off by roughly `r round(mae_kwh(heapo_lm), 1)` kWh/day on
+terms improves this to `r round(summary(heapo_lm)$adj.r.squared, 4)` — a real but modest gain. The five-fold
+cross-validation MAE provides the most interpretable out-of-sample error measure:
+predictions are off by roughly `r round(lm_ext_cv_mae, 1)` kWh/day on
 average for the extended model. This confirms the interaction terms are
 meaningful while also highlighting that the overall explanatory power of a
 linear model is limited on this dataset.
@@ -499,7 +551,7 @@ negligible explanatory power.
 **Overall explanatory power is limited:** The extended model explains only
 ~`r round(summary(heapo_lm)$adj.r.squared * 100, 1)`% of the variance in log daily consumption (adj. R² = `r round(summary(heapo_lm)$adj.r.squared, 4)`). On the
 original kWh scale the mean absolute error is approximately
-`r round(mae_kwh(heapo_lm), 1)` kWh/day, meaning a typical prediction deviates
+`r round(lm_ext_cv_mae, 1)` kWh/day (5-fold CV), meaning a typical prediction deviates
 by that amount from the observed daily consumption.
 
 ### Conclusion
@@ -1867,6 +1919,17 @@ cm_baseline <- confusionMatrix(pred_baseline, test_y, positive = "high")
 
 best_C <- svm_caret$bestTune$C
 best_sigma <- round(svm_caret$bestTune$sigma, 4)
+
+# 5-fold CV results (pre-computed by R/08_model_comparison_cv_classification.R)
+if (file.exists("../models/cv_class_results.rds")) {
+  cv_class <- readRDS("../models/cv_class_results.rds")
+  svm_cv_row <- cv_class[grepl("SVM", cv_class$Model), ]
+  svm_cv_auc <- svm_cv_row[["CV AUC"]]
+  svm_cv_acc <- svm_cv_row[["CV Accuracy"]]
+} else {
+  svm_cv_auc <- NA
+  svm_cv_acc <- NA
+}
 ```
 
 ### Objective
@@ -1956,6 +2019,28 @@ bind_rows(
 ) %>%
   knitr::kable(caption = "SVM model comparison on test set")
 ```
+
+```{r svm-cv-table, echo=FALSE}
+if (!is.na(svm_cv_auc)) {
+  knitr::kable(
+    data.frame(
+      Model = paste0("Tuned SVM (C=", best_C, ", σ=", best_sigma, ")"),
+      `CV AUC` = round(svm_cv_auc, 3),
+      `CV Accuracy` = round(svm_cv_acc, 3),
+      check.names = FALSE
+    ),
+    caption = "Tuned SVM — 5-fold cross-validation performance (global 75th percentile threshold)"
+  )
+} else {
+  cat(
+    "*CV results not available. Run R/08_model_comparison_cv_classification.R first.*"
+  )
+}
+```
+
+The tuned SVM achieves a five-fold CV AUC of **`r round(svm_cv_auc, 3)`** and CV accuracy of
+**`r round(svm_cv_acc * 100, 1)`%**. The single 80/20 split below provides additional
+diagnostic detail (sensitivity, specificity, F1) not available from the CV summary.
 
 The tuned SVM (C = `r best_C`, sigma = `r best_sigma`) achieves an accuracy of **`r round(cm_best$overall["Accuracy"] * 100, 1)`%** on the
 test set, compared to `r round(cm_baseline$overall["Accuracy"] * 100, 1)`% for the baseline — a modest improvement. However,
