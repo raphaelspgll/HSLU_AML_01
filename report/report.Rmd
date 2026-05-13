@@ -1617,11 +1617,6 @@ performs reliably on unseen data.
 
 ### Model Results
 
-The neural network achieves an accuracy of approximately `r round(acc, 2)`, indicating solid
-predictive performance and a clear improvement over a naive classifier $(\approx
-0.50)$ given the balanced dataset. This suggests that the model captures
-meaningful structure in the data.
-
 ```{r nn-results, echo=FALSE}
 truth <- test_nn$high_consumption
 pred_class <- factor(
@@ -1653,6 +1648,10 @@ knitr::kable(
 )
 ```
 
+The neural network achieves an accuracy of approximately `r round(acc, 2)`, indicating solid
+predictive performance and a clear improvement over a naive classifier $(\approx
+0.50)$ given the balanced dataset. This suggests that the model captures
+meaningful structure in the data.
 
 Sensitivity (`r round(sensitivity, 3)`) exceeds specificity (`r round(specificity, 3)`), indicating that the model is
 more effective at identifying high-consumption events than low-consumption
