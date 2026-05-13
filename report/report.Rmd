@@ -2122,12 +2122,80 @@ the sole basis for high-consumption day decisions.
 
 # Model Comparison {#comparison}
 
-The classification models (GLM Binomial, Neural Network, SVM) are evaluated
-on `high_consumption` using five-fold CV AUC and accuracy. The GLM Poisson
-targets a monthly count at a different aggregation level and is assessed
-separately. The regression comparison (LM vs GAM) is covered in the
-respective model sections.
+The six models do not all share the same response variable, so a single
+unified comparison table is not possible. Instead, models are grouped by
+what they predict. Regression models (LM and GAM) are evaluated on
+`log_kWh_total` using five-fold cross-validation mean absolute error in kWh
+and R². Classification models (GLM Binomial, Neural Network, SVM) are
+evaluated on `high_consumption` using five-fold CV AUC and accuracy. The
+GLM Poisson targets a monthly count at a different aggregation level and is
+assessed separately. In all cases, the same random fold assignment is used
+across models within each group so that fold-to-fold variation cancels out
+and differences reflect only model quality.
 
+## Regression Models: LM vs GAM
+
+```{r reg-comparison-load, echo=FALSE}
+if (file.exists("../models/cv_reg_results.rds")) {
+  reg_summary <- readRDS("../models/cv_reg_results.rds")
+} else {
+  reg_summary <- NULL
+}
+```
+
+The table below reports five-fold cross-validation performance for the two
+regression models fitted to `log_kWh_total`. MAE is computed on the original
+kWh scale for interpretability. R² is computed on the log scale.
+
+```{r reg-comparison-table, echo=FALSE}
+if (!is.null(reg_summary)) {
+  knitr::kable(
+    reg_summary,
+    caption = paste(
+      "Five-fold CV performance: regression models on log_kWh_total.",
+      "MAE is on the kWh scale; R² is on the log scale."
+    )
+  )
+} else {
+  cat("*Table not available. Run R/07_model_comparison_cv.R first.*")
+}
+```
+
+```{r reg-comparison-plot, echo=FALSE, fig.height=3.5}
+if (!is.null(reg_summary)) {
+  reg_long <- tidyr::pivot_longer(
+    reg_summary,
+    cols = -Model,
+    names_to = "Metric",
+    values_to = "Value"
+  )
+
+  print(
+    ggplot(reg_long, aes(x = Model, y = Value, fill = Model)) +
+      geom_col(width = 0.5, show.legend = FALSE) +
+      scale_fill_manual(values = c("steelblue", "tomato")) +
+      facet_wrap(~Metric, scales = "free_y") +
+      theme_minimal(base_size = 12) +
+      labs(
+        title = "5-fold CV: LM vs GAM",
+        x = NULL,
+        y = NULL
+      )
+  )
+}
+```
+
+The two models use overlapping but not identical predictor sets. The extended
+LM includes sunshine hours, humidity, and number of residents, while the GAM
+replaces these with a flexible smooth on average temperature. Direct
+comparison is therefore indicative rather than perfectly controlled. Despite
+this, the results reveal whether the GAM's flexible smooth terms translate
+into a meaningful reduction in prediction error relative to the linear
+specification. A GAM MAE materially lower than the LM would justify the
+added complexity for forecasting purposes; a small difference would suggest
+that the non-linearities found in the smooth plots have limited practical
+impact and that the simpler LM is the better choice for a client who values
+interpretability.
 
 ## Classification Models: GLM Binomial vs SVM vs Neural Network
 
