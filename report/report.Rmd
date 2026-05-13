@@ -2195,11 +2195,66 @@ that the non-linearities found in the smooth plots have limited practical
 impact and that the simpler LM is the better choice for a client who values
 interpretability.
 
-## Classification Models: GLM Binomial, Neural Network, SVM
+## Classification Models: GLM Binomial vs SVM
 
-*To be completed by Raphaël Spagolla and Tharrmeehan Krishnathasan once the
-SVM response variable is aligned with the GLM Binomial household-median
-threshold. See finalise.md for details.*
+```{r class-comparison-load, echo=FALSE}
+if (file.exists("../models/cv_class_results.rds")) {
+  class_summary <- readRDS("../models/cv_class_results.rds")
+} else {
+  class_summary <- NULL
+}
+```
+
+The table below reports five-fold cross-validation performance for the two
+classification models fitted to `high_consumption` (household-median threshold).
+Both models use the same fold assignment so fold-to-fold variation cancels out.
+AUC summarises discrimination across all thresholds; accuracy uses a 0.5 cutoff.
+The Neural Network is excluded from this CV table — see the note below.
+
+```{r class-comparison-table, echo=FALSE}
+if (!is.null(class_summary)) {
+  knitr::kable(
+    class_summary,
+    caption = paste(
+      "Five-fold CV performance: classification models on high_consumption.",
+      "AUC and accuracy are averaged across five folds."
+    )
+  )
+} else {
+  cat("*Table not available. Run R/08_model_comparison_cv_classification.R first.*")
+}
+```
+
+```{r class-comparison-plot, echo=FALSE, fig.height=3.5}
+if (!is.null(class_summary)) {
+  class_long <- tidyr::pivot_longer(
+    class_summary,
+    cols      = -Model,
+    names_to  = "Metric",
+    values_to = "Value"
+  )
+
+  print(
+    ggplot(class_long, aes(x = Model, y = Value, fill = Model)) +
+      geom_col(width = 0.5, show.legend = FALSE) +
+      scale_fill_manual(values = c("steelblue", "tomato")) +
+      facet_wrap(~Metric, scales = "free_y") +
+      theme_minimal(base_size = 12) +
+      labs(
+        title = "5-fold CV: GLM Binomial vs SVM",
+        x     = NULL,
+        y     = NULL
+      )
+  )
+}
+```
+
+**Note on the Neural Network:** The NN predictions are loaded from pre-saved
+files (`data_processed/splits/nn/`) produced by an external Python training
+pipeline. Adding the NN to this CV table would require retraining five separate
+models with different fold assignments, which is not feasible within the R
+workflow. The NN's single-split AUC and accuracy (reported in the Neural Network
+section) should be treated as an indicative rather than CV-validated figure.
 
 ## GLM Poisson (Standalone)
 
