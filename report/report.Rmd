@@ -2221,7 +2221,9 @@ if (!is.null(class_summary)) {
     )
   )
 } else {
-  cat("*Table not available. Run R/08_model_comparison_cv_classification.R first.*")
+  cat(
+    "*Table not available. Run R/08_model_comparison_cv_classification.R first.*"
+  )
 }
 ```
 
@@ -2229,8 +2231,8 @@ if (!is.null(class_summary)) {
 if (!is.null(class_summary)) {
   class_long <- tidyr::pivot_longer(
     class_summary,
-    cols      = -Model,
-    names_to  = "Metric",
+    cols = -Model,
+    names_to = "Metric",
     values_to = "Value"
   )
 
@@ -2242,8 +2244,8 @@ if (!is.null(class_summary)) {
       theme_minimal(base_size = 12) +
       labs(
         title = "5-fold CV: GLM Binomial vs SVM",
-        x     = NULL,
-        y     = NULL
+        x = NULL,
+        y = NULL
       )
   )
 }
