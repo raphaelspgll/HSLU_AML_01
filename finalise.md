@@ -17,7 +17,7 @@ Items marked **[ALL]** require input from all three members before the section c
 
 ### Tharrmeehan Krishnathasan
 
-- [ ] **SVM: refit the model with the household-level median threshold.** Currently the SVM defines high consumption as the top 25% (global 75th percentile of log_kWh_total). The GLM Binomial uses the household median instead. These must match for the classification comparison to be valid. Re-run e1071::tune() with the updated response variable and overwrite `models/svm/heapo_svm.rds`. Update all performance metrics and the Data Preparation subsection accordingly.
+- [X] **SVM: refit the model with the household-level median threshold.** Currently the SVM defines high consumption as the top 25% (global 75th percentile of log_kWh_total). The GLM Binomial uses the household median instead. These must match for the classification comparison to be valid. Re-run e1071::tune() with the updated response variable and overwrite `models/svm/heapo_svm.rds`. Update all performance metrics and the Data Preparation subsection accordingly.
 - [ ] **SVM: fix the doParallel reference in the report.** Line ~1355 of report.Rmd states that cross-validation is "parallelised across cores via doParallel". doParallel was removed from renv.lock when the SVM was refactored to e1071::tune(). Replace this sentence with an accurate description of e1071::tune() and its built-in grid search.
 - [ ] **LM: replace RMSE on log scale with MAE in kWh.** The internal comparison table (simple MLR vs extended MLR) uses RMSE on the log scale. The agreed convention for continuous response models is MAE in kWh and R². Recompute and replace the RMSE column with MAE in kWh. Update the surrounding prose accordingly.
 

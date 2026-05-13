@@ -441,7 +441,11 @@ therefore expected and do not invalidate the model or inflate coefficient
 uncertainty in practice.
 
 ```{r lm-model-comparison, echo=FALSE}
-rmse <- function(model) sqrt(mean(residuals(model)^2))
+mae_kwh <- function(model) {
+  actual_kwh <- exp(model$model[[1]])
+  pred_kwh <- exp(fitted(model))
+  mean(abs(actual_kwh - pred_kwh))
+}
 
 tibble(
   Model = c("Simple MLR (main effects)", "Extended MLR (+ interactions)"),
@@ -449,19 +453,21 @@ tibble(
     round(summary(heapo_mlm_simple)$adj.r.squared, 4),
     round(summary(heapo_lm)$adj.r.squared, 4)
   ),
-  RMSE = c(
-    round(rmse(heapo_mlm_simple), 4),
-    round(rmse(heapo_lm), 4)
+  `MAE (kWh/day)` = c(
+    round(mae_kwh(heapo_mlm_simple), 2),
+    round(mae_kwh(heapo_lm), 2)
   )
 ) %>%
   knitr::kable(caption = "LM model comparison")
 ```
 
-The simple model achieves an adjusted R² of 0.2727 (RMSE = 0.8794). Adding the
-two interaction terms improves this to 0.2743 (RMSE = 0.8785) — a real but
-modest gain. This confirms the interaction terms are meaningful while also
-highlighting that the overall explanatory power of a linear model is limited on
-this dataset.
+The simple model achieves an adjusted R² of 0.2727. Adding the two interaction
+terms improves this to 0.2743 — a real but modest gain. The MAE in kWh/day
+(back-transformed from log scale) provides the most interpretable error measure:
+predictions are off by roughly `r round(mae_kwh(heapo_lm), 1)` kWh/day on
+average for the extended model. This confirms the interaction terms are
+meaningful while also highlighting that the overall explanatory power of a
+linear model is limited on this dataset.
 
 ### Key Findings
 
@@ -489,10 +495,10 @@ systems.
 negligible explanatory power.
 
 **Overall explanatory power is limited:** The extended model explains only
-~27.4% of the variance in log daily consumption (adj. R² = 0.2743, RMSE = 0.879
-on log scale). On the original kWh scale this corresponds to a residual standard
-error of approximately $e^{0.879} \approx 2.4\times$, meaning predictions can be
-off by more than a factor of two.
+~27.4% of the variance in log daily consumption (adj. R² = 0.2743). On the
+original kWh scale the mean absolute error is approximately
+`r round(mae_kwh(heapo_lm), 1)` kWh/day, meaning a typical prediction deviates
+by that amount from the observed daily consumption.
 
 ### Conclusion
 
@@ -973,13 +979,23 @@ specificity <- tn / (tn + fp)
 ```{r glm-binomial-coef-table, echo=FALSE}
 glm_cs <- coef(summary(model_glm))
 glm_tbl <- data.frame(
-  Term    = rownames(glm_cs),
+  Term = rownames(glm_cs),
   Estimate = round(glm_cs[, "Estimate"], 3),
-  OR      = round(exp(glm_cs[, "Estimate"]), 3),
-  CI_Low  = round(exp(glm_cs[, "Estimate"] -
-                    1.96 * glm_cs[, "Std. Error"]), 3),
-  CI_High = round(exp(glm_cs[, "Estimate"] +
-                    1.96 * glm_cs[, "Std. Error"]), 3),
+  OR = round(exp(glm_cs[, "Estimate"]), 3),
+  CI_Low = round(
+    exp(
+      glm_cs[, "Estimate"] -
+        1.96 * glm_cs[, "Std. Error"]
+    ),
+    3
+  ),
+  CI_High = round(
+    exp(
+      glm_cs[, "Estimate"] +
+        1.96 * glm_cs[, "Std. Error"]
+    ),
+    3
+  ),
   p_value = signif(glm_cs[, "Pr(>|z|)"], 3),
   check.names = FALSE
 ) |>
@@ -989,7 +1005,7 @@ glm_tbl <- data.frame(
 knitr::kable(
   glm_tbl,
   col.names = c("Term", "Estimate", "OR", "CI Low", "CI High", "p-value"),
-  caption   = paste(
+  caption = paste(
     "GLM Binomial: coefficient estimates and odds ratios.",
     "Month dummies omitted here; all effects shown in the OR plot below."
   )
@@ -1916,9 +1932,11 @@ serves as a reference point for the tuned model.
 **Tuned SVM:** 5-fold cross-validation is used to search over a grid of `C` ∈
 {1, 10, 100} and `sigma` ∈ {0.01, 0.1, 1/7}. `C` controls the penalty for
 misclassification (higher = tighter fit); `sigma` is the inverse bandwidth of
-the RBF kernel (higher = more local boundaries). Cross-validation is
-parallelised across cores via `doParallel`. The best parameter combination
-maximises cross-validation accuracy on the training set.
+the RBF kernel (higher = more local boundaries). The grid search and
+cross-validation are performed internally by `e1071::tune()`, which evaluates
+every parameter combination and returns the model with the lowest
+cross-validation error. The best parameter combination maximises
+cross-validation accuracy on the training set.
 
 The tuned model uses the following best parameters: C = 100, sigma = 0.1429
 (equal to 1/7, the default gamma in `e1071`). These were selected from a 3×3
