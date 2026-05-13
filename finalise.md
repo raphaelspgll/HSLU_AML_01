@@ -42,9 +42,9 @@ Items marked **[ALL]** require input from all three members before the section c
 
 - [ ] **Write the Conclusions section.** 5–10 sentences. Non-technical and actionable. Cover: what the data shows about the drivers of electricity consumption, which model performed best and why, and what the client (energy supplier or grid operator) should take away. Do not use jargon. Do not repeat the model results in detail — summarise the story.
 
-- [ ] **Write the AI Usage paragraph.** Required by the course. One paragraph covering: (1) how generative AI was used in this project (code generation, text drafting, concept explanations, debugging); (2) what was easy, what was hard, and what was impossible using AI; (3) what had to be critically evaluated or corrected when using AI-generated output.
+- [X] **Write the AI Usage paragraph.** Required by the course. One paragraph covering: (1) how generative AI was used in this project (code generation, text drafting, concept explanations, debugging); (2) what was easy, what was hard, and what was impossible using AI; (3) what had to be critically evaluated or corrected when using AI-generated output.
 
-- [ ] **Add an introduction to the Modelling chapter.** Before the Linear Model subsection, add a short paragraph (3–5 sentences) explaining: which models are fitted, which response variable each targets, and how the models will be compared. This gives the reader a map before they enter six sub-sections.
+- [X] **Add an introduction to the Modelling chapter.** Before the Linear Model subsection, add a short paragraph (3–5 sentences) explaining: which models are fitted, which response variable each targets, and how the models will be compared. This gives the reader a map before they enter six sub-sections.
 
 - [ ] **Verify building_type levels in the Variable Description table.** The table (Introduction section) lists three levels: "flat, house, or other". The data and all model outputs show only two levels: "appartment" (note the spelling) and "house". Correct the table and note the exact spelling.
 

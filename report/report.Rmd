@@ -222,13 +222,15 @@ capture both to be useful.
 Six models are fitted to the HEAPO data, each targeting a response variable
 suited to its statistical family. The Linear Model and Generalised Additive
 Model are fitted to `log_kWh_total`, the log-transformed daily electricity
-consumption. The GLM Binomial, Neural Network, and Support Vector Machine
-classify each household-day as high or low consumption relative to the
-household's own median. The GLM Poisson models the monthly count of
-high-consumption days per household, a coarser aggregation that captures
-longer-term demand patterns. Model performance is evaluated in the comparison
-section using five-fold cross-validation: mean absolute error and R² for
-regression models, and AUC for classification models.
+consumption. The GLM Binomial classifies household-days as high or low
+consumption relative to each household's own median. The Support Vector Machine
+and Neural Network classify days as high consumption using the global 75th
+percentile of daily kWh as the threshold (top 25% of usage). The GLM Poisson
+models the monthly count of high-consumption days per household, capturing
+longer-term demand patterns at a coarser aggregation. Model performance is
+evaluated in the comparison section: regression models are compared via
+five-fold cross-validation MAE in kWh and R²; classification models via AUC
+and accuracy.
 
 ## Linear Model (LM) {#lm}
 
@@ -2311,3 +2313,5 @@ and report separately.*
      1. How generative AI was used (code questions, text generation, concept explanations, ...)
      2. What was easy / hard / impossible to do with generative AI
      3. What had to be critically evaluated when using results obtained through generative AI -->
+
+Generative AI tools (primarily Claude and GitHub Copilot) were used throughout this project for code generation, debugging, and text drafting. Concretely, AI assisted with writing R code for data preprocessing pipelines, model fitting wrappers, cross-validation loops, and visualisation. It also helped explain statistical concepts such as overdispersion in Poisson models, the interpretation of GAM smooth terms, and the role of the cost and kernel bandwidth parameters in SVMs. Straightforward, well-scoped tasks were handled reliably: generating boilerplate ggplot2 code, converting between data formats, and producing first drafts of prose that described model outputs. More demanding tasks required significant human oversight: AI-generated cross-validation code contained subtle bugs (for example, returning single-column data frames instead of vectors, and using a mismatched response variable across models), and AI-drafted coefficient interpretations occasionally overstated certainty or omitted important caveats. Certain tasks were not delegable at all — the substantive analytical decisions, such as choosing which threshold to use for the high-consumption binary response and how to handle the incompatibility between the Neural Network's pre-computed predictions and the rest of the CV pipeline, required domain judgement that the AI could frame but not resolve. All AI-generated code was reviewed, tested, and where necessary corrected before being incorporated, and all interpretive prose was verified against the actual model output rather than accepted at face value.
