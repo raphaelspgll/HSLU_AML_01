@@ -17,7 +17,7 @@ Items marked **[ALL]** require input from all three members before the section c
 
 ### Tharrmeehan Krishnathasan
 
-- [X] **SVM: refit the model with the household-level median threshold.** Currently the SVM defines high consumption as the top 25% (global 75th percentile of log_kWh_total). The GLM Binomial uses the household median instead. These must match for the classification comparison to be valid. Re-run e1071::tune() with the updated response variable and overwrite `models/svm/heapo_svm.rds`. Update all performance metrics and the Data Preparation subsection accordingly.
+- [~] **SVM threshold decision — keeping 25%.** The SVM stays on the global 75th percentile threshold (top 25%). The GLM Binomial uses the household median instead — their individual sections use different thresholds. The CV comparison script (`R/08_model_comparison_cv_classification.R`) uses the 25% threshold for both models so the comparison table is internally consistent.
 - [X] **SVM: fix the doParallel reference in the report.** Line ~1355 of report.Rmd states that cross-validation is "parallelised across cores via doParallel". doParallel was removed from renv.lock when the SVM was refactored to e1071::tune(). Replace this sentence with an accurate description of e1071::tune() and its built-in grid search.
 - [X] **LM: replace RMSE on log scale with MAE in kWh.** The internal comparison table (simple MLR vs extended MLR) uses RMSE on the log scale. The agreed convention for continuous response models is MAE in kWh and R². Recompute and replace the RMSE column with MAE in kWh. Update the surrounding prose accordingly.
 
@@ -36,7 +36,7 @@ Items marked **[ALL]** require input from all three members before the section c
 
 - [ ] **Write the Model Comparison section.** The section is currently an empty placeholder. Structure it as three sub-sections:
   1. **Regression (LM vs GAM):** 5-fold CV MAE in kWh and R² on `log_kWh_total`. Present as a two-row summary table. Discuss whether the GAM's flexibility translates into a meaningful MAE improvement over the LM.
-  2. **Classification (GLM Binomial vs NN vs SVM):** 5-fold CV AUC and accuracy on `high_consumption` (household median threshold — requires SVM refit above). Present as a three-row summary table. Discuss which model achieves the best AUC and whether the gain justifies the loss of interpretability.
+  2. **Classification (GLM Binomial vs SVM):** 5-fold CV AUC and accuracy on `high_consumption` (global 75th percentile / top 25% threshold). Present as a two-row summary table. Discuss which model achieves the best AUC and whether the gain justifies the loss of interpretability. Note: NN cannot be included — see blocker note in the CV section above.
   3. **GLM Poisson (standalone):** 5-fold CV RMSE on `n_high_days`. This model targets a monthly count at a different aggregation level and cannot be placed in the classification table. Evaluate separately and state this limitation explicitly.
   Close with a paragraph discussing the interpretability vs performance trade-off across all models.
 

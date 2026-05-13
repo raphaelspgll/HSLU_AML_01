@@ -1,5 +1,6 @@
 # 5-fold CV for classification models: GLM Binomial and SVM
-# Uses the household-median high_consumption threshold already in heapo_modelling.rds.
+# Response: high_consumption defined as the global 75th percentile of log_kWh_total
+# (top 25% of daily usage), consistent with the SVM section of the report.
 # SVM hyperparameters are fixed to the tuned values (C=100, sigma=0.1429) so that
 # each fold evaluates predictive performance rather than re-running hyperparameter search.
 # Output: models/cv_class_results.rds
@@ -13,11 +14,15 @@ library(kernlab)
 
 heapo <- readRDS("data_processed/heapo/heapo_modelling.rds")
 
+# Derive high_consumption using the global 75th percentile (top 25%), matching
+# the threshold used in the SVM section of the report.
+q75 <- quantile(heapo$log_kWh_total, 0.75, na.rm = TRUE)
+
 # Union of predictors used by either model — drop NAs across all of them once
 # so both models operate on exactly the same rows and folds are shared.
 df_all <- heapo |>
   select(
-    high_consumption,
+    log_kWh_total,
     heating_degree_days,
     temp_avg,
     sunshine_hours,
@@ -32,12 +37,13 @@ df_all <- heapo |>
   ) |>
   mutate(
     month = as.factor(month),
-    high_consumption_int = as.integer(high_consumption),
+    high_consumption_int = as.integer(log_kWh_total >= q75),
     high_consumption_fac = factor(
-      ifelse(high_consumption == 1, "high", "normal"),
+      ifelse(log_kWh_total >= q75, "high", "normal"),
       levels = c("high", "normal")
     )
   ) |>
+  select(-log_kWh_total) |>
   na.omit()
 
 cat(sprintf("Rows after NA removal: %d\n", nrow(df_all)))
