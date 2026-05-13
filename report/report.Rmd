@@ -1176,7 +1176,7 @@ and therefore genuinely ambiguous.
 - Overall classification accuracy is `r round(accuracy * 100, 1)`% on the held-
   out test set, with an AUC of `r round(auc_val, 3)`.
 - **Building type** is the dominant predictor: houses have substantially higher
-  odds of high consumption than appartments, driven by larger floor areas and
+  odds of high consumption than flats, driven by larger floor areas and
   greater heating demand.
 - **Ground-source heat pumps** reduce the odds of high consumption relative to
   air-source systems, reflecting their higher seasonal efficiency.
@@ -1275,10 +1275,10 @@ print(coef_df_gam)
 
 The parametric coefficients are additive shifts on the log scale. Converting
 with `(exp(coef) - 1) × 100` gives the **percentage difference in daily kWh**
-relative to the reference category (appartment, air-source heat pump), all else
+relative to the reference category (flat, air-source heat pump), all else
 equal:
 
-- **Houses vs. appartments:** Houses consume **`r round((exp(coef(model_gam)["building_typehouse"]) - 1) * 100, 1)`% more**
+- **Houses vs. flats:** Houses consume **`r round((exp(coef(model_gam)["building_typehouse"]) - 1) * 100, 1)`% more**
   electricity per day on average. Given a median daily consumption of around 21
   kWh, this corresponds to roughly `r round((exp(coef(model_gam)["building_typehouse"]) - 1) * median(gam_train$log_kWh_total |> exp()), 1)` additional kWh per day. This is
   a modest but statistically reliable difference that likely reflects greater
@@ -1370,10 +1370,10 @@ ggplot(
 ```
 
 This plot isolates the effect of heating demand on electricity consumption for
-houses compared to appartments. The x-axis spans the full observed range of
+houses compared to flats. The x-axis spans the full observed range of
 heating degree days, from warm summer days near zero to the coldest winter days.
 The key aspects to examine are whether consumption accelerates sharply at high
-HDD values, whether the gap between houses and appartments widens in winter, and
+HDD values, whether the gap between houses and flats widens in winter, and
 whether the confidence bands widen at the extremes due to fewer extreme cold
 days in the training data.
 
@@ -1521,7 +1521,7 @@ actionable, and R² communicates model quality in plain percentage terms.
   medium-sized homes behave differently from small or large ones, likely due to
   heating system configuration and occupancy patterns.
 - Houses consume `r round((exp(coef(model_gam)["building_typehouse"]) - 1) *
-  100, 1)`% more electricity per day than appartments, all else equal.
+  100, 1)`% more electricity per day than flats, all else equal.
 - Ground-source heat pumps consume `r round((1 -
   exp(coef(model_gam)["heatpump_typeground-source"])) * 100, 1)`% less
   electricity than air-source systems, reflecting their superior year-round
@@ -1535,7 +1535,7 @@ The GAM reveals that temperature and living area have genuinely non-linear
 effects on electricity consumption, which a plain linear model would
 misrepresent. Heating degree days, however, turn out to be linear, suggesting
 the LM's treatment of that variable was already adequate. Houses consume `r round((exp(coef(model_gam)["building_typehouse"]) - 1) * 100, 1)`% more than
-appartments, and ground-source heat pumps consume `r round((1 - exp(coef(model_gam)["heatpump_typeground-source"])) * 100, 1)`% less than air-
+flats, and ground-source heat pumps consume `r round((1 - exp(coef(model_gam)["heatpump_typeground-source"])) * 100, 1)`% less than air-
 source systems. With an R² of `r round(r2_gam * 100, 1)`% and a mean prediction
 error of `r round(gam_mae_kwh, 1)` kWh/day, the model performs moderately well for a
 purely weather- and building-based specification and will serve as the
@@ -1887,8 +1887,8 @@ a held-out test set using accuracy, sensitivity, specificity, and F1 score.
 
 The response variable, `high_consumption`, is derived from `log_kWh_total` using
 the 75th percentile as a threshold. Days above this threshold are labelled
-*high*; all others are *normal*. The threshold corresponds to 3.541 on the log
-scale (approximately 34.5 kWh per day). This data-driven cutoff identifies the
+*high*; all others are *normal*. The threshold corresponds to `r round(q75, 3)` on the log
+scale (approximately `r round(exp(q75), 1)` kWh per day). This data-driven cutoff identifies the
 25% of days with the highest energy demand, which are disproportionately
 responsible for grid stress events.
 
@@ -2129,6 +2129,8 @@ targets a monthly count at a different aggregation level and is assessed
 separately. The regression comparison (LM vs GAM) is covered in the
 respective model sections.
 
+## Regression Models: LM vs GAM
+
 
 ## Classification Models: GLM Binomial vs SVM vs Neural Network
 
@@ -2223,11 +2225,6 @@ if (!is.null(class_summary)) {
 ```
 
 ## GLM Poisson (Standalone)
-
-*To be completed by Raphaël Spagolla. The Poisson model targets
-`n_high_days`, a monthly aggregation, and cannot be placed in the
-classification table. Evaluate with five-fold CV RMSE on the monthly count
-and report separately.*
 
 ---
 
