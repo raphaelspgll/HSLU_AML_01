@@ -463,8 +463,8 @@ tibble(
   knitr::kable(caption = "LM model comparison")
 ```
 
-The simple model achieves an adjusted R² of 0.2727. Adding the two interaction
-terms improves this to 0.2743 — a real but modest gain. The MAE in kWh/day
+The simple model achieves an adjusted R² of `r round(summary(heapo_mlm_simple)$adj.r.squared, 4)`. Adding the two interaction
+terms improves this to `r round(summary(heapo_lm)$adj.r.squared, 4)` — a real but modest gain. The MAE in kWh/day
 (back-transformed from log scale) provides the most interpretable error measure:
 predictions are off by roughly `r round(mae_kwh(heapo_lm), 1)` kWh/day on
 average for the extended model. This confirms the interaction terms are
@@ -497,7 +497,7 @@ systems.
 negligible explanatory power.
 
 **Overall explanatory power is limited:** The extended model explains only
-~27.4% of the variance in log daily consumption (adj. R² = 0.2743). On the
+~`r round(summary(heapo_lm)$adj.r.squared * 100, 1)`% of the variance in log daily consumption (adj. R² = `r round(summary(heapo_lm)$adj.r.squared, 4)`). On the
 original kWh scale the mean absolute error is approximately
 `r round(mae_kwh(heapo_lm), 1)` kWh/day, meaning a typical prediction deviates
 by that amount from the observed daily consumption.
@@ -511,7 +511,7 @@ significant, and the interaction terms meaningfully capture the heterogeneous
 effect of cold weather across building and pump types.
 
 However, the model is of **limited usefulness for prediction**. An adjusted R²
-of 0.27 means the model leaves ~73% of the variance in daily consumption
+of `r round(summary(heapo_lm)$adj.r.squared, 2)` means the model leaves ~`r round((1 - summary(heapo_lm)$adj.r.squared) * 100, 0)`% of the variance in daily consumption
 unexplained. At the household-day level, predictions are too imprecise to serve
 as a reliable forecasting tool. The likely cause is the strong household-level
 heterogeneity that a cross-sectional linear model cannot capture — different
@@ -634,8 +634,8 @@ temperature captures an important environmental influence.
 To complement the model output, the plots below provide direct visual support
 for the main relationships in the data.
 
-The *boxplot by building type* shows a striking separation between apartments
-and houses. Apartments cluster tightly with a median close to 3 high-consumption
+The *boxplot by building type* shows a striking separation between flats
+and houses. Flats cluster tightly with a median close to 3 high-consumption
 days and only two mild outliers, while houses display a median around 16 days
 with a very wide interquartile range extending from nearly 0 to 28. This large
 difference in both level and spread confirms that building type is the dominant
@@ -1617,7 +1617,7 @@ performs reliably on unseen data.
 
 ### Model Results
 
-The neural network achieves an accuracy of approximately 0.77, indicating solid
+The neural network achieves an accuracy of approximately `r round(acc, 2)`, indicating solid
 predictive performance and a clear improvement over a naive classifier $(\approx
 0.50)$ given the balanced dataset. This suggests that the model captures
 meaningful structure in the data.
@@ -1654,7 +1654,7 @@ knitr::kable(
 ```
 
 
-Sensitivity (0.803) exceeds specificity (0.737), indicating that the model is
+Sensitivity (`r round(sensitivity, 3)`) exceeds specificity (`r round(specificity, 3)`), indicating that the model is
 more effective at identifying high-consumption events than low-consumption
 cases. This suggests that patterns associated with high consumption are more
 strongly captured by the available predictors. While this may be advantageous in
@@ -1760,7 +1760,7 @@ distributional assumptions. The chosen architecture (8–3–1) provides a balan
 between flexibility and overfitting, allowing the model to capture non-linear
 relationships while maintaining stable generalisation.
 
-The test accuracy of approximately 77% indicates reasonable generalisation to
+The test accuracy of approximately `r round(acc * 100, 1)`% indicates reasonable generalisation to
 unseen data. The absence of a substantial gap between training and test
 performance suggests that overfitting is limited, although some dependence on
 the specific train–test split may remain.
@@ -1782,7 +1782,7 @@ specification.
 ### Key Findings
 
 * The neural network achieves solid predictive performance, with an accuracy of
-  approximately 77%, clearly outperforming a naive baseline.
+  approximately `r round(acc * 100, 1)`%, clearly outperforming a naive baseline.
 
 * The model is more effective at identifying high-consumption events than low-
   consumption cases, as reflected in higher sensitivity compared to specificity.
@@ -1801,7 +1801,7 @@ specification.
 
 The neural network achieves solid predictive performance and successfully
 captures non-linear relationships in the data. With an accuracy of approximately
-77%, it provides a meaningful improvement over baseline classification and
+`r round(acc * 100, 1)`%, it provides a meaningful improvement over baseline classification and
 demonstrates good overall discriminative ability.
 
 However, the presence of overlap in predicted probabilities indicates that the
@@ -1958,28 +1958,28 @@ bind_rows(
   knitr::kable(caption = "SVM model comparison on test set")
 ```
 
-The tuned SVM (C = 100, sigma = 0.1429) achieves an accuracy of **83.2%** on the
-test set, compared to 82.2% for the baseline — a modest improvement. However,
+The tuned SVM (C = `r best_C`, sigma = `r best_sigma`) achieves an accuracy of **`r round(cm_best$overall["Accuracy"] * 100, 1)`%** on the
+test set, compared to `r round(cm_baseline$overall["Accuracy"] * 100, 1)`% for the baseline — a modest improvement. However,
 accuracy alone is misleading here because a naive classifier that always
-predicts *normal* would achieve 75.0% (the majority class proportion). The true
-gain over this baseline is therefore only ~8 percentage points.
+predicts *normal* would achieve `r round(table(test_y)["normal"] / length(test_y) * 100, 1)`% (the majority class proportion). The true
+gain over this baseline is therefore only ~`r round((cm_best$overall["Accuracy"] - table(test_y)["normal"] / length(test_y)) * 100, 0)` percentage points.
 
 The more important metrics for this task are:
 
-**Sensitivity: 0.4834** — the model correctly identifies only 48.3% of actual
+**Sensitivity: `r round(cm_best$byClass["Sensitivity"], 4)`** — the model correctly identifies only `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% of actual
 high-consumption days. More than half of all high-load days are missed. This is
 a significant limitation for an early-warning application where false negatives
 carry higher operational costs.
 
-**Specificity: 0.9481** — normal days are classified correctly 94.8% of the
+**Specificity: `r round(cm_best$byClass["Specificity"], 4)`** — normal days are classified correctly `r round(cm_best$byClass["Specificity"] * 100, 1)`% of the
 time. The model is conservative: it flags fewer high-consumption days than
-actually occur (1,598 predicted high vs. 2,502 actual high in the test set).
+actually occur (`r sum(cm_best$table["high", ])` predicted high vs. `r sum(cm_best$table[, "high"])` actual high in the test set).
 
-**F1 Score: 0.5899** — the harmonic mean of precision and recall for the high
+**F1 Score: `r round(cm_best$byClass["F1"], 4)`** — the harmonic mean of precision and recall for the high
 class reflects the imbalance between high specificity and low sensitivity.
 
-**Kappa: 0.4905** — a moderate level of agreement beyond chance, improving on
-the baseline (0.4602) but still below the 0.6 threshold typically considered
+**Kappa: `r round(cm_best$overall["Kappa"], 4)`** — a moderate level of agreement beyond chance, improving on
+the baseline (`r round(cm_baseline$overall["Kappa"], 4)`) but still below the 0.6 threshold typically considered
 *substantial* agreement.
 
 The tuned model is selected as the final model based on the highest cross-
@@ -2050,44 +2050,44 @@ kernel. The gain from increasing C from 10 to 100 at sigma=0.1429 is small
 (0.8268 → 0.8304), indicating diminishing returns from further penalising
 misclassification.
 
-**Class separability:** Sensitivity of 48.3% reveals that the available
+**Class separability:** Sensitivity of `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% reveals that the available
 predictors (weather conditions and household characteristics) do not reliably
 separate the two classes. Many high-consumption days fall in the same feature
 space as normal days, creating an irreducible overlap that no kernel or
 parameter choice can overcome.
 
-**Tuning stability:** The best parameter combination (C=100, sigma=0.1429) sits
+**Tuning stability:** The best parameter combination (C=`r best_C`, sigma=`r best_sigma`) sits
 at the top-right corner of the grid, raising the question of whether a larger C
 or sigma would further improve results. However, given the flattening
 improvement from C=10 to C=100 and the domain knowledge that the classes
 genuinely overlap, additional tuning is unlikely to produce meaningful
 sensitivity gains.
 
-**Comparison with baseline:** The tuned model improves accuracy (82.2% → 83.2%)
-and sensitivity (46.2% → 48.3%) over the default parameterisation. The
+**Comparison with baseline:** The tuned model improves accuracy (`r round(cm_baseline$overall["Accuracy"] * 100, 1)`% → `r round(cm_best$overall["Accuracy"] * 100, 1)`%)
+and sensitivity (`r round(cm_baseline$byClass["Sensitivity"] * 100, 1)`% → `r round(cm_best$byClass["Sensitivity"] * 100, 1)`%) over the default parameterisation. The
 improvement is real but modest, consistent with the view that the bottleneck is
 feature informativeness rather than model configuration.
 
 ### Key Findings
 
-**The SVM achieves reasonable accuracy but low sensitivity:** At 83.2% accuracy,
-the model clearly outperforms always predicting the majority class (75.0%).
-However, sensitivity of 48.3% means it misses more than half of all actual high-
+**The SVM achieves reasonable accuracy but low sensitivity:** At `r round(cm_best$overall["Accuracy"] * 100, 1)`% accuracy,
+the model clearly outperforms always predicting the majority class (`r round(table(test_y)["normal"] / length(test_y) * 100, 1)`%).
+However, sensitivity of `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% means it misses more than half of all actual high-
 consumption days — the most operationally important class.
 
-**High specificity reflects a conservative classifier:** Specificity of 94.8%
+**High specificity reflects a conservative classifier:** Specificity of `r round(cm_best$byClass["Specificity"] * 100, 1)`%
 shows the model rarely raises false alarms on normal days, but this comes at the
 cost of missing many genuine high-load events.
 
 **Cross-validation tuning yields real but limited improvement:** Moving from
-default parameters to C=100, sigma=0.1429 improves sensitivity from 46.2% to
-48.3% and accuracy from 82.2% to 83.2%. The gain is consistent but small,
+default parameters to C=`r best_C`, sigma=`r best_sigma` improves sensitivity from `r round(cm_baseline$byClass["Sensitivity"] * 100, 1)`% to
+`r round(cm_best$byClass["Sensitivity"] * 100, 1)`% and accuracy from `r round(cm_baseline$overall["Accuracy"] * 100, 1)`% to `r round(cm_best$overall["Accuracy"] * 100, 1)`%. The gain is consistent but small,
 confirming that further tuning alone cannot resolve the core problem.
 
 **The predictor set is the bottleneck:** Weather conditions and static household
 characteristics (building type, living area, residents, heat pump type) capture
 only part of what drives high-consumption days. The strong day-to-day within-
-household variation that drives a day over the 34.5 kWh threshold is not fully
+household variation that drives a day over the `r round(exp(q75), 1)` kWh threshold is not fully
 explained by the available features.
 
 **Feature leakage is correctly avoided:** By excluding `log_kWh_total`, all
@@ -2102,7 +2102,7 @@ points above the naive majority-class baseline. The model is well-specified and
 the tuning is sound.
 
 However, the model is of **limited practical usefulness as a standalone early-
-warning system**. A sensitivity of 48.3% means that in a deployment context,
+warning system**. A sensitivity of `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% means that in a deployment context,
 more than half of high-load days would go undetected. For capacity planning or
 demand-response triggering, this miss rate is likely too high to be
 operationally reliable.
@@ -2128,8 +2128,6 @@ on `high_consumption` using five-fold CV AUC and accuracy. The GLM Poisson
 targets a monthly count at a different aggregation level and is assessed
 separately. The regression comparison (LM vs GAM) is covered in the
 respective model sections.
-
-## Regression Models: LM vs GAM
 
 
 ## Classification Models: GLM Binomial vs SVM vs Neural Network
