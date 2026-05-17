@@ -1871,10 +1871,8 @@ interpreted with some caution due to remaining classification uncertainty.
 
 Further improvements are more likely to come from enhanced feature engineering
 or the inclusion of additional relevant variables rather than increasing model
-complexity. In addition, more robust evaluation methods, such as cross-
-validation, could provide more stable performance estimates and reduce
-dependence on a single train–test split.
-
+complexity. Cross-validation results for the Neural Network are reported in the
+Model Comparison section.
 ---
 
 ## Support Vector Machine (SVM) {#svm}
