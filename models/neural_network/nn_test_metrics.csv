@@ -1,2 +1,0 @@
-"model","size","decay","maxit","accuracy","sensitivity","specificity","auc"
-"Neural Network (nn_10)",25,0.05,1000,0.824551737954523,0.825686235223402,0.823417467948718,0.914458680873974
