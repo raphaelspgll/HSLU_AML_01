@@ -1835,6 +1835,14 @@ accuracy, indicating potential overfitting. Simpler architectures achieved
 comparable results with greater stability, supporting the choice of the 8–3–1
 specification.
 
+### Coefficient Interpretation
+
+Neural network weights are not directly interpretable as coefficients. Because
+inputs pass through non-linear transformations across multiple layers, no single
+weight carries an isolated, meaningful effect. Model performance metrics (AUC,
+accuracy) and the cross-validation comparison in the Model Comparison section
+serve as the practical evaluation instead.
+
 ### Key Findings
 
 * The neural network achieves solid predictive performance, with an accuracy of
