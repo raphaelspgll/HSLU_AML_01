@@ -2462,9 +2462,10 @@ if (!is.null(class_summary)) {
     full_table,
     caption = paste(
       "Classification model performance.",
-      "GLM Binomial and SVM: 5-fold CV, global 75th percentile threshold.",
-      "† Neural Network: single 80/20 split, household-median threshold —",
-      "not directly comparable."
+      "GLM Binomial CV: global 75th percentile threshold (computed before",
+      "threshold change to per-household 75th percentile; results indicative).",
+      "SVM: 5-fold CV, global 75th percentile threshold.",
+      "† Neural Network: single 80/20 split, household-median threshold."
     )
   )
 } else {
@@ -2505,17 +2506,52 @@ if (!is.null(class_summary)) {
 }
 ```
 
+Because the three models use different threshold definitions, no single winner
+can be declared. Within the models that share the same threshold (GLM Binomial
+and SVM, both evaluated under the global 75th percentile CV), the SVM achieves
+a slightly higher AUC (0.842 vs 0.830) and accuracy (83.1% vs 80.2%). The
+difference is modest: both models correctly identify roughly four out of five
+household-days as high or low consumption. The SVM's marginal advantage comes
+at the cost of interpretability — its decision boundary is defined by support
+vectors in a high-dimensional space, while the GLM Binomial provides explicit
+odds ratios for each predictor. For a client who needs to explain predictions
+(for example, when flagging a household for an energy audit), the GLM Binomial
+is the practical choice. For automated classification at scale, the SVM offers
+a small accuracy gain.
+
 ## GLM Poisson (Standalone)
 
 ---
 
 # Conclusions {#conclusions}
 
-<!-- Short paragraph (5-10 sentences) summarising:
-     - What the data shows
-     - Which model performed best and why
-     - What the client should take away
-     Keep it non-technical and actionable. -->
+Across 127 Swiss households monitored daily from 2022 to 2024, cold weather
+is the strongest and most consistent driver of electricity consumption. The
+relationship is non-linear for houses: consumption accelerates sharply on the
+coldest winter days, while appartment consumption responds more gradually. The
+single most actionable finding for an energy supplier or grid operator is heat
+pump type. Households with ground-source heat pumps use approximately 13% less
+electricity per day than those with air-source systems, holding all else equal,
+and this difference is stable across seasons and building types. Occupancy also
+matters: every additional resident adds roughly 14% to daily demand, which
+suggests that family size should be a key variable in any demand forecasting or
+household segmentation tool.
+
+On the modelling side, the Generalised Additive Model achieved the best
+predictive accuracy for daily consumption (mean error of 10.6 kWh/day, R² of
+31%), improving on the extended Linear Model (11.0 kWh/day, R² of 27%) by
+capturing the non-linear cold-weather response of houses. The improvement is
+real but moderate: both models leave roughly two-thirds of day-to-day variation
+unexplained, which reflects individual household behaviour that weather and
+building characteristics alone cannot predict. For classification of high-
+consumption days, the SVM performed best (AUC = 0.842, accuracy = 83%) with
+the GLM Binomial close behind (AUC = 0.830, accuracy = 80%). For a client
+prioritising transparency, the GLM Binomial is the recommended model: it
+identifies high-demand household-days with good accuracy and explains exactly
+why each prediction was made. The clearest practical takeaway is that upgrading
+from air-source to ground-source heat pumps is the intervention most likely to
+reduce peak demand, and that larger households with air-source systems should be
+the first target for efficiency programmes.
 
 ---
 
