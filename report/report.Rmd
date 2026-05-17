@@ -2329,15 +2329,28 @@ if (!is.null(reg_summary)) {
 
 The two models use overlapping but not identical predictor sets. The extended
 LM includes sunshine hours, humidity, and number of residents, while the GAM
-replaces these with a flexible smooth on average temperature. Direct
-comparison is therefore indicative rather than perfectly controlled. Despite
-this, the results reveal whether the GAM's flexible smooth terms translate
-into a meaningful reduction in prediction error relative to the linear
-specification. A GAM MAE materially lower than the LM would justify the
-added complexity for forecasting purposes; a small difference would suggest
-that the non-linearities found in the smooth plots have limited practical
-impact and that the simpler LM is the better choice for a client who values
-interpretability.
+replaces these with a flexible smooth on average temperature. Direct comparison
+is therefore indicative rather than perfectly controlled.
+
+The GAM achieves a CV MAE of
+`r reg_summary[reg_summary$Model == "GAM", "CV MAE (kWh/day)"]` kWh/day and
+an R² of `r reg_summary[reg_summary$Model == "GAM", "CV R2"]`, compared to
+`r reg_summary[grepl("Linear", reg_summary$Model), "CV MAE (kWh/day)"]` kWh/day
+and R² of `r reg_summary[grepl("Linear", reg_summary$Model), "CV R2"]` for the
+extended LM. The GAM reduces prediction error by
+`r round(reg_summary[grepl("Linear", reg_summary$Model), "CV MAE (kWh/day)"] - reg_summary[reg_summary$Model == "GAM", "CV MAE (kWh/day)"], 2)`
+kWh/day — a roughly 4% improvement — and explains 2.2 additional percentage
+points of variance. The improvement is real but modest. As the GAM smooth plots
+showed, temperature and living area have genuinely non-linear effects, but these
+non-linearities do not translate into a large reduction in out-of-sample error.
+This suggests that household-level heterogeneity — not functional form — is the
+main source of unexplained variance in both models.
+
+For a client who prioritises interpretability, the extended LM is a reasonable
+choice: its coefficients are directly actionable and its predictions are nearly
+as accurate. For a client who prioritises predictive performance, the GAM is
+preferred, but the marginal gain of 0.41 kWh/day should be weighed against the
+added complexity of smooth terms.
 
 ## Classification Models: GLM Binomial vs SVM vs Neural Network
 
