@@ -103,7 +103,7 @@ set of building, technology, and weather covariates.
 | `n_residents` | Count | Number of permanent household members. |
 | `is_weekend` | Binary | 1 if Saturday or Sunday, 0 otherwise. |
 | `has_floor_heating` | Binary | 1 if floor heating system present, 0 otherwise. |
-| `high_consumption` | Binary | 1 if daily kWh exceeds the household-level median. Response for GLM Binomial and SVM. |
+| `high_consumption` | Binary | 1 if daily kWh exceeds the global 75th percentile (top 25% of usage days). Response for GLM Binomial and SVM. |
 
 The raw HEAPO dataset spans 2018 to 2024 across 438 monitored households in the
 canton of Zurich. The modelling subset was restricted to the period 2022-01-01
@@ -120,7 +120,8 @@ Daily electricity consumption (`kWh_total`) is right-skewed on the raw scale and
 approximately symmetric after log transformation. The log-transformed variable
 `log_kWh_total` is used as the continuous response in all regression models. The
 binary variable `high_consumption` is derived from it: a day is classified as
-high consumption if daily usage exceeds the household-level median.
+high consumption if daily `log_kWh_total` exceeds the global 75th percentile
+(top 25% of usage days across the full dataset).
 
 ## Seasonal Pattern
 
@@ -222,11 +223,10 @@ capture both to be useful.
 Six models are fitted to the HEAPO data, each targeting a response variable
 suited to its statistical family. The Linear Model and Generalised Additive
 Model are fitted to `log_kWh_total`, the log-transformed daily electricity
-consumption. The GLM Binomial classifies household-days as high or low
-consumption relative to each household's own median. The Support Vector Machine
-classifies days as high consumption using the global 75th percentile of daily
-kWh as the threshold (top 25% of usage). The Neural Network uses each
-household's own median as its high-consumption threshold. The GLM Poisson
+consumption. The GLM Binomial and the Support Vector Machine both classify household-days
+as high or low consumption using the global 75th percentile of daily
+`log_kWh_total` as the threshold (top 25% of usage days). The Neural Network
+uses each household's own median as its high-consumption threshold. The GLM Poisson
 models the monthly count of high-consumption days per household, capturing
 longer-term demand patterns at a coarser aggregation. Model performance is
 evaluated in the comparison section: regression models are compared via
@@ -943,24 +943,28 @@ hoc correction.
 
 ### Objective
 
-Can we predict whether a given household-day will see above-average electricity
-consumption before it happens? This section fits a **Generalised Linear Model
-with a binomial family** to answer exactly that question. The response variable
+Can we predict whether a given household-day will rank among the highest-demand
+days in the portfolio? This section fits a **Generalised Linear Model with a
+binomial family** to answer exactly that question. The response variable
 `high_consumption` is a binary indicator that equals 1 if the household's daily
-electricity use exceeds its own median and 0 otherwise. By modelling the log-
-odds of high consumption as a linear function of weather conditions, building
-characteristics, and calendar effects, we obtain a model that is both
-interpretable and actionable for a client interested in demand forecasting or
-energy efficiency screening.
+`log_kWh_total` exceeds the global 75th percentile of the dataset (top 25% of
+usage days) and 0 otherwise. This threshold matches the definition used in the
+SVM section, making the two models directly comparable in the Model Comparison
+chapter. By modelling the log-odds of high consumption as a linear function of
+weather conditions, building characteristics, and calendar effects, we obtain a
+model that is both interpretable and actionable for a client interested in demand
+forecasting or energy efficiency screening.
 
 ### Model Setup
 
 ```{r glm-binomial-prep}
 set.seed(42)
 
+glm_q75 <- quantile(heapo$log_kWh_total, 0.75, na.rm = TRUE)
+
 df_glm <- heapo |>
   select(
-    high_consumption,
+    log_kWh_total,
     heating_degree_days,
     temp_avg,
     living_area,
@@ -972,9 +976,10 @@ df_glm <- heapo |>
     month
   ) |>
   mutate(
-    high_consumption = as.integer(high_consumption),
+    high_consumption = as.integer(log_kWh_total >= glm_q75),
     month = as.factor(month)
   ) |>
+  select(-log_kWh_total) |>
   drop_na()
 
 train_idx <- sample(nrow(df_glm), 0.8 * nrow(df_glm))
@@ -983,15 +988,19 @@ test_df <- df_glm[-train_idx, ]
 ```
 
 ```{r glm-binomial-fit, cache=TRUE}
-if (!file.exists("../models/glm_binomial/glm_binomial.rds")) {
+if (!file.exists("../models/glm_binomial/glm_binomial_q75.rds")) {
   model_glm <- glm(high_consumption ~ ., data = train_df, family = binomial)
-  saveRDS(model_glm, "../models/glm_binomial/glm_binomial.rds")
+  saveRDS(model_glm, "../models/glm_binomial/glm_binomial_q75.rds")
 } else {
-  model_glm <- readRDS("../models/glm_binomial/glm_binomial.rds")
+  model_glm <- readRDS("../models/glm_binomial/glm_binomial_q75.rds")
 }
 ```
 
-The dataset is restricted to ten predictors covering weather conditions,
+The response variable is redefined as 1 if `log_kWh_total` is at or above the
+global 75th percentile (`r round(glm_q75, 3)` on the log scale, approximately
+`r round(exp(glm_q75), 1)` kWh/day), and 0 otherwise. This produces a
+class-imbalanced outcome: roughly 25% high-consumption days and 75% normal days.
+The dataset is restricted to nine predictors covering weather conditions,
 building characteristics, and calendar effects, then split into 80% training and
 20% test sets. The model is fitted with `glm()` using `family = binomial`, which
 models the log-odds of high consumption as a linear combination of predictors.
@@ -1217,11 +1226,12 @@ ggplot(conf_df, aes(x = Actual, y = Predicted, fill = Count)) +
 The confusion matrix shows the model's classifications on the held-out test set.
 The model correctly identifies `r round(recall * 100, 1)`% of true high-
 consumption days (sensitivity) and `r round(specificity * 100, 1)`% of true low-
-consumption days (specificity). Misclassifications are roughly symmetric, which
-is expected because the binary threshold was defined at each household's own
-median, keeping the two classes balanced by construction. The remaining errors
-occur mainly on days where consumption is only marginally above or below average
-and therefore genuinely ambiguous.
+consumption days (specificity). Because the 75th percentile threshold creates an
+imbalanced outcome (roughly 25% high, 75% normal), a naive classifier that always
+predicts normal would achieve around 75% accuracy. The confusion matrix reveals
+whether the model adds real discriminative power beyond that baseline. The
+remaining errors occur mainly on days where consumption is only marginally above
+or below the threshold and therefore genuinely ambiguous.
 
 ### Key Findings
 
@@ -1234,8 +1244,9 @@ and therefore genuinely ambiguous.
   air-source systems, reflecting their higher seasonal efficiency.
 - **Weather effects** (heating degree days, temperature) operate as expected but
   are secondary to structural household characteristics.
-- The model is well-calibrated: sensitivity and specificity are nearly equal,
-  reflecting the balanced binary outcome defined at each household's own median.
+- The threshold definition (global 75th percentile) creates an imbalanced
+  outcome. AUC and sensitivity are the most informative metrics here, as
+  accuracy alone is inflated by the 75% majority class.
 
 ### Conclusion
 
