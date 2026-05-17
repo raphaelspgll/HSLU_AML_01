@@ -160,9 +160,12 @@ cat(sprintf("\n[05] Accuracy: %.4f | Sensitivity: %.4f | Specificity: %.4f\n",
 # ============================================================
 # (6) Save metrics + confusion matrix
 # ============================================================
+pred_roc <- ROCR::prediction(pred_prob_1, truth)
+auc_val <- as.numeric(ROCR::performance(pred_roc, "auc")@y.values[[1]])
 write.csv(
   data.frame(model = "Neural Network", accuracy = acc,
-             sensitivity = sensitivity, specificity = specificity),
+             sensitivity = sensitivity, specificity = specificity,
+             auc = auc_val),
   path_metr, row.names = FALSE
 )
 
@@ -172,7 +175,6 @@ cat("\n[06] Metrics saved to:", path_metr, "\n")
 # ============================================================
 # (7) Evaluation plots  (console preview only — report uses ggplot)
 # ============================================================
-pred_roc <- ROCR::prediction(pred_prob_1, truth)
 perf_roc <- ROCR::performance(pred_roc, "tpr", "fpr")
 
 par(mfrow = c(1, 2))

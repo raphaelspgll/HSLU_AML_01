@@ -1688,13 +1688,18 @@ specificity <- tn / (tn + fp)
 # ROC object (used by plots below)
 pred_roc <- ROCR::prediction(pred_prob_1, truth)
 perf_roc <- ROCR::performance(pred_roc, "tpr", "fpr")
+auc_val <- round(
+  as.numeric(ROCR::performance(pred_roc, "auc")@y.values[[1]]),
+  3
+)
 
 knitr::kable(
   data.frame(
     Model = "Neural Network",
     Accuracy = round(acc, 3),
     Sensitivity = round(sensitivity, 3),
-    Specificity = round(specificity, 3)
+    Specificity = round(specificity, 3),
+    AUC          = auc_val
   ),
   caption = "Neural Network Performance Metrics"
 )
@@ -1703,14 +1708,14 @@ knitr::kable(
 The neural network achieves an accuracy of approximately `r round(acc, 2)`, indicating solid
 predictive performance and a clear improvement over a naive classifier $(\approx
 0.50)$ given the balanced dataset. This suggests that the model captures
-meaningful structure in the data.
+meaningful structure in the data. The AUC of `r auc_val` confirms strong discriminative ability across all classification thresholds.
 
 Sensitivity (`r round(sensitivity, 3)`) exceeds specificity (`r round(specificity, 3)`), indicating that the model is
 more effective at identifying high-consumption events than low-consumption
 cases. This suggests that patterns associated with high consumption are more
 strongly captured by the available predictors. While this may be advantageous in
 contexts where detecting high-consumption events is particularly important, it
-also implies a slightly higher rate of false positives.
+also implies a slightly higher rate of false positives. 
 
 Overall, the confusion matrix shows that the majority of observations are
 correctly classified, with most predictions concentrated along the diagonal.
