@@ -1074,34 +1074,58 @@ knitr::kable(
 ```
 
 Coefficients from a binomial GLM are expressed as **odds ratios** (OR =
-exp(coefficient)): a value above 1 increases the odds of high consumption, below
-1 decreases it, relative to the reference category.
+exp(coefficient)): a value above 1 increases the odds of exceeding the global
+75th percentile threshold, below 1 decreases it, relative to the reference
+category.
 
 Key findings from the coefficient table:
 
-- **Building type (house vs flat):** The dominant structural driver. Houses
-  have an OR of `r round(exp(coef(model_glm)["building_typehouse"]), 2)`
-  relative to flats, meaning their odds of a high-consumption day are
+- **Building type (house vs flat):** By far the dominant effect in the model.
+  Houses have an OR of
+  `r round(exp(coef(model_glm)["building_typehouse"]), 1)` relative to flats,
+  meaning their odds of a high-consumption day are roughly
   `r round((exp(coef(model_glm)["building_typehouse"]) - 1) * 100, 0)`%
-  higher, all else equal. The gap reflects larger floor areas and greater
-  heating demand.
-- **Ground-source heat pump:** Households with a ground-source system have
-  an OR of `r round(exp(coef(model_glm)["heatpump_typeground-source"]), 2)`,
+  higher, all else equal. This extreme value arises because the global 75th
+  percentile threshold (approximately
+  `r round(exp(glm_q75), 1)` kWh/day) is set well above the typical daily
+  consumption of a flat, meaning most high-consumption days in the dataset
+  belong to houses by construction.
+- **Ground-source heat pump:** Households with a ground-source system have an
+  OR of `r round(exp(coef(model_glm)["heatpump_typeground-source"]), 2)`,
   meaning
   `r round((1 - exp(coef(model_glm)["heatpump_typeground-source"])) * 100, 0)`%
-  lower odds of high consumption than air-source households. This is
-  consistent with the higher seasonal efficiency of ground-source systems.
+  lower odds of high consumption than air-source households. Ground-source
+  systems extract heat from the ground at a stable temperature year-round and
+  are substantially more efficient than air-source systems.
+- **Number of residents:** Each additional household member increases the odds
+  by `r round((exp(coef(model_glm)["n_residents"]) - 1) * 100, 0)`% (OR =
+  `r round(exp(coef(model_glm)["n_residents"]), 2)`). Larger households run
+  more appliances and generate more domestic hot water demand on top of
+  heating.
+- **Weekend:** Days falling on a Saturday or Sunday have
+  `r round((exp(coef(model_glm)["is_weekend"]) - 1) * 100, 0)`% higher odds
+  of high consumption than weekdays (OR =
+  `r round(exp(coef(model_glm)["is_weekend"]), 2)`). Households are at home
+  for longer on weekends, increasing both heating and appliance usage.
 - **Floor heating:** OR =
-  `r round(exp(coef(model_glm)["has_floor_heating1"]), 2)`, a modest
-  positive association likely driven by confounding with building size, as
-  floor heating is more common in larger houses.
-- **Heating degree days:** Each additional degree-day multiplies the odds
-  of high consumption by
-  `r round(exp(coef(model_glm)["heating_degree_days"]), 4)`. The per-unit
-  effect is small but accumulates substantially over cold stretches.
-- **Month:** Summer months carry substantially lower odds than January (the
-  reference month). The full range of seasonal month effects is visible in
-  the odds ratio plot below.
+  `r round(exp(coef(model_glm)["has_floor_heating1"]), 2)`, a modest positive
+  association. Floor heating systems require more energy input to maintain
+  comfortable surface temperatures, and are also more common in larger houses.
+- **Heating degree days and temperature:** Each additional HDD increases the
+  odds by `r round((exp(coef(model_glm)["heating_degree_days"]) - 1) * 100, 1)`%
+  (OR = `r round(exp(coef(model_glm)["heating_degree_days"]), 4)`), while
+  each additional degree Celsius in average temperature reduces the odds by
+  `r round((1 - exp(coef(model_glm)["temp_avg"])) * 100, 1)`% (OR =
+  `r round(exp(coef(model_glm)["temp_avg"]), 3)`). The two variables are
+  collinear and capture overlapping thermal information.
+- **Month:** All months have significantly lower odds of high consumption
+  than January (the reference month), except December, which is not
+  statistically distinguishable from January (p = 0.505). September and
+  October show the largest reductions (OR
+  `r round(exp(coef(model_glm)["month9"]), 2)` and
+  `r round(exp(coef(model_glm)["month10"]), 2)` respectively), reflecting the
+  transition season when neither heating nor cooling is needed. The full
+  seasonal pattern is shown in the odds ratio plot below.
 
 ### Visual Evidence
 
@@ -1235,28 +1259,49 @@ or below the threshold and therefore genuinely ambiguous.
 
 ### Key Findings
 
-- Overall classification accuracy is `r round(accuracy * 100, 1)`% on the held-
-  out test set, with an AUC of `r round(auc_val, 3)`.
-- **Building type** is the dominant predictor: houses have substantially higher
-  odds of high consumption than flats, driven by larger floor areas and
-  greater heating demand.
-- **Ground-source heat pumps** reduce the odds of high consumption relative to
-  air-source systems, reflecting their higher seasonal efficiency.
-- **Weather effects** (heating degree days, temperature) operate as expected but
-  are secondary to structural household characteristics.
-- The threshold definition (global 75th percentile) creates an imbalanced
-  outcome. AUC and sensitivity are the most informative metrics here, as
-  accuracy alone is inflated by the 75% majority class.
+- The model achieves an AUC of `r round(auc_val, 3)` and an accuracy of
+  `r round(accuracy * 100, 1)`% on the held-out test set. Because the 75th
+  percentile threshold produces a 75/25 class split, a naive classifier that
+  always predicts normal achieves `r round(sum(actual == 0)/length(actual) * 100, 1)`%
+  accuracy. The true gain over this baseline is only
+  `r round((accuracy - sum(actual == 0)/length(actual)) * 100, 1)` percentage
+  points, so AUC is the more informative metric here.
+- **Building type** dominates the model with an OR of approximately
+  `r round(exp(coef(model_glm)["building_typehouse"]), 0)`. This extreme value
+  reflects the fact that the global threshold sits well above the typical flat
+  consumption, so houses account for the large majority of high-consumption
+  days in the dataset.
+- **Sensitivity is low at `r round(recall * 100, 1)`%** — the model misses more
+  than half of actual high-consumption days. Specificity is high at
+  `r round(specificity * 100, 1)`%, meaning normal days are classified
+  reliably. This conservative behaviour is driven by the class imbalance: the
+  model finds it hard to distinguish the top-25% days purely from weather and
+  household characteristics.
+- **Ground-source heat pumps, number of residents, and weekend status** are the
+  next strongest predictors after building type, each with ORs between 1.2 and
+  1.6 in absolute terms.
+- **Weather** (HDD, temperature) is statistically significant but contributes
+  modest per-unit effects. Its influence is better captured by the seasonal
+  month coefficients, which show January and December as the highest-risk
+  months.
 
 ### Conclusion
 
-The GLM Binomial achieves an overall accuracy of `r round(accuracy * 100, 1)`%
-and an AUC of `r round(auc_val, 3)`. Building type and heat pump technology are
-the dominant structural drivers of whether a household-day is classified as
-high-consumption. Weather effects are present but secondary. The model provides
-a transparent and interpretable baseline for consumption classification and lays
-the groundwork for comparison with more flexible methods in the following
-sections.
+The GLM Binomial achieves an AUC of `r round(auc_val, 3)` and an accuracy of
+`r round(accuracy * 100, 1)`% on the held-out test set. Building type is the
+overwhelming structural driver: the OR of approximately
+`r round(exp(coef(model_glm)["building_typehouse"]), 0)` for houses versus flats
+reflects the fact that the global 75th percentile threshold is primarily crossed
+by house households. Ground-source heat pumps, number of residents, and weekend
+status are the next most important predictors. Weather enters through both the
+HDD and temperature coefficients and through the strong seasonal pattern in the
+month dummies.
+
+The model's practical limitation is its low sensitivity of
+`r round(recall * 100, 1)`%: it misses more than half of actual high-consumption
+days, which limits its usefulness as a standalone early-warning tool. It
+provides a transparent, fully interpretable baseline and will serve as the
+reference point for the more flexible SVM in the Model Comparison section.
 
 ---
 
