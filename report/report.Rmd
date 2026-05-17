@@ -1992,14 +1992,18 @@ dependence on a single train–test split.
 ```{r import-svm, echo=FALSE, message=FALSE, warning=FALSE}
 svm_caret <- readRDS("../models/svm/heapo_svm.rds")
 
-q75 <- quantile(heapo$log_kWh_total, 0.75)
+hh_q75_svm <- heapo |>
+  group_by(Household_ID) |>
+  summarise(hh_q75 = quantile(log_kWh_total, 0.75, na.rm = TRUE),
+            .groups = "drop")
 
-heapo_svm_data <- heapo %>%
+heapo_svm_data <- heapo |>
+  left_join(hh_q75_svm, by = "Household_ID") |>
   mutate(
     high_consumption = as.factor(
-      ifelse(log_kWh_total >= q75, "high", "normal")
+      ifelse(log_kWh_total >= hh_q75, "high", "normal")
     )
-  ) %>%
+  ) |>
   select(
     high_consumption,
     heating_degree_days,
@@ -2009,7 +2013,7 @@ heapo_svm_data <- heapo %>%
     n_residents,
     building_type,
     heatpump_type
-  ) %>%
+  ) |>
   na.omit()
 
 set.seed(42)
@@ -2061,11 +2065,13 @@ a held-out test set using accuracy, sensitivity, specificity, and F1 score.
 ### Data Preparation
 
 The response variable, `high_consumption`, is derived from `log_kWh_total` using
-the 75th percentile as a threshold. Days above this threshold are labelled
-*high*; all others are *normal*. The threshold corresponds to `r round(q75, 3)` on the log
-scale (approximately `r round(exp(q75), 1)` kWh per day). This data-driven cutoff identifies the
-25% of days with the highest energy demand, which are disproportionately
-responsible for grid stress events.
+each household's own 75th percentile as a threshold. For each of the
+`r n_distinct(heapo$Household_ID)` households, the 75th percentile of their
+`log_kWh_total` is computed and used as that household's personal high-consumption
+threshold. A day is labelled *high* if it falls in the top 25% of that
+household's own consumption distribution; all others are *normal*. By
+construction, every household contributes exactly 25% high-consumption days,
+which are disproportionately responsible for grid stress events.
 
 After removing missing values, the dataset contains 93,686 observations: 23,440
 high-consumption days (25.0%) and 70,246 normal days (75.0%). The original
@@ -2284,7 +2290,7 @@ confirming that further tuning alone cannot resolve the core problem.
 **The predictor set is the bottleneck:** Weather conditions and static household
 characteristics (building type, living area, residents, heat pump type) capture
 only part of what drives high-consumption days. The strong day-to-day within-
-household variation that drives a day over the `r round(exp(q75), 1)` kWh threshold is not fully
+household variation that drives a day above its household-specific threshold is not fully
 explained by the available features.
 
 **Feature leakage is correctly avoided:** By excluding `log_kWh_total`, all
@@ -2441,12 +2447,12 @@ nn_auc <- round(compute_auc_vec(nn_actual, nn_prob), 3)
 nn_acc <- round(mean(nn_pred == nn_actual), 3)
 ```
 
-The table below compares all three classification models. Because each model
-uses a different threshold definition, results are not directly comparable and
-are presented for reference only. The GLM Binomial uses each household's own
-75th percentile; the SVM uses the global 75th percentile; the Neural Network
-uses each household's own median. CV results are available for GLM Binomial and
-SVM; the Neural Network row shows a single 80/20 split.
+The table below compares all three classification models. The GLM Binomial and
+SVM both use each household's own 75th percentile as the high-consumption
+threshold; the Neural Network uses each household's own median. Because the
+Neural Network uses a different threshold definition, its results are not
+directly comparable to the other two. CV results are available for GLM Binomial
+and SVM; the Neural Network row shows a single 80/20 split.
 
 ```{r class-comparison-table, echo=FALSE}
 if (!is.null(class_summary)) {
@@ -2462,9 +2468,7 @@ if (!is.null(class_summary)) {
     full_table,
     caption = paste(
       "Classification model performance.",
-      "GLM Binomial CV: global 75th percentile threshold (computed before",
-      "threshold change to per-household 75th percentile; results indicative).",
-      "SVM: 5-fold CV, global 75th percentile threshold.",
+      "GLM Binomial and SVM: 5-fold CV, per-household 75th percentile threshold.",
       "† Neural Network: single 80/20 split, household-median threshold."
     )
   )
