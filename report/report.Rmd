@@ -2387,6 +2387,60 @@ if (!is.null(class_summary)) {
 
 ## GLM Poisson (Standalone)
 
+The GLM Poisson models `n_high_days` at the household–month level and
+cannot be placed in either comparison table. It is evaluated separately
+via five-fold CV RMSE on the count scale.
+
+```{r poisson-cv, echo=TRUE, cache=TRUE}
+set.seed(42)
+n        <- nrow(dat_count)
+folds    <- sample(rep(1:5, length.out = n))
+rmse_folds <- numeric(5)
+
+for (k in 1:5) {
+  train_k <- dat_count[folds != k, ]
+  test_k  <- dat_count[folds == k, ]
+
+  fit_k <- glm(
+    formula(mod_pois),          # reuses the exact same formula
+    family  = poisson(link = "log"),
+    data    = train_k
+  )
+
+  pred_k        <- predict(fit_k, newdata = test_k, type = "response")
+  rmse_folds[k] <- sqrt(mean((test_k$n_high_days - pred_k)^2))
+}
+
+pois_cv_rmse <- round(mean(rmse_folds), 3)
+pois_cv_sd   <- round(sd(rmse_folds),   3)
+```
+
+```{r poisson-cv-table, echo=FALSE}
+knitr::kable(
+  data.frame(
+    Fold = c(paste0("Fold ", 1:5), "**Mean**", "**SD**"),
+    RMSE = c(round(rmse_folds, 3), pois_cv_rmse, pois_cv_sd)
+  ),
+  caption = "Five-fold CV RMSE: GLM Poisson on n_high_days (count scale)."
+)
+```
+
+The five-fold CV RMSE is `r pois_cv_rmse` days (SD = `r pois_cv_sd`).
+Given that `n_high_days` ranges from 0 to ~30, this reflects moderate
+prediction error on the count scale.
+
+**Limitation.** This RMSE is not directly comparable to any other metric
+in this report: the unit of observation is a household–month and the
+response is a raw count. Cross-model ranking would be misleading.
+
+Across all six models, interpretability and predictive performance trade
+off consistently. The LM, GAMs, and GLM Poisson offer transparent,
+coefficient-based explanations but leave more variance unexplained. The
+SVM and Neural Network improve accuracy but are effectively black boxes.
+The GLM Binomial sits in between — log-odds coefficients remain
+interpretable while classification performance is competitive. The right
+choice depends on whether the use case demands explainability or accuracy.
+
 ---
 
 # Conclusions {#conclusions}
