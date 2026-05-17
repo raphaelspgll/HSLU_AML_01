@@ -2383,30 +2383,34 @@ if (!is.null(reg_summary)) {
 }
 ```
 
-The two models use overlapping but not identical predictor sets. The extended
-LM includes sunshine hours, humidity, and number of residents, while the GAM
-replaces these with a flexible smooth on average temperature. Direct comparison
-is therefore indicative rather than perfectly controlled.
+Both models use **exactly the same predictor set**: heating degree days
+(interacted with building type and heat pump type), sunshine hours, humidity,
+living area, and number of residents. The only difference is functional form:
+the LM uses linear terms and explicit interaction dummies, while the GAM
+replaces these with `by =` smooths. This makes the comparison controlled and
+directly attributable to model flexibility rather than predictor choice.
 
 The GAM achieves a CV MAE of
-`r reg_summary[reg_summary$Model == "GAM", "CV MAE (kWh/day)"]` kWh/day and
-an R² of `r reg_summary[reg_summary$Model == "GAM", "CV R2"]`, compared to
+`r reg_summary[grepl("GAM", reg_summary$Model), "CV MAE (kWh/day)"]` kWh/day
+and an R² of `r reg_summary[grepl("GAM", reg_summary$Model), "CV R2"]`,
+compared to
 `r reg_summary[grepl("Linear", reg_summary$Model), "CV MAE (kWh/day)"]` kWh/day
 and R² of `r reg_summary[grepl("Linear", reg_summary$Model), "CV R2"]` for the
 extended LM. The GAM reduces prediction error by
-`r round(reg_summary[grepl("Linear", reg_summary$Model), "CV MAE (kWh/day)"] - reg_summary[reg_summary$Model == "GAM", "CV MAE (kWh/day)"], 2)`
-kWh/day — a roughly 4% improvement — and explains 2.2 additional percentage
+`r round(reg_summary[grepl("Linear", reg_summary$Model), "CV MAE (kWh/day)"] - reg_summary[grepl("GAM", reg_summary$Model), "CV MAE (kWh/day)"], 2)`
+kWh/day, a roughly 3.6% improvement, and explains 3.6 additional percentage
 points of variance. The improvement is real but modest. As the GAM smooth plots
-showed, temperature and living area have genuinely non-linear effects, but these
-non-linearities do not translate into a large reduction in out-of-sample error.
-This suggests that household-level heterogeneity — not functional form — is the
-main source of unexplained variance in both models.
+showed, the main non-linearity is in how houses respond to extreme cold (edf =
+5.3 for s(HDD):house), but this effect does not translate into a large
+out-of-sample accuracy gain. This suggests that household-level heterogeneity,
+not functional form, is the primary source of unexplained variance.
 
 For a client who prioritises interpretability, the extended LM is a reasonable
 choice: its coefficients are directly actionable and its predictions are nearly
 as accurate. For a client who prioritises predictive performance, the GAM is
-preferred, but the marginal gain of 0.41 kWh/day should be weighed against the
-added complexity of smooth terms.
+preferred, but the marginal gain of 0.40 kWh/day should be weighed against the
+added complexity of smooth terms and the loss of a single interpretable
+coefficient per predictor.
 
 ## Classification Models: GLM Binomial vs SVM vs Neural Network
 
