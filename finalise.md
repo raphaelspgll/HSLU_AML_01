@@ -57,15 +57,10 @@ Items marked **[ALL]** require input from all three members before the section c
   summarise(hh_q75 = quantile(log_kWh_total, 0.75))`, join back, and use that
   binary variable as the SVM response. Overwrite `models/svm/heapo_svm.rds`
   and update all performance metrics and the Data Preparation subsection.
-- [ ] **SVM: fix the doParallel reference in the report.** The report still
-  states that cross-validation is "parallelised across cores via doParallel".
-  doParallel was removed when the SVM was refactored to `e1071::tune()`.
-  Replace that sentence with an accurate description of `e1071::tune()` and its
-  built-in grid search.
-- [ ] **LM: replace RMSE on log scale with MAE in kWh.** The internal
-  comparison table (simple MLR vs extended MLR) uses RMSE on the log scale.
-  The agreed convention is MAE in kWh and R². Recompute and replace the RMSE
-  column with MAE in kWh. Update the surrounding prose accordingly.
+- [x] **SVM: fix the doParallel reference in the report.** No reference to
+  doParallel or parallelisation remains anywhere in the report.
+- [x] **LM: replace RMSE on log scale with MAE in kWh.** The comparison table
+  already uses `CV MAE (kWh/day)` and the prose references MAE throughout.
 
 ---
 
