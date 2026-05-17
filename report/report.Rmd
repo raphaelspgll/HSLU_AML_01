@@ -2302,73 +2302,31 @@ if (file.exists("../models/cv_class_results.rds")) {
   class_summary <- NULL
 }
 
-# NN single-split metrics (household-median threshold, 80/20 split)
-nn_test <- readRDS("../data_processed/splits/nn/test_nn.rds")
-nn_prob <- readRDS("../data_processed/splits/nn/nn_pred_prob.rds")
-nn_actual <- as.integer(nn_test$high_consumption)
-nn_pred <- as.integer(nn_prob >= 0.5)
-
-compute_auc_vec <- function(actual, prob) {
-  ord <- order(prob, decreasing = TRUE)
-  act <- actual[ord]
-  n1 <- sum(act == 1)
-  n0 <- sum(act == 0)
-  tpr <- c(0, cumsum(act == 1) / n1)
-  fpr <- c(0, cumsum(act == 0) / n0)
-  sum(diff(fpr) * (tpr[-1] + tpr[-length(tpr)]) / 2)
-}
-
-nn_auc <- round(compute_auc_vec(nn_actual, nn_prob), 3)
-nn_acc <- round(mean(nn_pred == nn_actual), 3)
 ```
 
 The table below compares all three classification models. The GLM Binomial and
 SVM results are averaged across five cross-validation folds using the global
-75th percentile threshold (top 25% of daily usage). The Neural Network row is
-included for reference only — it uses a single 80/20 split and a different
-response definition (household-median threshold).
+75th percentile threshold (top 25% of daily usage).
 
 ```{r class-comparison-table, echo=FALSE}
 if (!is.null(class_summary)) {
-  nn_row <- data.frame(
-    Model = "Neural Network †",
-    `CV AUC` = nn_auc,
-    `CV Accuracy` = nn_acc,
-    check.names = FALSE
-  )
-  full_table <- rbind(class_summary, nn_row)
-
   knitr::kable(
-    full_table,
-    caption = paste(
-      "Classification model performance.",
-      "GLM Binomial and SVM: 5-fold CV, global 75th percentile threshold.",
-      "† Neural Network: single 80/20 split, household-median threshold —",
-      "not directly comparable."
-    )
+    class_summary,
+    caption = "Classification model performance: 5-fold CV, global 75th percentile threshold."
   )
 } else {
-  cat(
-    "*CV table not available. Run R/08_model_comparison_cv_classification.R first.*"
-  )
+  cat("*CV table not available. Run R/08_model_comparison_cv_classification.R then 01_nn_pipeline.R first.*")
 }
 ```
 
 ```{r class-comparison-plot, echo=FALSE, fig.height=3.5}
 if (!is.null(class_summary)) {
-  nn_row_plot <- data.frame(
-    Model = "Neural Network †",
-    `CV AUC` = nn_auc,
-    `CV Accuracy` = nn_acc,
-    check.names = FALSE
-  )
   plot_data <- tidyr::pivot_longer(
-    rbind(class_summary, nn_row_plot),
+    class_summary,
     cols = -Model,
     names_to = "Metric",
     values_to = "Value"
   )
-
   print(
     ggplot(plot_data, aes(x = Model, y = Value, fill = Model)) +
       geom_col(width = 0.5, show.legend = FALSE) +
@@ -2377,7 +2335,7 @@ if (!is.null(class_summary)) {
       theme_minimal(base_size = 12) +
       labs(
         title = "Classification model comparison",
-        subtitle = "† NN uses single split and different threshold",
+        subtitle = "All models: 5-fold CV, global 75th percentile threshold",
         x = NULL,
         y = NULL
       )
