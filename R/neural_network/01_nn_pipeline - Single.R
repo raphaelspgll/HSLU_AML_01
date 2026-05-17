@@ -111,9 +111,9 @@ if (file.exists(path_mod)) {
   mod_nn <- nnet(
     high_consumption ~ .,
     data  = train_nn,
-    size  = 3,
-    decay = 0.001,
-    maxit = 300,
+    size  = 25,
+    decay = 0.05,
+    maxit = 1000,
     trace = FALSE
   )
   
