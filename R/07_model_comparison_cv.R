@@ -10,7 +10,7 @@ heapo <- readRDS("data_processed/heapo/heapo_modelling.rds")
 
 df_reg <- heapo |>
   select(
-    log_kWh_total, heating_degree_days, temp_avg, sunshine_hours,
+    log_kWh_total, heating_degree_days, sunshine_hours,
     humidity_avg, living_area, n_residents, building_type, heatpump_type
   ) |>
   as.data.frame() |>
@@ -33,8 +33,11 @@ cv_results <- lapply(folds, function(test_idx) {
 
   gam_cv <- mgcv::gam(
     log_kWh_total ~
-      s(heating_degree_days) + s(temp_avg) + s(living_area) +
-      building_type + heatpump_type,
+      s(heating_degree_days, by = building_type) +
+      s(heating_degree_days, by = heatpump_type) +
+      building_type + heatpump_type +
+      s(sunshine_hours) + s(humidity_avg) +
+      s(living_area) + n_residents,
     family = gaussian,
     data = train
   )
@@ -61,7 +64,7 @@ mae_gam <- mean(sapply(cv_results, `[[`, "gam_mae"))
 r2_gam  <- mean(sapply(cv_results, `[[`, "gam_r2"))
 
 reg_summary <- data.frame(
-  Model             = c("Linear Model (extended)", "GAM"),
+  Model             = c("Linear Model (extended)", "GAM (same predictors)"),
   `CV MAE (kWh/day)` = round(c(mae_lm, mae_gam), 2),
   `CV R2`           = round(c(r2_lm,  r2_gam),  3),
   check.names = FALSE
