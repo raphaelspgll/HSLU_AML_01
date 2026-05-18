@@ -226,10 +226,10 @@ suited to its statistical family. The Linear Model and Generalised Additive
 Model are fitted to `log_kWh_total`, the log-transformed daily electricity
 consumption. The GLM Binomial classifies household-days as high or low consumption using
 each household's own 75th percentile as the threshold, capturing the top 25%
-of days for each individual household. The Support Vector Machine uses the
-global 75th percentile across the full dataset. The Neural Network uses each
-household's own median. Because all three classification models use different
-threshold definitions, direct comparison in the Model Comparison section is
+of days for each individual household. The Support Vector Machine uses each
+household's own 75th percentile, the same definition as the GLM Binomial. The Neural Network uses each
+household's own median. Because the Neural Network uses a different threshold
+definition, comparisons involving it in the Model Comparison section are
 indicative rather than fully controlled. The GLM Poisson
 models the monthly count of high-consumption days per household, capturing
 longer-term demand patterns at a coarser aggregation. Model performance is
@@ -1752,7 +1752,7 @@ knitr::kable(
     Accuracy = round(acc, 3),
     Sensitivity = round(sensitivity, 3),
     Specificity = round(specificity, 3),
-    AUC          = auc_val
+    AUC = auc_val
   ),
   caption = "Neural Network Performance Metrics"
 )
@@ -2306,7 +2306,6 @@ if (file.exists("../models/cv_class_results.rds")) {
 } else {
   class_summary <- NULL
 }
-
 ```
 
 The table below compares all three classification models. The GLM Binomial and
@@ -2327,7 +2326,9 @@ if (!is.null(class_summary)) {
     )
   )
 } else {
-  cat("*CV table not available. Run R/08_model_comparison_cv_classification.R then 01_nn_pipeline.R first.*")
+  cat(
+    "*CV table not available. Run R/08_model_comparison_cv_classification.R then 01_nn_pipeline.R first.*"
+  )
 }
 ```
 
@@ -2368,26 +2369,26 @@ via five-fold CV RMSE on the count scale.
 
 ```{r poisson-cv, echo=TRUE, cache=TRUE}
 set.seed(42)
-n        <- nrow(dat_count)
-folds    <- sample(rep(1:5, length.out = n))
+n <- nrow(dat_count)
+folds <- sample(rep(1:5, length.out = n))
 rmse_folds <- numeric(5)
 
 for (k in 1:5) {
   train_k <- dat_count[folds != k, ]
-  test_k  <- dat_count[folds == k, ]
+  test_k <- dat_count[folds == k, ]
 
   fit_k <- glm(
-    formula(mod_pois),          # reuses the exact same formula
-    family  = poisson(link = "log"),
-    data    = train_k
+    formula(mod_pois), # reuses the exact same formula
+    family = poisson(link = "log"),
+    data = train_k
   )
 
-  pred_k        <- predict(fit_k, newdata = test_k, type = "response")
+  pred_k <- predict(fit_k, newdata = test_k, type = "response")
   rmse_folds[k] <- sqrt(mean((test_k$n_high_days - pred_k)^2))
 }
 
 pois_cv_rmse <- round(mean(rmse_folds), 3)
-pois_cv_sd   <- round(sd(rmse_folds),   3)
+pois_cv_sd <- round(sd(rmse_folds), 3)
 ```
 
 ```{r poisson-cv-table, echo=FALSE}
