@@ -894,28 +894,8 @@ knitr::kable(
   caption = "Root Mean Squared Error for Poisson and quasi-Poisson models."
 )
 
-ggplot(dat_count, aes(x = fitted_pois, y = n_high_days)) +
-  geom_point(alpha = 0.2, size = 0.8) +
-  geom_abline(
-    slope = 1,
-    intercept = 0,
-    colour = "steelblue",
-    linetype = "dashed"
-  ) +
-  labs(
-    title = "Observed vs fitted values (Poisson GLM)",
-    x = "Fitted values",
-    y = "Observed n_high_days"
-  ) +
-  theme_minimal()
 ```
-
-The RMSE of `r round(rmse_pois, 3)` days reflects the residual spread visible in
-the plot — predictions are reasonably centred along the identity line but with
-substantial scatter, partly explained by the high overdispersion ($\hat{\phi}$ =
-`r round(phi_q, 2)`). Note that the quasi-Poisson model produces identical
-fitted values and therefore the same RMSE, as it only affects standard errors
-and inference, not point predictions.
+The RMSE of `r round(rmse_pois, 3)` days reflects substantial residual spread, partly explained by the high overdispersion ($\hat{\phi}$ = `r round(phi_q, 2)`).Note that the quasi-Poisson model produces identical fitted values and therefore the same RMSE, as it only affects standard errors and inference, not point predictions."
 
 ### Conclusion
 
@@ -1600,8 +1580,8 @@ interpretable benchmark in the model comparison section.
 
 ```{r import-NN, echo=FALSE, message=FALSE, warning=FALSE}
 mod_nn <- readRDS("../models/neural_network/mod_nn_nnet.rds")
-test_nn <- readRDS("../data_processed/splits/nn/test_nn.rds")
-pred_prob_1 <- readRDS("../data_processed/splits/nn/nn_pred_prob.rds")
+test_nn <- readRDS("../models/neural_network/splits/test_nn.rds")
+pred_prob_1 <- readRDS("../models/neural_network/splits/nn_pred_prob.rds")
 ```
 
 ### Objective
