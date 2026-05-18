@@ -1,6 +1,7 @@
 # 5-fold CV for classification models: GLM Binomial and SVM
-# Response: high_consumption defined as the global 75th percentile of log_kWh_total
-# (top 25% of daily usage), consistent with the SVM section of the report.
+# Response: high_consumption defined as the per-household 75th percentile of
+# log_kWh_total. Each household's own q75 is used as its threshold, so every
+# household contributes exactly 25% high-consumption days by construction.
 # SVM hyperparameters are fixed to the tuned values (C=100, sigma=0.1429) so that
 # each fold evaluates predictive performance rather than re-running hyperparameter search.
 # Output: models/cv_class_results.rds
@@ -14,15 +15,20 @@ library(kernlab)
 
 heapo <- readRDS("data_processed/heapo/heapo_modelling.rds")
 
-# Derive high_consumption using the global 75th percentile (top 25%), matching
-# the threshold used in the SVM section of the report.
-q75 <- quantile(heapo$log_kWh_total, 0.75, na.rm = TRUE)
+# Per-household 75th percentile threshold, consistent with the GLM Binomial and
+# SVM sections of the report.
+hh_q75 <- heapo |>
+  group_by(Household_ID) |>
+  summarise(hh_q75 = quantile(log_kWh_total, 0.75, na.rm = TRUE),
+            .groups = "drop")
 
 # Union of predictors used by either model — drop NAs across all of them once
 # so both models operate on exactly the same rows and folds are shared.
 df_all <- heapo |>
+  left_join(hh_q75, by = "Household_ID") |>
   select(
     log_kWh_total,
+    hh_q75,
     heating_degree_days,
     temp_avg,
     sunshine_hours,
@@ -37,13 +43,13 @@ df_all <- heapo |>
   ) |>
   mutate(
     month = as.factor(month),
-    high_consumption_int = as.integer(log_kWh_total >= q75),
+    high_consumption_int = as.integer(log_kWh_total >= hh_q75),
     high_consumption_fac = factor(
-      ifelse(log_kWh_total >= q75, "high", "normal"),
+      ifelse(log_kWh_total >= hh_q75, "high", "normal"),
       levels = c("high", "normal")
     )
   ) |>
-  select(-log_kWh_total) |>
+  select(-log_kWh_total, -hh_q75) |>
   na.omit()
 
 cat(sprintf("Rows after NA removal: %d\n", nrow(df_all)))
