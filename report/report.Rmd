@@ -968,8 +968,10 @@ set.seed(42)
 
 hh_q75 <- heapo |>
   group_by(Household_ID) |>
-  summarise(hh_q75 = quantile(log_kWh_total, 0.75, na.rm = TRUE),
-            .groups = "drop")
+  summarise(
+    hh_q75 = quantile(log_kWh_total, 0.75, na.rm = TRUE),
+    .groups = "drop"
+  )
 
 df_glm <- heapo |>
   left_join(hh_q75, by = "Household_ID") |>
@@ -1345,7 +1347,7 @@ df_gam <- heapo |>
 set.seed(42)
 gam_train_idx <- sample(nrow(df_gam), 0.8 * nrow(df_gam))
 gam_train <- df_gam[gam_train_idx, ]
-gam_test  <- df_gam[-gam_train_idx, ]
+gam_test <- df_gam[-gam_train_idx, ]
 ```
 
 ```{r gam-fit, cache=TRUE}
@@ -1354,11 +1356,14 @@ if (!file.exists("../models/gam/gam_model_v2.rds")) {
     log_kWh_total ~
       s(heating_degree_days, by = building_type) +
       s(heating_degree_days, by = heatpump_type) +
-      building_type + heatpump_type +
-      s(sunshine_hours) + s(humidity_avg) +
-      s(living_area) + n_residents,
+      building_type +
+      heatpump_type +
+      s(sunshine_hours) +
+      s(humidity_avg) +
+      s(living_area) +
+      n_residents,
     family = gaussian,
-    data   = gam_train
+    data = gam_train
   )
   saveRDS(model_gam, "../models/gam/gam_model_v2.rds")
 } else {
@@ -1380,12 +1385,12 @@ s_tab <- as.data.frame(s_gam$s.table)
 s_tab <- cbind(Term = rownames(s_tab), s_tab)
 knitr::kable(
   data.frame(
-    Term    = s_tab$Term,
-    EDF     = round(s_tab$edf, 1),
-    F       = round(s_tab$F, 2),
+    Term = s_tab$Term,
+    EDF = round(s_tab$edf, 1),
+    F = round(s_tab$F, 2),
     p.value = formatC(s_tab[["p-value"]], digits = 3, format = "g")
   ),
-  caption   = "GAM – Smooth Terms",
+  caption = "GAM – Smooth Terms",
   col.names = c("Smooth Term", "EDF", "F", "p-value"),
   row.names = FALSE
 )
@@ -1396,13 +1401,13 @@ p_tab <- as.data.frame(s_gam$p.table)
 p_tab <- cbind(Term = rownames(p_tab), p_tab)
 knitr::kable(
   data.frame(
-    Term    = p_tab$Term,
-    Est     = round(p_tab$Estimate, 4),
-    SE      = round(p_tab[["Std. Error"]], 4),
-    t.val   = round(p_tab[["t value"]], 2),
+    Term = p_tab$Term,
+    Est = round(p_tab$Estimate, 4),
+    SE = round(p_tab[["Std. Error"]], 4),
+    t.val = round(p_tab[["t value"]], 2),
     p.value = formatC(p_tab[["Pr(>|t|)"]], digits = 3, format = "g")
   ),
-  caption   = "GAM – Parametric Terms",
+  caption = "GAM – Parametric Terms",
   col.names = c("Term", "Estimate", "Std. Error", "t-value", "p-value"),
   row.names = FALSE
 )
@@ -1459,10 +1464,10 @@ The smooth terms reveal where non-linearity is present in the data:
 par(mfrow = c(2, 4), mar = c(4, 4, 3, 1))
 plot(
   model_gam,
-  shade      = TRUE,
+  shade = TRUE,
   seWithMean = TRUE,
-  ylab       = "Effect on log(kWh_total)",
-  residuals  = FALSE
+  ylab = "Effect on log(kWh_total)",
+  residuals = FALSE
 )
 par(mfrow = c(1, 1))
 ```
@@ -1484,23 +1489,23 @@ hdd_grid <- expand.grid(
     length.out = 200
   ),
   sunshine_hours = median(gam_train$sunshine_hours),
-  humidity_avg   = median(gam_train$humidity_avg),
-  living_area    = median(gam_train$living_area),
-  n_residents    = round(median(gam_train$n_residents)),
-  building_type  = levels(gam_train$building_type),
-  heatpump_type  = levels(gam_train$heatpump_type)[1]
+  humidity_avg = median(gam_train$humidity_avg),
+  living_area = median(gam_train$living_area),
+  n_residents = round(median(gam_train$n_residents)),
+  building_type = levels(gam_train$building_type),
+  heatpump_type = levels(gam_train$heatpump_type)[1]
 )
 hdd_pred <- predict(model_gam, newdata = hdd_grid, se.fit = TRUE)
 hdd_grid$fit <- hdd_pred$fit
-hdd_grid$se  <- hdd_pred$se.fit
+hdd_grid$se <- hdd_pred$se.fit
 
 ggplot(
   hdd_grid,
   aes(
-    x     = heating_degree_days,
-    y     = exp(fit),
+    x = heating_degree_days,
+    y = exp(fit),
     color = building_type,
-    fill  = building_type
+    fill = building_type
   )
 ) +
   geom_ribbon(
@@ -1510,12 +1515,12 @@ ggplot(
   ) +
   geom_line(linewidth = 1) +
   labs(
-    title    = "GAM – Predicted Daily Consumption by Heating Demand and Building Type",
+    title = "GAM – Predicted Daily Consumption by Heating Demand and Building Type",
     subtitle = "Other predictors held at median; air-source heat pump",
-    x     = "Heating Degree Days",
-    y     = "Predicted kWh/day",
+    x = "Heating Degree Days",
+    y = "Predicted kWh/day",
     color = "Building type",
-    fill  = "Building type"
+    fill = "Building type"
   ) +
   theme_minimal()
 ```
@@ -1536,23 +1541,23 @@ hp_grid <- expand.grid(
     length.out = 200
   ),
   sunshine_hours = median(gam_train$sunshine_hours),
-  humidity_avg   = median(gam_train$humidity_avg),
-  living_area    = median(gam_train$living_area),
-  n_residents    = round(median(gam_train$n_residents)),
-  building_type  = levels(gam_train$building_type)[1],
-  heatpump_type  = levels(gam_train$heatpump_type)
+  humidity_avg = median(gam_train$humidity_avg),
+  living_area = median(gam_train$living_area),
+  n_residents = round(median(gam_train$n_residents)),
+  building_type = levels(gam_train$building_type)[1],
+  heatpump_type = levels(gam_train$heatpump_type)
 )
 hp_pred <- predict(model_gam, newdata = hp_grid, se.fit = TRUE)
 hp_grid$fit <- hp_pred$fit
-hp_grid$se  <- hp_pred$se.fit
+hp_grid$se <- hp_pred$se.fit
 
 ggplot(
   hp_grid,
   aes(
-    x     = heating_degree_days,
-    y     = exp(fit),
+    x = heating_degree_days,
+    y = exp(fit),
     color = heatpump_type,
-    fill  = heatpump_type
+    fill = heatpump_type
   )
 ) +
   geom_ribbon(
@@ -1562,12 +1567,12 @@ ggplot(
   ) +
   geom_line(linewidth = 1) +
   labs(
-    title    = "GAM – Predicted Daily Consumption by Heating Demand and Heat Pump Type",
+    title = "GAM – Predicted Daily Consumption by Heating Demand and Heat Pump Type",
     subtitle = "Other predictors held at median; appartment building type",
-    x     = "Heating Degree Days",
-    y     = "Predicted kWh/day",
+    x = "Heating Degree Days",
+    y = "Predicted kWh/day",
     color = "Heat pump type",
-    fill  = "Heat pump type"
+    fill = "Heat pump type"
   ) +
   theme_minimal()
 ```
@@ -1994,8 +1999,10 @@ svm_caret <- readRDS("../models/svm/heapo_svm.rds")
 
 hh_q75_svm <- heapo |>
   group_by(Household_ID) |>
-  summarise(hh_q75 = quantile(log_kWh_total, 0.75, na.rm = TRUE),
-            .groups = "drop")
+  summarise(
+    hh_q75 = quantile(log_kWh_total, 0.75, na.rm = TRUE),
+    .groups = "drop"
+  )
 
 heapo_svm_data <- heapo |>
   left_join(hh_q75_svm, by = "Household_ID") |>
@@ -2566,4 +2573,8 @@ the first target for efficiency programmes.
      2. What was easy / hard / impossible to do with generative AI
      3. What had to be critically evaluated when using results obtained through generative AI -->
 
-Generative AI tools (primarily Claude and GitHub Copilot) were used throughout this project for code generation, debugging, and text drafting. Concretely, AI assisted with writing R code for data preprocessing pipelines, model fitting wrappers, cross-validation loops, and visualisation. It also helped explain statistical concepts such as overdispersion in Poisson models, the interpretation of GAM smooth terms, and the role of the cost and kernel bandwidth parameters in SVMs. Straightforward, well-scoped tasks were handled reliably: generating boilerplate ggplot2 code, converting between data formats, and producing first drafts of prose that described model outputs. More demanding tasks required significant human oversight: AI-generated cross-validation code contained subtle bugs (for example, returning single-column data frames instead of vectors, and using a mismatched response variable across models), and AI-drafted coefficient interpretations occasionally overstated certainty or omitted important caveats. Certain tasks were not delegable at all — the substantive analytical decisions, such as choosing which threshold to use for the high-consumption binary response and how to handle the incompatibility between the Neural Network's pre-computed predictions and the rest of the CV pipeline, required domain judgement that the AI could frame but not resolve. All AI-generated code was reviewed, tested, and where necessary corrected before being incorporated, and all interpretive prose was verified against the actual model output rather than accepted at face value.
+Generative AI tools (primarily Claude and GitHub Copilot) were used throughout for code generation, debugging, and text drafting. AI helped write data preprocessing pipelines, model fitting wrappers, cross-validation loops, and visualisation, and explained statistical concepts (overdispersion in Poisson models, GAM smooth term interpretation, SVM cost and kernel bandwidth parameters) as they came up.
+
+Routine tasks went smoothly: boilerplate ggplot2 code, format conversions, first-draft prose describing model outputs. More complex tasks needed closer attention. Cross-validation code had subtle bugs (returning single-column data frames instead of vectors, using a mismatched response variable across models) that only surfaced during testing. AI-drafted coefficient interpretations occasionally overstated certainty or dropped caveats that mattered.
+
+Some decisions could not be delegated. Choosing the threshold for the high-consumption binary response and handling the incompatibility between the Neural Network's pre-computed predictions and the rest of the CV pipeline both required judgment calls that AI could help frame but not make. All generated code was reviewed and tested before use, and interpretive prose was checked against the actual model output rather than taken at face value.
