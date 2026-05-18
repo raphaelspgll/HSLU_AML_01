@@ -583,13 +583,14 @@ based methods) would be needed.
 
 *Lead: Raphaël Spagolla*
 
-```{r import-poisson, echo=FALSE, cache=TRUE}
-dat_count <- readRDS("../data_processed/poisson/dat_count.rds")
-mod_pois <- readRDS("../models/poisson_glm/mod_pois.rds")
-mod_quasi_pois <- readRDS("../models/poisson_glm/mod_quasi.rds")
-rr_table <- read.csv("../models/poisson_glm/coeff_rate_ratios.csv")
-dispersion <- readRDS("../models/poisson_glm/dispersion_val.rds")
-comp <- read.csv("../models/poisson_glm/quasi_vs_pois_se_pvals.csv")
+```{r import-poisson, echo=FALSE, cache=FALSE}
+library(here)
+dat_count      <- readRDS(here("data_processed/poisson/dat_count.rds"))
+mod_pois       <- readRDS(here("models/poisson_glm/mod_pois.rds"))
+mod_quasi_pois <- readRDS(here("models/poisson_glm/mod_quasi.rds"))
+rr_table       <- read.csv(here("models/poisson_glm/coeff_rate_ratios.csv"))
+dispersion     <- readRDS(here("models/poisson_glm/dispersion_val.rds"))
+comp           <- read.csv(here("models/poisson_glm/quasi_vs_pois_se_pvals.csv"))
 ```
 
 ### Objective
