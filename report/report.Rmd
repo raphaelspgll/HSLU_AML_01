@@ -584,13 +584,9 @@ based methods) would be needed.
 *Lead: Raphaël Spagolla*
 
 ```{r import-poisson, echo=FALSE, cache=FALSE}
-library(here)
-dat_count      <- readRDS(here("data_processed/poisson/dat_count.rds"))
-mod_pois       <- readRDS(here("models/poisson_glm/mod_pois.rds"))
-mod_quasi_pois <- readRDS(here("models/poisson_glm/mod_quasi.rds"))
-rr_table       <- read.csv(here("models/poisson_glm/coeff_rate_ratios.csv"))
-dispersion     <- readRDS(here("models/poisson_glm/dispersion_val.rds"))
-comp           <- read.csv(here("models/poisson_glm/quasi_vs_pois_se_pvals.csv"))
+dat_count      <- readRDS("../data_processed/poisson/dat_count.rds")
+mod_pois       <- readRDS("../models/poisson_glm/mod_pois.rds")
+mod_quasi_pois <- readRDS("../models/poisson_glm/mod_quasi.rds")
 ```
 
 ### Objective
@@ -702,6 +698,7 @@ counts concentrate near zero. The smooth LOESS curve decreases steeply in the
 marginal effects of warmth once heating demand is already low.
 
 ```{r glm-poisson-plots, echo=FALSE, fig.height=4, fig.show='hold', out.width='50%'}
+library(ggplot2)
 ggplot(dat_count, aes(x = building_type, y = n_high_days)) +
   geom_boxplot() +
   labs(
@@ -798,7 +795,7 @@ p_quasi <- coef(summary(mod_quasi_pois))[, 4]
 A key assumption of the Poisson GLM is *equidispersion*, i.e., that the
 conditional variance equals the conditional mean. We assess this by comparing
 the residual deviance to the residual degrees of freedom. For the fitted Poisson
-model, the residual deviance is `r round(s_m_p$deviance, 1)` on `r s_m_p$df.residual` df, yielding a ratio of `r round(disp_pois, 2)`. Since this
+model, the residual deviance is `r format(round(s_m_p$deviance, 1), big.mark = ",", scientific = FALSE)` on `r s_m_p$df.residual` df, yielding a ratio of `r round(disp_pois, 2)`. Since this
 substantially exceeds 1, there is strong evidence of *overdispersion* — the
 Poisson model underestimates standard errors and overstates statistical
 significance.
