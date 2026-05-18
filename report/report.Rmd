@@ -1997,8 +1997,10 @@ dependence on a single train–test split.
 ```{r import-svm, echo=FALSE, message=FALSE, warning=FALSE}
 hh_q75_svm <- heapo |>
   group_by(Household_ID) |>
-  summarise(hh_q75 = quantile(log_kWh_total, 0.75, na.rm = TRUE),
-            .groups = "drop")
+  summarise(
+    hh_q75 = quantile(log_kWh_total, 0.75, na.rm = TRUE),
+    .groups = "drop"
+  )
 
 heapo_svm_data <- heapo |>
   left_join(hh_q75_svm, by = "Household_ID") |>
@@ -2026,7 +2028,7 @@ train_idx <- createDataPartition(
   list = FALSE
 )
 train_data <- heapo_svm_data[train_idx, ]
-test_data  <- heapo_svm_data[-train_idx, ]
+test_data <- heapo_svm_data[-train_idx, ]
 test_x <- test_data |> select(-high_consumption)
 test_y <- test_data$high_consumption
 
@@ -2034,8 +2036,12 @@ test_y <- test_data$high_consumption
 # Cached to heapo_svm_baseline_hh_q75.rds so subsequent knits skip refit.
 if (!file.exists("../models/svm/heapo_svm_baseline_hh_q75.rds")) {
   svm_baseline <- kernlab::ksvm(
-    high_consumption ~ ., data = train_data,
-    kernel = "rbfdot", C = 1, kpar = "automatic", scaled = TRUE
+    high_consumption ~ .,
+    data = train_data,
+    kernel = "rbfdot",
+    C = 1,
+    kpar = "automatic",
+    scaled = TRUE
   )
   saveRDS(svm_baseline, "../models/svm/heapo_svm_baseline_hh_q75.rds")
 } else {
@@ -2045,30 +2051,33 @@ if (!file.exists("../models/svm/heapo_svm_baseline_hh_q75.rds")) {
 # Tuned SVM: 5-fold CV grid search over C and sigma, same grid as original.
 # Cached to heapo_svm_hh_q75.rds so subsequent knits skip refit.
 if (!file.exists("../models/svm/heapo_svm_hh_q75.rds")) {
-  tune_grid <- expand.grid(C = c(1, 10, 100), sigma = c(0.01, 0.1, 1/7))
+  tune_grid <- expand.grid(C = c(1, 10, 100), sigma = c(0.01, 0.1, 1 / 7))
   ctrl <- trainControl(method = "cv", number = 5)
   svm_caret <- train(
-    high_consumption ~ ., data = train_data,
-    method = "svmRadial", tuneGrid = tune_grid,
-    trControl = ctrl, preProcess = c("center", "scale")
+    high_consumption ~ .,
+    data = train_data,
+    method = "svmRadial",
+    tuneGrid = tune_grid,
+    trControl = ctrl,
+    preProcess = c("center", "scale")
   )
   saveRDS(svm_caret, "../models/svm/heapo_svm_hh_q75.rds")
 } else {
   svm_caret <- readRDS("../models/svm/heapo_svm_hh_q75.rds")
 }
 
-pred_best     <- predict(svm_caret, test_x)
-cm_best       <- confusionMatrix(pred_best, test_y, positive = "high")
+pred_best <- predict(svm_caret, test_x)
+cm_best <- confusionMatrix(pred_best, test_y, positive = "high")
 
 pred_baseline <- kernlab::predict(svm_baseline, test_x)
-cm_baseline   <- confusionMatrix(pred_baseline, test_y, positive = "high")
+cm_baseline <- confusionMatrix(pred_baseline, test_y, positive = "high")
 
-best_C     <- svm_caret$bestTune$C
+best_C <- svm_caret$bestTune$C
 best_sigma <- round(svm_caret$bestTune$sigma, 4)
 
 # 5-fold CV results (pre-computed by R/08_model_comparison_cv_classification.R)
 if (file.exists("../models/cv_class_results.rds")) {
-  cv_class   <- readRDS("../models/cv_class_results.rds")
+  cv_class <- readRDS("../models/cv_class_results.rds")
   svm_cv_row <- cv_class[grepl("SVM", cv_class$Model), ]
   svm_cv_auc <- svm_cv_row[["CV AUC"]]
   svm_cv_acc <- svm_cv_row[["CV Accuracy"]]
