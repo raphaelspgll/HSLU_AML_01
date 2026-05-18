@@ -2541,16 +2541,8 @@ if (!is.null(class_summary)) {
 
 Because the three models use different threshold definitions, no single winner
 can be declared. Within the models that share the same threshold (GLM Binomial
-and SVM, both evaluated under the per-household 75th percentile CV), the SVM achieves
-a slightly higher AUC (0.842 vs 0.830) and accuracy (83.1% vs 80.2%). The
-difference is modest: both models correctly identify roughly four out of five
-household-days as high or low consumption. The SVM's marginal advantage comes
-at the cost of interpretability — its decision boundary is defined by support
-vectors in a high-dimensional space, while the GLM Binomial provides explicit
-odds ratios for each predictor. For a client who needs to explain predictions
-(for example, when flagging a household for an energy audit), the GLM Binomial
-is the practical choice. For automated classification at scale, the SVM offers
-a small accuracy gain.
+and SVM, both evaluated under the per-household 75th percentile CV), the GLM
+Binomial achieves a higher AUC (`r round(class_summary[grepl("GLM", class_summary$Model), "CV AUC"], 3)` vs `r round(class_summary[grepl("SVM", class_summary$Model), "CV AUC"], 3)`) while accuracy is essentially tied (`r round(class_summary[grepl("GLM", class_summary$Model), "CV Accuracy"] * 100, 1)`% vs `r round(class_summary[grepl("SVM", class_summary$Model), "CV Accuracy"] * 100, 1)`%). The AUC gap reflects the GLM's stronger overall discrimination across all classification thresholds. Both models correctly identify roughly four out of five household-days. The GLM Binomial is the preferred choice: it matches the SVM on accuracy, outperforms it on AUC, and provides explicit odds ratios for each predictor. For a client who needs to explain predictions (for example, when flagging a household for an energy audit), this interpretability advantage is directly actionable.
 
 ## GLM Poisson (Standalone)
 
