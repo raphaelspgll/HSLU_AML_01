@@ -84,13 +84,15 @@ specificity <- tn / (tn + fp)
 # ROC object (used by plots below)
 pred_roc <- ROCR::prediction(pred_prob_1, truth)
 perf_roc <- ROCR::performance(pred_roc, "tpr", "fpr")
+auc_val  <- as.numeric(ROCR::performance(pred_roc, "auc")@y.values[[1]])
 
 knitr::kable(
   data.frame(
     Model       = "Neural Network",
     Accuracy    = round(acc, 3),
     Sensitivity = round(sensitivity, 3),
-    Specificity = round(specificity, 3)
+    Specificity = round(specificity, 3),
+    AUC         = round(auc_val, 3)
   ),
   caption = "Neural Network Performance Metrics"
 )
@@ -99,7 +101,7 @@ knitr::kable(
 
 Sensitivity (0.803) exceeds specificity (0.737), indicating that the model is more effective at identifying high-consumption events than low-consumption cases. This suggests that patterns associated with high consumption are more strongly captured by the available predictors. While this may be advantageous in contexts where detecting high-consumption events is particularly important, it also implies a slightly higher rate of false positives.
 
-Overall, the confusion matrix shows that the majority of observations are correctly classified, with most predictions concentrated along the diagonal. However, misclassifications occur in both directions, indicating that some observations share similar characteristics across classes.
+Overall, the confusion matrix shows that the majority of observations are correctly classified, with most predictions concentrated along the diagonal. However, misclassifications occur in both directions, indicating that some observations share similar characteristics across classes. The AUC of `r round(auc_val, 3)` confirms strong discriminative ability across all classification thresholds, with performance well above random classification.
 
 These results indicate good overall classification performance, although some variability remains unexplained, likely due to overlap in predictor patterns between the two classes.
 
@@ -109,7 +111,7 @@ The *predicted probability plot* illustrates how the neural network separates th
 
 The *confusion matrix* provides a direct summary of classification performance. Most observations lie on the diagonal, confirming a high number of correct predictions for both classes. Nevertheless, errors occur in both directions, highlighting that class separation is not complete.
 
-```{r nn_plots_side_by_side, echo=False, fig.width=10, fig.height=4}
+```{r nn_plots_side_by_side, echo=FALSE, fig.width=10, fig.height=4}
 # ----------------------------------------
 # Combined plot: Probabilities + Confusion Matrix
 # ----------------------------------------
@@ -159,7 +161,7 @@ par(mfrow = c(1,1))
 
 The *ROC curve* further evaluates model performance across all possible classification thresholds. The curve lies clearly above the diagonal reference line, indicating strong discriminative ability and performance well above random classification. The steep initial increase suggests that high true positive rates can be achieved with relatively low false positive rates, while the flattening at higher values reflects diminishing gains.
 
-```{r nn_roc, echo=False, fig.width=6, fig.height=5}
+```{r nn_roc, echo=FALSE, fig.width=6, fig.height=5}
 plot(
   perf_roc,
   lwd = 2,
@@ -179,7 +181,7 @@ The test accuracy of approximately 77% indicates reasonable generalisation to un
 
 The ROC curve confirms consistent performance across classification thresholds and a clear improvement over random classification. However, the observed overlap in predicted probabilities indicates that the available predictors do not fully separate the two classes. This suggests that model performance is constrained more by the information content of the data than by the chosen model structure.
 
-Alternative network configurations were explored to assess the impact of model complexity. Increasing the number of hidden neurons led to slight improvements in training performance but did not translate into meaningful gains in test accuracy, indicating potential overfitting. Simpler architectures achieved comparable results with greater stability, supporting the choice of the 8–3–1 specification.
+Alternative network configurations were explored to assess the impact of model complexity. Increasing the number of hidden neurons led to slight improvements in training performance but did not translate into meaningful gains in test accuracy, indicating potential overfitting. Unlike linear models, the weights of a neural network cannot be interpreted directly as coefficients. In the nnet architecture, each weight connects nodes across layers through non-linear activation functions, meaning the contribution of any single predictor to the output depends on all other weights in the network and is not additive or constant. Extracting meaningful variable-level importance from these weights is therefore not straightforward. As a practical substitute, model performance in the Model Comparison section provides the primary basis for evaluating the neural network relative to other approaches.
 
 ### Key Findings
 
@@ -201,6 +203,6 @@ However, the presence of overlap in predicted probabilities indicates that the m
 
 From a practical perspective, the model can serve as a useful decision-support tool for identifying high-consumption events, although predictions should be interpreted with some caution due to remaining classification uncertainty.
 
-Further improvements are more likely to come from enhanced feature engineering or the inclusion of additional relevant variables rather than increasing model complexity. In addition, more robust evaluation methods, such as cross-validation, could provide more stable performance estimates and reduce dependence on a single train–test split.
+Further improvements are more likely to come from enhanced feature engineering or the inclusion of additional relevant variables rather than increasing model complexity. Cross-validation results for the Neural Network are reported in the Model Comparison section
 
 
