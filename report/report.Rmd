@@ -2367,16 +2367,17 @@ The GLM Poisson models `n_high_days` at the household–month level and
 cannot be placed in either comparison table. It is evaluated separately
 via five-fold CV RMSE on the count scale.
 
-```{r poisson-cv, echo=TRUE, cache=TRUE}
+```{r poisson-cv, echo=TRUE, cache=FALSE}
 set.seed(42)
 
-# Define formula directly — do NOT use formula(mod_pois)
-cv_form <- n_high_days ~ heating_degree_days + temp_avg + living_area +
-  building_type + heatpump_type + has_floor_heating +
-  n_residents + share_weekend
+# Extract formula cleanly — detach from model environment to avoid memory bleed
+cv_form <- as.formula(
+  deparse(formula(mod_pois)),
+  env = baseenv()
+)
 
-n     <- nrow(dat_count)
-folds <- sample(rep(1:5, length.out = n))
+n          <- nrow(dat_count)
+folds      <- sample(rep(1:5, length.out = n))
 rmse_folds <- numeric(5)
 
 for (k in 1:5) {
@@ -2386,54 +2387,21 @@ for (k in 1:5) {
   fit_k <- glm(
     cv_form,
     family = poisson(link = "log"),
-    offset = log_n_days,
-    data   = train_k
+    offset = log(n_days),
+    data   = train_k,
+    model  = FALSE,
+    x      = FALSE,
+    y      = FALSE
   )
 
-  pred_k <- predict(fit_k, newdata = test_k, type = "response")
+  pred_k        <- predict(fit_k, newdata = test_k, type = "response")
   rmse_folds[k] <- sqrt(mean((test_k$n_high_days - pred_k)^2))
+  rm(fit_k, train_k, test_k)
+  gc()
 }
 
 pois_cv_rmse <- round(mean(rmse_folds), 3)
 pois_cv_sd   <- round(sd(rmse_folds),   3)
-```
-
-
-```{r poisson-cv, echo=TRUE, cache=TRUE}
-set.seed(42)
-n     <- nrow(dat_count)
-folds <- sample(rep(1:5, length.out = n))
-rmse_folds <- numeric(5)
-
-for (k in 1:5) {
-  train_k <- dat_count[folds != k, ]
-  test_k  <- dat_count[folds == k, ]
-
-  fit_k <- glm(
-    formula(mod_pois),
-    family = poisson(link = "log"),
-    offset = log_n_days,
-    data   = train_k
-  )
-
-  pred_k <- predict(fit_k, newdata = test_k, type = "response")
-
-  rmse_folds[k] <- sqrt(mean((test_k$n_high_days - pred_k)^2))
-}
-
-pois_cv_rmse <- round(mean(rmse_folds), 3)
-pois_cv_sd   <- round(sd(rmse_folds),   3)
-```
-
-```{r poisson-cv-table, echo=FALSE}
-knitr::kable(
-  data.frame(
-    Fold = c(paste0("Fold ", 1:5), "**Mean**", "**SD**"),
-    RMSE = c(round(rmse_folds, 3), pois_cv_rmse, pois_cv_sd)
-  ),
-  caption = "Five-fold CV RMSE: GLM Poisson on n_high_days (count scale)."
-) %>%
-  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
 The five-fold CV RMSE is `r pois_cv_rmse` days (SD = `r pois_cv_sd`).
