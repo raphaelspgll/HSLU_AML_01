@@ -834,7 +834,7 @@ comp_long <- comp_table %>%
   mutate(model = ifelse(model == "se_pois", "Poisson", "Quasi-Poisson"))
 
 ggplot(comp_long, aes(x = se, y = term, colour = model)) +
-  geom_line(aes(group = term), colour = "grey70", linewidth = 0.5) +
+  geom_line(aes(group = term), colour = clr_neutral, linewidth = 0.5) +
   geom_point(size = 2.5) +
   scale_colour_manual(
     values = c("Poisson" = clr_primary, "Quasi-Poisson" = clr_secondary)
