@@ -1582,7 +1582,7 @@ ggplot(resid_df, aes(x = fitted, y = residuals)) +
   report_theme
 ```
 
-A well-fitting model shows residuals scattered randomly around zero. The orange
+A well-fitting model shows residuals scattered randomly around zero. The red
 smoother (loess) should be approximately flat. A curved smoother would indicate
 the model still misses a systematic pattern. A funnel shape (residual variance
 increasing with fitted values) would suggest heteroscedasticity: the model is
