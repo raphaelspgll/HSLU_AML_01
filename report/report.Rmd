@@ -42,6 +42,7 @@ library(ROCR)
 library(e1071) # SVM
 library(caret) # Cross-validation
 library(kernlab) # SVM kernels
+library(gridExtra)
 ```
 
 ```{r plot-defaults, include=FALSE}
@@ -399,9 +400,35 @@ ggplot(fit_df, aes(x = fitted, y = observed)) +
 ### Model Diagnostics
 
 ```{r lm-diagnostics, echo=FALSE, fig.height=6, fig.width=7}
-par(mfrow = c(2, 2))
-plot(heapo_lm)
-par(mfrow = c(1, 1))
+aug <- broom::augment(heapo_lm)
+
+p1 <- ggplot(aug, aes(x = .fitted, y = .resid)) +
+  geom_point(alpha = 0.1, size = 0.5, color = clr_primary) +
+  geom_smooth(method = "loess", se = FALSE, color = clr_secondary, linewidth = 0.8) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  labs(title = "Residuals vs Fitted", x = "Fitted values", y = "Residuals") +
+  report_theme
+
+p2 <- ggplot(aug, aes(sample = .std.resid)) +
+  stat_qq(alpha = 0.2, size = 0.5, color = clr_primary) +
+  stat_qq_line(color = clr_secondary, linetype = "dashed") +
+  labs(title = "Normal Q-Q", x = "Theoretical quantiles", y = "Standardised residuals") +
+  report_theme
+
+p3 <- ggplot(aug, aes(x = .fitted, y = sqrt(abs(.std.resid)))) +
+  geom_point(alpha = 0.1, size = 0.5, color = clr_primary) +
+  geom_smooth(method = "loess", se = FALSE, color = clr_secondary, linewidth = 0.8) +
+  labs(title = "Scale-Location", x = "Fitted values", y = expression(sqrt("|Std. residuals|"))) +
+  report_theme
+
+p4 <- ggplot(aug, aes(x = .hat, y = .std.resid)) +
+  geom_point(alpha = 0.2, size = 0.5, color = clr_primary) +
+  geom_smooth(method = "loess", se = FALSE, color = clr_secondary, linewidth = 0.8) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  labs(title = "Residuals vs Leverage", x = "Leverage", y = "Standardised residuals") +
+  report_theme
+
+gridExtra::grid.arrange(p1, p2, p3, p4, ncol = 2)
 ```
 
 - **Residuals vs Fitted:** Checks linearity. A horizontal band with no
