@@ -447,7 +447,10 @@ data.frame(
   Predictor = names(vif_vals),
   VIF = round(as.numeric(vif_vals), 2)
 ) %>%
-  knitr::kable(caption = "Variance Inflation Factors (VIF) — extended model") %>%
+  knitr::kable(
+    caption = "Variance Inflation Factors (VIF) — extended model",
+    table.attr = 'style="min-width: 420px"'
+  ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
@@ -524,7 +527,8 @@ tibble(
   )
 ) %>%
   knitr::kable(
-    caption = "LM model comparison — Adj. R² on full data; MAE from 5-fold CV"
+    caption = "LM model comparison — Adj. R² on full data; MAE from 5-fold CV",
+    table.attr = 'style="min-width: 520px"'
   ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
@@ -868,7 +872,8 @@ knitr::kable(
     Model = c("Poisson", "Quasi-Poisson"),
     RMSE = round(c(rmse_pois, rmse_quasi), 3)
   ),
-  caption = "Root Mean Squared Error for Poisson and quasi-Poisson models."
+  caption = "Root Mean Squared Error for Poisson and quasi-Poisson models.",
+  table.attr = 'style="min-width: 500px"'
 ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 
@@ -1038,7 +1043,7 @@ knitr::kable(
     "Month dummies omitted here; all effects shown in the OR plot below."
   )
 ) %>%
-  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 ```
 
 Coefficients from a binomial GLM are expressed as **odds ratios** (OR =
@@ -2132,7 +2137,8 @@ if (!is.na(svm_cv_auc)) {
       `CV Accuracy` = round(svm_cv_acc, 3),
       check.names = FALSE
     ),
-    caption = "Tuned SVM — 5-fold cross-validation performance (per-household 75th percentile threshold)"
+    caption = "Tuned SVM — 5-fold cross-validation performance (per-household 75th percentile threshold)",
+    table.attr = 'style="min-width: 720px"'
   ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 } else {
@@ -2294,7 +2300,7 @@ if (!is.null(reg_summary)) {
       "MAE is on the kWh scale; R² is on the log scale."
     )
   ) %>%
-  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 } else {
   cat("*Table not available. Run R/07_model_comparison_cv.R first.*")
 }
@@ -2380,7 +2386,7 @@ if (!is.null(class_summary)) {
       "Neural Network: 5-fold CV, household-median threshold."
     )
   ) %>%
-  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 } else {
   cat(
     "*CV table not available. Run R/08_model_comparison_cv_classification.R then 01_nn_pipeline.R first.*"
