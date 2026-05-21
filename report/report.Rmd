@@ -650,7 +650,7 @@ marginal effects of warmth once heating demand is already low.
 ```{r glm-poisson-plots, echo=FALSE, fig.height=4, fig.show='hold', out.width='50%'}
 library(ggplot2)
 ggplot(dat_count, aes(x = building_type, y = n_high_days, fill = building_type)) +
-  geom_boxplot() +
+  geom_boxplot(alpha = 0.7, outlier.size = 0.2) +
   scale_fill_manual(values = clr_builds, guide = "none") +
   labs(
     title = "High-consumption days by building type",
