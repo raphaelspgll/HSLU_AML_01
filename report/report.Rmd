@@ -661,7 +661,7 @@ ggplot(dat_count, aes(x = building_type, y = n_high_days, fill = building_type))
 
 ggplot(dat_count, aes(x = temp_avg, y = n_high_days)) +
   geom_point(alpha = 0.3) +
-  geom_smooth(method = "loess") +
+  geom_smooth(method = "loess", color = clr_secondary) +
   labs(
     title = "High-consumption days vs temperature",
     x = "Average temperature",
