@@ -522,13 +522,10 @@ For inference, the model does its job: it gives directly interpretable coefficie
 
 *Lead: Raphaël Spagolla*
 
-```{r import-poisson, echo=FALSE, cache=TRUE}
-dat_count <- readRDS("../data_processed/poisson/dat_count.rds")
-mod_pois <- readRDS("../models/poisson_glm/mod_pois.rds")
+```{r import-poisson, echo=FALSE, cache=FALSE}
+dat_count      <- readRDS("../data_processed/poisson/dat_count.rds")
+mod_pois       <- readRDS("../models/poisson_glm/mod_pois.rds")
 mod_quasi_pois <- readRDS("../models/poisson_glm/mod_quasi.rds")
-rr_table <- read.csv("../models/poisson_glm/coeff_rate_ratios.csv")
-dispersion <- readRDS("../models/poisson_glm/dispersion_val.rds")
-comp <- read.csv("../models/poisson_glm/quasi_vs_pois_se_pvals.csv")
 ```
 
 ### Objective
@@ -640,6 +637,7 @@ counts concentrate near zero. The smooth LOESS curve decreases steeply in the
 marginal effects of warmth once heating demand is already low.
 
 ```{r glm-poisson-plots, echo=FALSE, fig.height=4, fig.show='hold', out.width='50%'}
+library(ggplot2)
 ggplot(dat_count, aes(x = building_type, y = n_high_days)) +
   geom_boxplot() +
   labs(
@@ -736,7 +734,7 @@ p_quasi <- coef(summary(mod_quasi_pois))[, 4]
 A key assumption of the Poisson GLM is *equidispersion*, i.e., that the
 conditional variance equals the conditional mean. We assess this by comparing
 the residual deviance to the residual degrees of freedom. For the fitted Poisson
-model, the residual deviance is `r round(s_m_p$deviance, 1)` on `r s_m_p$df.residual` df, yielding a ratio of `r round(disp_pois, 2)`. Since this
+model, the residual deviance is `r format(round(s_m_p$deviance, 1), big.mark = ",", scientific = FALSE)` on `r s_m_p$df.residual` df, yielding a ratio of `r round(disp_pois, 2)`. Since this
 substantially exceeds 1, there is strong evidence of *overdispersion* — the
 Poisson model underestimates standard errors and overstates statistical
 significance.
@@ -833,28 +831,8 @@ knitr::kable(
   caption = "Root Mean Squared Error for Poisson and quasi-Poisson models."
 )
 
-ggplot(dat_count, aes(x = fitted_pois, y = n_high_days)) +
-  geom_point(alpha = 0.2, size = 0.8) +
-  geom_abline(
-    slope = 1,
-    intercept = 0,
-    colour = "steelblue",
-    linetype = "dashed"
-  ) +
-  labs(
-    title = "Observed vs fitted values (Poisson GLM)",
-    x = "Fitted values",
-    y = "Observed n_high_days"
-  ) +
-  theme_minimal()
 ```
-
-The RMSE of `r round(rmse_pois, 3)` days reflects the residual spread visible in
-the plot — predictions are reasonably centred along the identity line but with
-substantial scatter, partly explained by the high overdispersion ($\hat{\phi}$ =
-`r round(phi_q, 2)`). Note that the quasi-Poisson model produces identical
-fitted values and therefore the same RMSE, as it only affects standard errors
-and inference, not point predictions.
+The RMSE of `r round(rmse_pois, 3)` days reflects substantial residual spread, partly explained by the high overdispersion ($\hat{\phi}$ = `r round(phi_q, 2)`).Note that the quasi-Poisson model produces identical fitted values and therefore the same RMSE, as it only affects standard errors and inference, not point predictions."
 
 ### Conclusion
 
@@ -1653,8 +1631,8 @@ in the Model Comparison section.
 
 ```{r import-NN, echo=FALSE, message=FALSE, warning=FALSE}
 mod_nn <- readRDS("../models/neural_network/mod_nn_nnet.rds")
-test_nn <- readRDS("../data_processed/splits/nn/test_nn.rds")
-pred_prob_1 <- readRDS("../data_processed/splits/nn/nn_pred_prob.rds")
+test_nn <- readRDS("../models/neural_network/splits/test_nn.rds")
+pred_prob_1 <- readRDS("../models/neural_network/splits/nn_pred_prob.rds")
 ```
 
 ### Objective

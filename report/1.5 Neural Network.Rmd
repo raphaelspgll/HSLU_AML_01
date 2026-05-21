@@ -31,8 +31,8 @@ set.seed(1234)
 
 ```{r import-NN, echo=FALSE, message=FALSE, warning=FALSE}
 mod_nn      <- readRDS("../models/neural_network/mod_nn_nnet.rds")
-test_nn     <- readRDS("../data_processed/splits/nn/test_nn.rds")
-pred_prob_1 <- readRDS("../data_processed/splits/nn/nn_pred_prob.rds")
+test_nn     <- readRDS("../models/neural_network/splits/test_nn.rds")
+pred_prob_1 <- readRDS("../models/neural_network/splits/nn_pred_prob.rds")
 ```
 
 ### Objective

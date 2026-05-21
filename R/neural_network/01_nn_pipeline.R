@@ -21,8 +21,8 @@ suppressPackageStartupMessages({
 # Paths
 # ------------------------------------------------------------
 path_in       <- here("data_processed/heapo/heapo_modelling.rds")
-path_test     <- here("data_processed/splits/nn/test_nn.rds")
-path_pred     <- here("data_processed/splits/nn/nn_pred_prob.rds")
+path_test     <- here("models/neural_network/splits/test_nn.rds")
+path_pred     <- here("models/neural_network/splits/nn_pred_prob.rds")
 path_mod      <- here("models/neural_network/mod_nn_nnet.rds")
 path_cv       <- here("models/neural_network/nn_cv_results.csv")
 path_cv_class <- here("models/cv_class_results.rds")
@@ -38,11 +38,16 @@ if (!file.exists(path_in)) stop("Input file not found: ", path_in)
 dat <- readRDS(path_in)
 cat("\n[01] Data loaded —", nrow(dat), "rows,", ncol(dat), "cols\n")
 
-# Redefine high_consumption using global 75th percentile (matches GLM/SVM)
-q75 <- quantile(dat$log_kWh_total, 0.75)
-dat <- dat %>% mutate(high_consumption = ifelse(log_kWh_total >= q75, 1, 0))
-cat(sprintf("[01] Threshold q75 = %.4f | High: %d (%.1f%%) | Normal: %d (%.1f%%)\n",
-            q75,
+# Define high_consumption using per-household 75th percentile
+hh_q75 <- dat %>%
+  group_by(Household_ID) %>%
+  summarise(hh_q75 = quantile(log_kWh_total, 0.75, na.rm = TRUE), .groups = "drop")
+
+dat <- dat %>%
+  left_join(hh_q75, by = "Household_ID") %>%
+  mutate(high_consumption = as.integer(log_kWh_total >= hh_q75)) %>%
+  select(-hh_q75)
+cat(sprintf("[01] Per-household q75 | High: %d (%.1f%%) | Normal: %d (%.1f%%)\n",
             sum(dat$high_consumption == 1), mean(dat$high_consumption == 1) * 100,
             sum(dat$high_consumption == 0), mean(dat$high_consumption == 0) * 100))
 
