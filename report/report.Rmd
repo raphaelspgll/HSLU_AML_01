@@ -136,7 +136,7 @@ household.
 
 ## Seasonal Pattern
 
-```{r eda-seasonal, fig.height=4}
+```{r eda-seasonal, fig.height=4, fig.align='center'}
 heapo %>%
   mutate(Month = month(date, label = TRUE, abbr = TRUE)) %>%
   ggplot(aes(x = Month, y = kWh_total)) +
@@ -164,7 +164,7 @@ shortfall below the 12°C Swiss SIA base temperature. A day averaging 2°C
 contributes 10 HDD; days above 12°C contribute zero. HDD is a more direct proxy
 for heat pump workload than raw outdoor temperature.
 
-```{r eda-hdd, fig.height=4}
+```{r eda-hdd, fig.height=4, fig.align='center'}
 heapo %>%
   slice_sample(n = 15000) %>%
   ggplot(aes(x = heating_degree_days, y = kWh_total)) +
@@ -188,7 +188,7 @@ the GAM will capture this through its flexible smooth terms.
 
 ## Consumption by Building Type
 
-```{r eda-building, fig.height=3.5}
+```{r eda-building, fig.height=3.5, fig.align='center'}
 heapo %>%
   ggplot(aes(x = building_type, y = kWh_total, fill = building_type)) +
   geom_boxplot(alpha = 0.7, outlier.size = 0.2) +
@@ -400,7 +400,7 @@ ggplot(fit_df, aes(x = fitted, y = observed)) +
 
 ### Model Diagnostics
 
-```{r lm-diagnostics, echo=FALSE, fig.height=6, fig.width=7}
+```{r lm-diagnostics, echo=FALSE, fig.height=6, fig.width=7, fig.align='center'}
 aug <- broom::augment(heapo_lm)
 
 p1 <- ggplot(aug, aes(x = .fitted, y = .resid)) +
@@ -675,7 +675,7 @@ counts concentrate near zero. The smooth LOESS curve decreases steeply in the
 0–10°C range and flattens at higher temperatures, suggesting diminishing
 marginal effects of warmth once heating demand is already low.
 
-```{r glm-poisson-plots, echo=FALSE, fig.height=4, fig.show='hold', out.width='50%'}
+```{r glm-poisson-plots, echo=FALSE, fig.height=4, fig.show='hold', out.width='50%', fig.align='center'}
 library(ggplot2)
 ggplot(dat_count, aes(x = building_type, y = n_high_days, fill = building_type)) +
   geom_boxplot(alpha = 0.7, outlier.size = 0.2) +
@@ -707,7 +707,7 @@ heating*, *number of residents*, and *living area* show moderate to small
 increases. *Heating degree days* sits right at 1 and is the only non-significant
 predictor (shown in grey).
 
-```{r glm-poisson-rr-plot, echo=FALSE, fig.height=5, fig.width=7}
+```{r glm-poisson-rr-plot, echo=FALSE, fig.height=5, fig.width=7, fig.align='center'}
 coef_summary <- coef(summary(mod_pois))
 
 coef_df <- data.frame(
@@ -793,7 +793,7 @@ share*, *house vs flat*) show the largest absolute increase, while those with
 very small SEs (e.g., *living area*, *number of residents*) are inflated by a
 smaller absolute amount but the same factor $\sqrt{\hat{\phi}}$.
 
-```{r quasi-se-plot, echo=FALSE, fig.height=4}
+```{r quasi-se-plot, echo=FALSE, fig.height=4, fig.align='center'}
 pois_tidy <- tidy(mod_pois) %>% select(term, estimate, std.error, p.value)
 quasi_tidy <- tidy(mod_quasi_pois) %>% select(term, std.error, p.value)
 
@@ -1090,7 +1090,7 @@ Key findings from the coefficient table:
 
 ### Visual Evidence
 
-```{r glm-binomial-or, fig.height=5, fig.width=7}
+```{r glm-binomial-or, fig.height=5, fig.width=7, fig.align='center'}
 coef_summary <- coef(summary(model_glm))
 coef_df <- data.frame(
   term = rownames(coef_summary),
@@ -1137,7 +1137,7 @@ The wide spread of odds ratios, from heat pump type on the left to building type
 on the right, indicates that structural household characteristics matter far
 more than calendar or weather effects alone.
 
-```{r glm-binomial-roc, fig.height=4, fig.width=6}
+```{r glm-binomial-roc, fig.height=4, fig.width=6, fig.align='center'}
 roc_df <- (function(actual, prob) {
   ord <- order(prob, decreasing = TRUE)
   act <- actual[ord]
@@ -1172,7 +1172,7 @@ meaningful improvement over chance.
 
 ### Model Diagnostics
 
-```{r glm-binomial-confmat, fig.height=4, fig.width=4.5}
+```{r glm-binomial-confmat, fig.height=4, fig.width=4.5, fig.align='center'}
 conf_df <- data.frame(
   Predicted = factor(c("0", "0", "1", "1"), levels = c("1", "0")),
   Actual = factor(c("0", "1", "0", "1"), levels = c("0", "1")),
@@ -1417,7 +1417,7 @@ The smooth terms reveal where non-linearity is present in the data:
 
 ### Visual Evidence
 
-```{r gam-smooth-plots, fig.height=6}
+```{r gam-smooth-plots, fig.height=6, fig.align='center'}
 gratia::draw(model_gam, residuals = FALSE, ci_level = 0.95) &
   report_theme
 ```
@@ -1431,7 +1431,7 @@ values indicate more complex shapes. The s(HDD):house smooth (edf = 5.3) shows
 the most visible curvature, confirming that cold-weather response is the main
 source of non-linearity for houses.
 
-```{r gam-pred-hdd, fig.height=4}
+```{r gam-pred-hdd, fig.height=4, fig.align='center'}
 hdd_grid <- expand.grid(
   heating_degree_days = seq(
     min(gam_train$heating_degree_days),
@@ -1485,7 +1485,7 @@ been forced into a single linear slope by the LM's interaction term. The wider
 confidence band for appartments at extreme cold values reflects lower sample
 density there.
 
-```{r gam-pred-heatpump, fig.height=4}
+```{r gam-pred-heatpump, fig.height=4, fig.align='center'}
 hp_grid <- expand.grid(
   heating_degree_days = seq(
     min(gam_train$heating_degree_days),
@@ -1565,7 +1565,7 @@ suggest that high-consumption days are inherently harder to predict, likely due
 to household-specific behaviour that the model cannot capture from weather and
 building characteristics alone.
 
-```{r gam-residuals, fig.height=4}
+```{r gam-residuals, fig.height=4, fig.align='center'}
 resid_df <- data.frame(
   fitted = fitted(model_gam),
   residuals = residuals(model_gam)
@@ -1813,7 +1813,7 @@ Most observations lie on the diagonal, confirming a high number of correct
 predictions for both classes. Nevertheless, errors occur in both directions,
 highlighting that class separation is not complete.
 
-```{r nn-pred-prob, echo=FALSE, fig.height=4, fig.width=6}
+```{r nn-pred-prob, echo=FALSE, fig.height=4, fig.width=6, fig.align='center'}
 nn_prob_df <- data.frame(
   index       = seq_along(pred_prob_1),
   probability = as.numeric(pred_prob_1),
@@ -1837,7 +1837,7 @@ ggplot(nn_prob_df, aes(x = index, y = probability, color = actual)) +
   theme(legend.position = "bottom")
 ```
 
-```{r nn-confmat, echo=FALSE, fig.height=4, fig.width=4.5}
+```{r nn-confmat, echo=FALSE, fig.height=4, fig.width=4.5, fig.align='center'}
 nn_df <- data.frame(
   Predicted = factor(c("0", "0", "1", "1"), levels = c("1", "0")),
   Actual    = factor(c("0", "1", "0", "1"), levels = c("0", "1")),
@@ -1876,7 +1876,7 @@ classification. The steep initial increase suggests that high true positive
 rates can be achieved with relatively low false positive rates, while the
 flattening at higher values reflects diminishing gains.
 
-```{r nn_roc, echo=FALSE, fig.height=4, fig.width=6}
+```{r nn_roc, echo=FALSE, fig.height=4, fig.width=6, fig.align='center'}
 roc_df_nn <- data.frame(
   fpr = perf_roc@x.values[[1]],
   tpr = perf_roc@y.values[[1]]
@@ -2160,7 +2160,7 @@ The more informative metrics are:
 
 The confusion matrix heatmap shows the distribution of predictions versus actual labels. Correct predictions fall on the diagonal; off-diagonal cells are misclassifications.
 
-```{r svm-conf-matrix-plot, echo=FALSE, fig.height=4, fig.width=4.5}
+```{r svm-conf-matrix-plot, echo=FALSE, fig.height=4, fig.width=4.5, fig.align='center'}
 cm_mat <- cm_best$table
 
 svm_df <- data.frame(
@@ -2197,7 +2197,7 @@ ggplot(svm_df, aes(x = Actual, y = Predicted, fill = Count)) +
 
 The bar chart compares sensitivity and specificity for the baseline and tuned models, showing how tuning shifts the balance between detecting high-consumption days and avoiding false alarms.
 
-```{r svm-metric-comparison, echo=FALSE, fig.height=3.5, fig.width=5, out.width="48%", fig.show="hold"}
+```{r svm-metric-comparison, echo=FALSE, fig.height=3.5, fig.width=5, out.width="48%", fig.show="hold", fig.align='center'}
 metrics_df <- bind_rows(
   extract_metrics(cm_baseline, "Baseline"),
   extract_metrics(cm_best, "Tuned")
@@ -2300,7 +2300,7 @@ if (!is.null(reg_summary)) {
 }
 ```
 
-```{r reg-comparison-plot, echo=FALSE, fig.height=3.5}
+```{r reg-comparison-plot, echo=FALSE, fig.height=3.5, fig.align='center'}
 if (!is.null(reg_summary)) {
   reg_long <- tidyr::pivot_longer(
     reg_summary,
@@ -2388,7 +2388,7 @@ if (!is.null(class_summary)) {
 }
 ```
 
-```{r class-comparison-plot, echo=FALSE, fig.height=3.5}
+```{r class-comparison-plot, echo=FALSE, fig.height=3.5, fig.align='center'}
 if (!is.null(class_summary)) {
   plot_data <- tidyr::pivot_longer(
     class_summary,
