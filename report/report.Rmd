@@ -1548,7 +1548,7 @@ resid_df <- data.frame(
 ggplot(resid_df, aes(x = fitted, y = residuals)) +
   geom_point(alpha = 0.1, size = 0.6, color = clr_primary) +
   geom_hline(yintercept = 0, color = clr_secondary, linetype = "dashed") +
-  geom_smooth(method = "loess", se = FALSE, color = "orange", linewidth = 0.8) +
+  geom_smooth(method = "loess", se = FALSE, color = clr_secondary, linewidth = 0.8) +
   labs(
     title = "GAM – Residuals vs. Fitted",
     x = "Fitted log(kWh_total)",
