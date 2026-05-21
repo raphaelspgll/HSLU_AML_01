@@ -308,7 +308,8 @@ tidy(heapo_lm) %>%
   ) %>%
   knitr::kable(
     col.names = c("Predictor", "Estimate", "Std. Error", "t value", "p value"),
-    caption = "Extended MLR: coefficient estimates"
+    caption = "Extended MLR: coefficient estimates",
+    table.attr = 'style="min-width: 380px"'
   ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
@@ -1352,7 +1353,8 @@ knitr::kable(
   ),
   caption = "GAM – Smooth Terms",
   col.names = c("Smooth Term", "EDF", "F", "p-value"),
-  row.names = FALSE
+  row.names = FALSE,
+  table.attr = 'style="min-width: 220px"'
 ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
@@ -1370,7 +1372,8 @@ knitr::kable(
   ),
   caption = "GAM – Parametric Terms",
   col.names = c("Term", "Estimate", "Std. Error", "t-value", "p-value"),
-  row.names = FALSE
+  row.names = FALSE,
+  table.attr = 'style="min-width: 260px"'
 ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
@@ -1784,7 +1787,8 @@ knitr::kable(
     Specificity = round(specificity, 3),
     AUC = auc_val
   ),
-  caption = "Neural Network Performance Metrics"
+  caption = "Neural Network Performance Metrics",
+  table.attr = 'style="min-width: 380px"'
 ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
@@ -2096,7 +2100,10 @@ prop.table(table(train_data$high_consumption)) %>%
   as.data.frame() %>%
   rename(Class = Var1, Proportion = Freq) %>%
   mutate(Proportion = round(Proportion, 3)) %>%
-  knitr::kable(caption = "Class balance in the training set") %>%
+  knitr::kable(
+    caption = "Class balance in the training set",
+    table.attr = 'style="min-width: 380px"'
+  ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
@@ -2130,7 +2137,10 @@ bind_rows(
     paste0("Tuned SVM (C=", best_C, ", sigma=", best_sigma, ")")
   )
 ) %>%
-  knitr::kable(caption = "SVM model comparison on test set") %>%
+  knitr::kable(
+    caption = "SVM model comparison on test set",
+    table.attr = 'style="min-width: 380px"'
+  ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
