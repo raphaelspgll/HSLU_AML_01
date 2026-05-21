@@ -1144,7 +1144,7 @@ meaningful improvement over chance.
 
 ### Model Diagnostics
 
-```{r glm-binomial-confmat, fig.height=4}
+```{r glm-binomial-confmat, fig.height=4, fig.width=4.5}
 conf_df <- data.frame(
   Predicted = factor(c("0", "0", "1", "1"), levels = c("1", "0")),
   Actual = factor(c("0", "1", "0", "1"), levels = c("0", "1")),
@@ -1788,14 +1788,7 @@ Most observations lie on the diagonal, confirming a high number of correct
 predictions for both classes. Nevertheless, errors occur in both directions,
 highlighting that class separation is not complete.
 
-```{r nn_plots_side_by_side, echo=FALSE, fig.width=10, fig.height=4}
-# ----------------------------------------
-# Combined plot: Probabilities + Confusion Matrix
-# ----------------------------------------
-
-par(mfrow = c(1, 2))
-
-# (1) Predicted probabilities
+```{r nn_plots_side_by_side, echo=FALSE, fig.width=5, fig.height=4}
 plot(
   pred_prob_1,
   col = ifelse(truth == "1", "red", "blue"),
@@ -1812,30 +1805,30 @@ legend(
   pch = 16,
   cex = 0.8
 )
+```
 
-# (2) Confusion matrix
-cm_mat <- as.matrix(cm)
-
-image(
-  1:2,
-  1:2,
-  cm_mat,
-  axes = FALSE,
-  xlab = "Actual",
-  ylab = "Predicted",
-  main = "Confusion matrix"
+```{r nn-confmat, echo=FALSE, fig.height=4, fig.width=4.5}
+nn_df <- data.frame(
+  Predicted = factor(c("0", "0", "1", "1"), levels = c("1", "0")),
+  Actual    = factor(c("0", "1", "0", "1"), levels = c("0", "1")),
+  Count     = c(cm["0", "0"],
+                cm["0", "1"],
+                cm["1", "0"],
+                cm["1", "1"]),
+  Label     = c("TN", "FN", "FP", "TP")
 )
 
-axis(1, at = 1:2, labels = colnames(cm_mat))
-axis(2, at = 1:2, labels = rownames(cm_mat))
-
-text(
-  rep(1:2, each = 2),
-  rep(1:2, times = 2),
-  labels = cm_mat
-)
-
-par(mfrow = c(1, 1))
+ggplot(nn_df, aes(x = Actual, y = Predicted, fill = Count)) +
+  geom_tile(color = "white", linewidth = 1.2) +
+  geom_text(aes(label = paste0(Label, "\n", Count)),
+            size = 5, fontface = "bold", color = "white") +
+  scale_fill_gradient(low = clr_primary, high = clr_secondary) +
+  scale_x_discrete(labels = c("0" = "Low (0)", "1" = "High (1)")) +
+  scale_y_discrete(labels = c("0" = "Low (0)", "1" = "High (1)")) +
+  labs(title = "Neural Network – Confusion Matrix",
+       x = "Actual class", y = "Predicted class") +
+  report_theme +
+  theme(legend.position = "none", panel.grid = element_blank())
 ```
 
 The *ROC curve* further evaluates model performance across all possible
@@ -2122,21 +2115,32 @@ The more informative metrics are:
 
 The confusion matrix heatmap shows the distribution of predictions versus actual labels. Correct predictions fall on the diagonal; off-diagonal cells are misclassifications.
 
-```{r svm-conf-matrix-plot, echo=FALSE, fig.height=3.5, fig.width=4.5, out.width="48%", fig.show="hold"}
-cm_mat <- as.table(cm_best$table)
+```{r svm-conf-matrix-plot, echo=FALSE, fig.height=4, fig.width=4.5, out.width="48%", fig.show="hold"}
+cm_mat <- cm_best$table
 
-cm_df <- as.data.frame(cm_mat) %>%
-  rename(Predicted = Prediction, Actual = Reference)
+svm_df <- data.frame(
+  Predicted = factor(c("normal", "normal", "high", "high"),
+                     levels = c("high", "normal")),
+  Actual    = factor(c("normal", "high",   "normal", "high"),
+                     levels = c("normal", "high")),
+  Count     = c(cm_mat["normal", "normal"],
+                cm_mat["normal", "high"],
+                cm_mat["high",   "normal"],
+                cm_mat["high",   "high"]),
+  Label     = c("TN", "FN", "FP", "TP")
+)
 
-ggplot(cm_df, aes(x = Actual, y = Predicted, fill = Freq)) +
-  geom_tile(color = "white") +
-  geom_text(aes(label = Freq), size = 5) +
-  scale_fill_gradient(low = "#f0f4f8", high = clr_primary) +
+ggplot(svm_df, aes(x = Actual, y = Predicted, fill = Count)) +
+  geom_tile(color = "white", linewidth = 1.2) +
+  geom_text(aes(label = paste0(Label, "\n", Count)),
+            size = 5, fontface = "bold", color = "white") +
+  scale_fill_gradient(low = clr_primary, high = clr_secondary) +
+  scale_x_discrete(labels = c("normal" = "Low (0)", "high" = "High (1)")) +
+  scale_y_discrete(labels = c("normal" = "Low (0)", "high" = "High (1)")) +
+  labs(title = "Confusion Matrix — Tuned SVM",
+       x = "Actual class", y = "Predicted class") +
   report_theme +
-  labs(
-    title = "Confusion Matrix — Tuned SVM",
-    fill = "Count"
-  )
+  theme(legend.position = "none", panel.grid = element_blank())
 ```
 
 The bar chart compares sensitivity and specificity for the baseline and tuned models, showing how tuning shifts the balance between detecting high-consumption days and avoiding false alarms.
