@@ -1838,16 +1838,22 @@ classification. The steep initial increase suggests that high true positive
 rates can be achieved with relatively low false positive rates, while the
 flattening at higher values reflects diminishing gains.
 
-```{r nn_roc, echo=FALSE}
-plot(
-  perf_roc,
-  lwd = 2,
-  main = "ROC curve",
-  xlab = "False positive rate",
-  ylab = "True positive rate"
+```{r nn_roc, echo=FALSE, fig.height=4}
+roc_df_nn <- data.frame(
+  fpr = perf_roc@x.values[[1]],
+  tpr = perf_roc@y.values[[1]]
 )
 
-abline(a = 0, b = 1, lty = 2)
+ggplot(roc_df_nn, aes(x = fpr, y = tpr)) +
+  geom_line(color = clr_primary, linewidth = 1) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey50") +
+  labs(
+    title = "Neural Network – ROC Curve",
+    subtitle = paste0("AUC = ", auc_val),
+    x = "False Positive Rate",
+    y = "True Positive Rate"
+  ) +
+  report_theme
 ```
 
 ### Model Diagnostics
