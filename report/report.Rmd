@@ -1788,23 +1788,28 @@ Most observations lie on the diagonal, confirming a high number of correct
 predictions for both classes. Nevertheless, errors occur in both directions,
 highlighting that class separation is not complete.
 
-```{r nn_plots_side_by_side, echo=FALSE, fig.width=5, fig.height=4}
-plot(
-  pred_prob_1,
-  col = ifelse(truth == "1", "red", "blue"),
-  pch = 16,
-  main = "Predicted probabilities",
-  xlab = "Observation",
-  ylab = "Probability"
+```{r nn-pred-prob, echo=FALSE, fig.height=4, fig.width=6}
+nn_prob_df <- data.frame(
+  index       = seq_along(pred_prob_1),
+  probability = as.numeric(pred_prob_1),
+  actual      = as.character(truth)
 )
 
-legend(
-  "topright",
-  legend = c("Actual 1", "Actual 0"),
-  col = c("red", "blue"),
-  pch = 16,
-  cex = 0.8
-)
+ggplot(nn_prob_df, aes(x = index, y = probability, color = actual)) +
+  geom_point(alpha = 0.4, size = 0.4) +
+  geom_hline(yintercept = 0.5, linetype = "dashed", color = "grey50") +
+  scale_color_manual(
+    values = c("0" = clr_primary, "1" = clr_secondary),
+    labels = c("0" = "Actual Low (0)", "1" = "Actual High (1)")
+  ) +
+  labs(
+    title = "Neural Network – Predicted Probabilities",
+    x     = "Observation",
+    y     = "Predicted Probability",
+    color = NULL
+  ) +
+  report_theme +
+  theme(legend.position = "bottom")
 ```
 
 ```{r nn-confmat, echo=FALSE, fig.height=4, fig.width=4.5}
