@@ -2178,7 +2178,7 @@ ggplot(svm_df, aes(x = Actual, y = Predicted, fill = Count)) +
   scale_x_discrete(labels = c("normal" = "Low (0)", "high" = "High (1)")) +
   scale_y_discrete(labels = c("normal" = "Low (0)", "high" = "High (1)")) +
   labs(
-    title = "Confusion Matrix — Tuned SVM",
+    title = "SVM – Confusion Matrix",
     subtitle = paste0(
       "Accuracy = ", round(cm_best$overall["Accuracy"], 3),
       "  |  F1 = ", round(cm_best$byClass["F1"], 3),
