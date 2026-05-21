@@ -339,7 +339,7 @@ temperatures.
 
 The coefficient plot below summarises the direction and significance of all predictors in the extended model.
 
-```{r lm-coef-plot, echo=FALSE, fig.width=6.5, fig.height=5.5, out.width="80%", fig.align="center"}
+```{r lm-coef-plot, echo=FALSE, fig.height=5, fig.width=7, out.width="80%", fig.align="center"}
 cis <- confint(heapo_lm)
 
 coef_df <- tibble(
@@ -679,7 +679,7 @@ heating*, *number of residents*, and *living area* show moderate to small
 increases. *Heating degree days* sits right at 1 and is the only non-significant
 predictor (shown in grey).
 
-```{r glm-poisson-rr-plot, echo=FALSE}
+```{r glm-poisson-rr-plot, echo=FALSE, fig.height=5, fig.width=7}
 coef_summary <- coef(summary(mod_pois))
 
 coef_df <- data.frame(
@@ -1062,7 +1062,7 @@ Key findings from the coefficient table:
 
 ### Visual Evidence
 
-```{r glm-binomial-or}
+```{r glm-binomial-or, fig.height=5, fig.width=7}
 coef_summary <- coef(summary(model_glm))
 coef_df <- data.frame(
   term = rownames(coef_summary),
@@ -1109,7 +1109,7 @@ The wide spread of odds ratios, from heat pump type on the left to building type
 on the right, indicates that structural household characteristics matter far
 more than calendar or weather effects alone.
 
-```{r glm-binomial-roc, fig.height=4}
+```{r glm-binomial-roc, fig.height=4, fig.width=6}
 roc_df <- (function(actual, prob) {
   ord <- order(prob, decreasing = TRUE)
   act <- actual[ord]
@@ -1843,7 +1843,7 @@ classification. The steep initial increase suggests that high true positive
 rates can be achieved with relatively low false positive rates, while the
 flattening at higher values reflects diminishing gains.
 
-```{r nn_roc, echo=FALSE, fig.height=4}
+```{r nn_roc, echo=FALSE, fig.height=4, fig.width=6}
 roc_df_nn <- data.frame(
   fpr = perf_roc@x.values[[1]],
   tpr = perf_roc@y.values[[1]]
