@@ -2191,7 +2191,7 @@ metrics_df <- bind_rows(
 
 ggplot(metrics_df, aes(x = Metric, y = Value, fill = Model)) +
   geom_col(position = "dodge") +
-  scale_fill_manual(values = c("Baseline" = "grey70", "Tuned" = clr_primary)) +
+  scale_fill_manual(values = c("Baseline" = clr_neutral, "Tuned" = clr_primary)) +
   scale_y_continuous(limits = c(0, 1)) +
   report_theme +
   labs(
