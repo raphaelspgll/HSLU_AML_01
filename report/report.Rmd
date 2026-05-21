@@ -2159,7 +2159,7 @@ The more informative metrics are:
 
 The confusion matrix heatmap shows the distribution of predictions versus actual labels. Correct predictions fall on the diagonal; off-diagonal cells are misclassifications.
 
-```{r svm-conf-matrix-plot, echo=FALSE, fig.height=4, fig.width=4.5, out.width="48%", fig.show="hold"}
+```{r svm-conf-matrix-plot, echo=FALSE, fig.height=4, fig.width=4.5}
 cm_mat <- cm_best$table
 
 svm_df <- data.frame(
