@@ -49,7 +49,7 @@ clr_primary   <- "#4E79A7"
 clr_secondary <- "#E15759"
 clr_neutral   <- "#AAAAAA"
 clr_builds    <- c("flat" = "#4E79A7", "house" = "#E15759")
-report_theme  <- report_theme
+report_theme  <- theme_minimal(base_size = 12)
 ```
 
 ```{r load-data, include=FALSE}
@@ -307,7 +307,8 @@ tidy(heapo_lm) %>%
   knitr::kable(
     col.names = c("Predictor", "Estimate", "Std. Error", "t value", "p value"),
     caption = "Extended MLR: coefficient estimates"
-  )
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
 All predictors are significant at the 0.001 level except `humidity_avg` (p = 0.165), which adds nothing once the other weather variables are included. Effects on log energy consumption, holding all other variables constant:
@@ -418,7 +419,8 @@ data.frame(
   Predictor = names(vif_vals),
   VIF = round(as.numeric(vif_vals), 2)
 ) %>%
-  knitr::kable(caption = "Variance Inflation Factors (VIF) — extended model")
+  knitr::kable(caption = "Variance Inflation Factors (VIF) — extended model") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
 Most predictors have VIF below 3, indicating no problematic multicollinearity.
@@ -495,7 +497,8 @@ tibble(
 ) %>%
   knitr::kable(
     caption = "LM model comparison — Adj. R² on full data; MAE from 5-fold CV"
-  )
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
 The simple model achieves an adjusted R² of `r round(summary(heapo_mlm_simple)$adj.r.squared, 4)`. Adding the two interaction terms improves this to `r round(summary(heapo_lm)$adj.r.squared, 4)`, a real but modest gain. Five-fold CV MAE is roughly `r round(lm_ext_cv_mae, 1)` kWh/day for the extended model. The interaction terms are meaningful, but overall explanatory power remains limited on this dataset.
@@ -838,7 +841,8 @@ knitr::kable(
     RMSE = round(c(rmse_pois, rmse_quasi), 3)
   ),
   caption = "Root Mean Squared Error for Poisson and quasi-Poisson models."
-)
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 
 ```
 The RMSE of `r round(rmse_pois, 3)` days reflects substantial residual spread, partly explained by the high overdispersion ($\hat{\phi}$ = `r round(phi_q, 2)`).Note that the quasi-Poisson model produces identical fitted values and therefore the same RMSE, as it only affects standard errors and inference, not point predictions."
@@ -1005,7 +1009,8 @@ knitr::kable(
     "GLM Binomial: coefficient estimates and odds ratios.",
     "Month dummies omitted here; all effects shown in the OR plot below."
   )
-)
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
 Coefficients from a binomial GLM are expressed as **odds ratios** (OR =
@@ -1315,7 +1320,8 @@ knitr::kable(
   caption = "GAM – Smooth Terms",
   col.names = c("Smooth Term", "EDF", "F", "p-value"),
   row.names = FALSE
-)
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
 ```{r gam-parametric-table}
@@ -1332,7 +1338,8 @@ knitr::kable(
   caption = "GAM – Parametric Terms",
   col.names = c("Term", "Estimate", "Std. Error", "t-value", "p-value"),
   row.names = FALSE
-)
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
 The parametric terms capture the **baseline level** shift between groups, while
@@ -1742,7 +1749,8 @@ knitr::kable(
     AUC = auc_val
   ),
   caption = "Neural Network Performance Metrics"
-)
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
 The neural network achieves an accuracy of approximately `r round(acc, 2)`, indicating solid
@@ -2039,7 +2047,8 @@ prop.table(table(train_data$high_consumption)) %>%
   as.data.frame() %>%
   rename(Class = Var1, Proportion = Freq) %>%
   mutate(Proportion = round(Proportion, 3)) %>%
-  knitr::kable(caption = "Class balance in the training set")
+  knitr::kable(caption = "Class balance in the training set") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
 ### Model Setup
@@ -2072,7 +2081,8 @@ bind_rows(
     paste0("Tuned SVM (C=", best_C, ", sigma=", best_sigma, ")")
   )
 ) %>%
-  knitr::kable(caption = "SVM model comparison on test set")
+  knitr::kable(caption = "SVM model comparison on test set") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
 ```{r svm-cv-table, echo=FALSE}
@@ -2085,7 +2095,8 @@ if (!is.na(svm_cv_auc)) {
       check.names = FALSE
     ),
     caption = "Tuned SVM — 5-fold cross-validation performance (per-household 75th percentile threshold)"
-  )
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 } else {
   cat(
     "*CV results not available. Run R/08_model_comparison_cv_classification.R first.*"
@@ -2226,7 +2237,8 @@ if (!is.null(reg_summary)) {
       "Five-fold CV performance: regression models on log_kWh_total.",
       "MAE is on the kWh scale; R² is on the log scale."
     )
-  )
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 } else {
   cat("*Table not available. Run R/07_model_comparison_cv.R first.*")
 }
@@ -2311,7 +2323,8 @@ if (!is.null(class_summary)) {
       "GLM Binomial and SVM: 5-fold CV, per-household 75th percentile threshold.",
       "Neural Network: 5-fold CV, household-median threshold."
     )
-  )
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 } else {
   cat(
     "*CV table not available. Run R/08_model_comparison_cv_classification.R then 01_nn_pipeline.R first.*"
@@ -2356,18 +2369,25 @@ via five-fold CV RMSE on the count scale.
 
 ```{r poisson-cv, echo=TRUE, cache=TRUE}
 set.seed(42)
-n <- nrow(dat_count)
+
+# Define formula directly — do NOT use formula(mod_pois)
+cv_form <- n_high_days ~ heating_degree_days + temp_avg + living_area +
+  building_type + heatpump_type + has_floor_heating +
+  n_residents + share_weekend
+
+n     <- nrow(dat_count)
 folds <- sample(rep(1:5, length.out = n))
 rmse_folds <- numeric(5)
 
 for (k in 1:5) {
   train_k <- dat_count[folds != k, ]
-  test_k <- dat_count[folds == k, ]
+  test_k  <- dat_count[folds == k, ]
 
   fit_k <- glm(
-    formula(mod_pois), # reuses the exact same formula
+    cv_form,
     family = poisson(link = "log"),
-    data = train_k
+    offset = log_n_days,
+    data   = train_k
   )
 
   pred_k <- predict(fit_k, newdata = test_k, type = "response")
@@ -2375,7 +2395,34 @@ for (k in 1:5) {
 }
 
 pois_cv_rmse <- round(mean(rmse_folds), 3)
-pois_cv_sd <- round(sd(rmse_folds), 3)
+pois_cv_sd   <- round(sd(rmse_folds),   3)
+```
+
+
+```{r poisson-cv, echo=TRUE, cache=TRUE}
+set.seed(42)
+n     <- nrow(dat_count)
+folds <- sample(rep(1:5, length.out = n))
+rmse_folds <- numeric(5)
+
+for (k in 1:5) {
+  train_k <- dat_count[folds != k, ]
+  test_k  <- dat_count[folds == k, ]
+
+  fit_k <- glm(
+    formula(mod_pois),
+    family = poisson(link = "log"),
+    offset = log_n_days,
+    data   = train_k
+  )
+
+  pred_k <- predict(fit_k, newdata = test_k, type = "response")
+
+  rmse_folds[k] <- sqrt(mean((test_k$n_high_days - pred_k)^2))
+}
+
+pois_cv_rmse <- round(mean(rmse_folds), 3)
+pois_cv_sd   <- round(sd(rmse_folds),   3)
 ```
 
 ```{r poisson-cv-table, echo=FALSE}
@@ -2385,7 +2432,8 @@ knitr::kable(
     RMSE = c(round(rmse_folds, 3), pois_cv_rmse, pois_cv_sd)
   ),
   caption = "Five-fold CV RMSE: GLM Poisson on n_high_days (count scale)."
-)
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
 The five-fold CV RMSE is `r pois_cv_rmse` days (SD = `r pois_cv_sd`).
