@@ -44,6 +44,14 @@ library(caret) # Cross-validation
 library(kernlab) # SVM kernels
 ```
 
+```{r plot-defaults, include=FALSE}
+clr_primary   <- "#4E79A7"
+clr_secondary <- "#E15759"
+clr_neutral   <- "#AAAAAA"
+clr_builds    <- c("flat" = "#4E79A7", "house" = "#E15759")
+report_theme  <- report_theme
+```
+
 ```{r load-data, include=FALSE}
 heapo <- readRDS("../data_processed/heapo/heapo_modelling.rds")
 ```
@@ -130,14 +138,14 @@ household.
 heapo %>%
   mutate(Month = month(date, label = TRUE, abbr = TRUE)) %>%
   ggplot(aes(x = Month, y = kWh_total)) +
-  geom_boxplot(fill = "steelblue", alpha = 0.7, outlier.size = 0.2) +
+  geom_boxplot(fill = clr_primary, alpha = 0.7, outlier.size = 0.2) +
   scale_y_continuous(labels = comma) +
   labs(
     title = "Daily Electricity Consumption by Month",
     x = NULL,
     y = "kWh per day"
   ) +
-  theme_minimal()
+  report_theme
 ```
 
 Consumption in winter months (December to February) is roughly three to five
@@ -158,8 +166,8 @@ for heat pump workload than raw outdoor temperature.
 heapo %>%
   slice_sample(n = 15000) %>%
   ggplot(aes(x = heating_degree_days, y = kWh_total)) +
-  geom_point(alpha = 0.08, size = 0.5, color = "steelblue") +
-  geom_smooth(method = "loess", color = "tomato", se = FALSE, linewidth = 1) +
+  geom_point(alpha = 0.08, size = 0.5, color = clr_primary) +
+  geom_smooth(method = "loess", color = clr_secondary, se = FALSE, linewidth = 1) +
   scale_y_continuous(labels = comma) +
   labs(
     title = "Heating Degree Days vs. Daily Consumption",
@@ -167,7 +175,7 @@ heapo %>%
     x = "Heating Degree Days (HDD)",
     y = "kWh per day"
   ) +
-  theme_minimal()
+  report_theme
 ```
 
 The relationship is strongly positive and close to linear across the observed
@@ -183,13 +191,13 @@ heapo %>%
   ggplot(aes(x = building_type, y = kWh_total, fill = building_type)) +
   geom_boxplot(alpha = 0.7, outlier.size = 0.2, show.legend = FALSE) +
   scale_y_continuous(labels = comma) +
-  scale_fill_manual(values = c("steelblue", "tomato")) +
+  scale_fill_manual(values = c(clr_primary, clr_secondary)) +
   labs(
     title = "Daily Consumption by Building Type",
     x = NULL,
     y = "kWh per day"
   ) +
-  theme_minimal()
+  report_theme
 ```
 
 Houses consume substantially more electricity per day than flats, with medians
@@ -350,10 +358,10 @@ ggplot(
   geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.3) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
   scale_color_manual(
-    values = c("FALSE" = "grey60", "TRUE" = "steelblue"),
+    values = c("FALSE" = clr_neutral, "TRUE" = clr_primary),
     labels = c("n.s.", "p < 0.05")
   ) +
-  theme_minimal(base_size = 13) +
+  report_theme +
   labs(
     title = "Extended MLR: Coefficient Estimates with 95% CIs",
     subtitle = "Coefficients on log scale — positive = higher consumption",
@@ -376,10 +384,10 @@ ggplot(fit_df, aes(x = fitted, y = observed)) +
   geom_abline(
     slope = 1,
     intercept = 0,
-    color = "steelblue",
+    color = clr_primary,
     linetype = "dashed"
   ) +
-  theme_minimal(base_size = 13) +
+  report_theme +
   labs(
     title = "Observed vs. Fitted (log kWh)",
     x = "Fitted values",
@@ -645,7 +653,7 @@ ggplot(dat_count, aes(x = building_type, y = n_high_days)) +
     x = "Building type",
     y = "Number of high-consumption days"
   ) +
-  theme_minimal()
+  report_theme
 
 ggplot(dat_count, aes(x = temp_avg, y = n_high_days)) +
   geom_point(alpha = 0.3) +
@@ -655,7 +663,7 @@ ggplot(dat_count, aes(x = temp_avg, y = n_high_days)) +
     x = "Average temperature",
     y = "High-consumption days"
   ) +
-  theme_minimal()
+  report_theme
 ```
 
 The *rate-ratio plot* below summarises all model effects on a log scale. *House
@@ -704,7 +712,7 @@ ggplot(
   geom_errorbarh(aes(xmin = ci_low, xmax = ci_high), height = 0.3) +
   geom_vline(xintercept = 1, linetype = "dashed", color = "grey50") +
   scale_color_manual(
-    values = c("FALSE" = "grey60", "TRUE" = "steelblue"),
+    values = c("FALSE" = clr_neutral, "TRUE" = clr_primary),
     labels = c("n.s.", "p < 0.05")
   ) +
   scale_x_log10() +
@@ -714,7 +722,7 @@ ggplot(
     y = NULL,
     color = NULL
   ) +
-  theme_minimal(base_size = 13)
+  report_theme
 ```
 
 ### Model Diagnostics
@@ -797,7 +805,7 @@ ggplot(comp_long, aes(x = se, y = term, colour = model)) +
   geom_line(aes(group = term), colour = "grey70", linewidth = 0.5) +
   geom_point(size = 2.5) +
   scale_colour_manual(
-    values = c("Poisson" = "steelblue", "Quasi-Poisson" = "tomato")
+    values = c("Poisson" = clr_primary, "Quasi-Poisson" = clr_secondary)
   ) +
   geom_vline(xintercept = 0, linetype = "dashed", colour = "grey50") +
   labs(
@@ -806,7 +814,7 @@ ggplot(comp_long, aes(x = se, y = term, colour = model)) +
     y = NULL,
     colour = "Model"
   ) +
-  theme_minimal(base_size = 12)
+  report_theme
 ```
 
 ### Goodness of Fit
@@ -1073,7 +1081,7 @@ ggplot(
   geom_errorbarh(aes(xmin = ci_low, xmax = ci_high), height = 0.3) +
   geom_vline(xintercept = 1, linetype = "dashed", color = "grey50") +
   scale_color_manual(
-    values = c("FALSE" = "grey60", "TRUE" = "steelblue"),
+    values = c("FALSE" = clr_neutral, "TRUE" = clr_primary),
     labels = c("n.s.", "p < 0.05")
   ) +
   scale_x_log10() +
@@ -1083,7 +1091,7 @@ ggplot(
     y = NULL,
     color = NULL
   ) +
-  theme_minimal()
+  report_theme
 ```
 
 Each point shows the estimated odds ratio for one predictor, with 95% confidence
@@ -1108,7 +1116,7 @@ roc_df <- (function(actual, prob) {
 })(actual, pred_prob)
 
 ggplot(roc_df, aes(x = fpr, y = tpr)) +
-  geom_line(color = "steelblue", linewidth = 1) +
+  geom_line(color = clr_primary, linewidth = 1) +
   geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey50") +
   labs(
     title = "GLM Binomial – ROC Curve",
@@ -1116,7 +1124,7 @@ ggplot(roc_df, aes(x = fpr, y = tpr)) +
     x = "False Positive Rate",
     y = "True Positive Rate"
   ) +
-  theme_minimal()
+  report_theme
 ```
 
 The ROC curve traces the model's sensitivity against its false positive rate as
@@ -1145,7 +1153,7 @@ ggplot(conf_df, aes(x = Actual, y = Predicted, fill = Count)) +
     fontface = "bold",
     color = "white"
   ) +
-  scale_fill_gradient(low = "steelblue", high = "tomato") +
+  scale_fill_gradient(low = clr_primary, high = clr_secondary) +
   scale_x_discrete(labels = c("0" = "Low (0)", "1" = "High (1)")) +
   scale_y_discrete(labels = c("0" = "Low (0)", "1" = "High (1)")) +
   labs(
@@ -1162,7 +1170,7 @@ ggplot(conf_df, aes(x = Actual, y = Predicted, fill = Count)) +
     y = "Predicted class",
     fill = "Count"
   ) +
-  theme_minimal(base_size = 13) +
+  report_theme +
   theme(legend.position = "none", panel.grid = element_blank())
 ```
 
@@ -1435,7 +1443,7 @@ ggplot(
     color = "Building type",
     fill = "Building type"
   ) +
-  theme_minimal()
+  report_theme
 ```
 
 This plot shows how the GAM's heating-demand curve differs between houses and
@@ -1487,7 +1495,7 @@ ggplot(
     color = "Heat pump type",
     fill = "Heat pump type"
   ) +
-  theme_minimal()
+  report_theme
 ```
 
 This plot compares the predicted heating-demand curves for air-source and
@@ -1506,14 +1514,14 @@ fit_df <- data.frame(
   fitted = fitted(model_gam)
 )
 ggplot(fit_df, aes(x = fitted, y = observed)) +
-  geom_point(alpha = 0.1, size = 0.6, color = "steelblue") +
-  geom_abline(intercept = 0, slope = 1, color = "tomato", linetype = "dashed") +
+  geom_point(alpha = 0.1, size = 0.6, color = clr_primary) +
+  geom_abline(intercept = 0, slope = 1, color = clr_secondary, linetype = "dashed") +
   labs(
     title = "GAM – Observed vs. Fitted",
     x = "Fitted log(kWh_total)",
     y = "Observed log(kWh_total)"
   ) +
-  theme_minimal()
+  report_theme
 ```
 
 The dashed line is the ideal 1:1 line. A perfectly calibrated model would
@@ -1530,15 +1538,15 @@ resid_df <- data.frame(
   residuals = residuals(model_gam)
 )
 ggplot(resid_df, aes(x = fitted, y = residuals)) +
-  geom_point(alpha = 0.1, size = 0.6, color = "steelblue") +
-  geom_hline(yintercept = 0, color = "tomato", linetype = "dashed") +
+  geom_point(alpha = 0.1, size = 0.6, color = clr_primary) +
+  geom_hline(yintercept = 0, color = clr_secondary, linetype = "dashed") +
   geom_smooth(method = "loess", se = FALSE, color = "orange", linewidth = 0.8) +
   labs(
     title = "GAM – Residuals vs. Fitted",
     x = "Fitted log(kWh_total)",
     y = "Residuals"
   ) +
-  theme_minimal()
+  report_theme
 ```
 
 A well-fitting model shows residuals scattered randomly around zero. The orange
@@ -2111,8 +2119,8 @@ cm_df <- as.data.frame(cm_mat) %>%
 ggplot(cm_df, aes(x = Actual, y = Predicted, fill = Freq)) +
   geom_tile(color = "white") +
   geom_text(aes(label = Freq), size = 5) +
-  scale_fill_gradient(low = "#f0f4f8", high = "steelblue") +
-  theme_minimal(base_size = 13) +
+  scale_fill_gradient(low = "#f0f4f8", high = clr_primary) +
+  report_theme +
   labs(
     title = "Confusion Matrix — Tuned SVM",
     fill = "Count"
@@ -2135,9 +2143,9 @@ metrics_df <- bind_rows(
 
 ggplot(metrics_df, aes(x = Metric, y = Value, fill = Model)) +
   geom_col(position = "dodge") +
-  scale_fill_manual(values = c("Baseline" = "grey70", "Tuned" = "steelblue")) +
+  scale_fill_manual(values = c("Baseline" = "grey70", "Tuned" = clr_primary)) +
   scale_y_continuous(limits = c(0, 1)) +
-  theme_minimal(base_size = 13) +
+  report_theme +
   labs(
     title = "Sensitivity and Specificity: Baseline vs. Tuned SVM",
     x = NULL,
@@ -2235,9 +2243,9 @@ if (!is.null(reg_summary)) {
   print(
     ggplot(reg_long, aes(x = Model, y = Value, fill = Model)) +
       geom_col(width = 0.5, show.legend = FALSE) +
-      scale_fill_manual(values = c("steelblue", "tomato")) +
+      scale_fill_manual(values = c(clr_primary, clr_secondary)) +
       facet_wrap(~Metric, scales = "free_y") +
-      theme_minimal(base_size = 12) +
+      report_theme +
       labs(
         title = "5-fold CV: LM vs GAM",
         x = NULL,
@@ -2321,9 +2329,9 @@ if (!is.null(class_summary)) {
   print(
     ggplot(plot_data, aes(x = Model, y = Value, fill = Model)) +
       geom_col(width = 0.5, show.legend = FALSE) +
-      scale_fill_manual(values = c("steelblue", "grey60", "tomato")) +
+      scale_fill_manual(values = c(clr_primary, clr_neutral, clr_secondary)) +
       facet_wrap(~Metric, scales = "free_y") +
-      theme_minimal(base_size = 12) +
+      report_theme +
       labs(
         title = "Classification model comparison",
         subtitle = "GLM/SVM: per-household 75th percentile; NN: household median",
