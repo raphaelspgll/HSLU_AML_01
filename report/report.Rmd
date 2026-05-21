@@ -364,7 +364,7 @@ ggplot(
   ) +
   report_theme +
   labs(
-    title = "Extended MLR: Coefficient Estimates with 95% CIs",
+    title = "Linear Model – Coefficient Estimates with 95% CIs",
     subtitle = "Coefficients on log scale — positive = higher consumption",
     x = "Coefficient estimate",
     y = NULL,
@@ -721,7 +721,7 @@ ggplot(
   ) +
   scale_x_log10() +
   labs(
-    title = "Rate Ratios with 95% Confidence Intervals",
+    title = "GLM Poisson – Rate Ratios with 95% CIs",
     x = "Rate Ratio (log scale)",
     y = NULL,
     color = NULL
@@ -1092,7 +1092,7 @@ ggplot(
   ) +
   scale_x_log10() +
   labs(
-    title = "GLM Binomial – Odds Ratios (95% CI)",
+    title = "GLM Binomial – Odds Ratios with 95% CIs",
     x = "Odds Ratio (log scale)",
     y = NULL,
     color = NULL
