@@ -359,7 +359,7 @@ ggplot(
 ) +
   geom_point(size = 2.5) +
   geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.3) +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = clr_neutral) +
   scale_color_manual(
     values = c("FALSE" = clr_neutral, "TRUE" = clr_primary),
     labels = c("n.s.", "p < 0.05")
@@ -742,7 +742,7 @@ ggplot(
 ) +
   geom_point(size = 2.5) +
   geom_errorbarh(aes(xmin = ci_low, xmax = ci_high), height = 0.3) +
-  geom_vline(xintercept = 1, linetype = "dashed", color = "grey50") +
+  geom_vline(xintercept = 1, linetype = "dashed", color = clr_neutral) +
   scale_color_manual(
     values = c("FALSE" = clr_neutral, "TRUE" = clr_primary),
     labels = c("n.s.", "p < 0.05")
@@ -1113,7 +1113,7 @@ ggplot(
 ) +
   geom_point(size = 2.5) +
   geom_errorbarh(aes(xmin = ci_low, xmax = ci_high), height = 0.3) +
-  geom_vline(xintercept = 1, linetype = "dashed", color = "grey50") +
+  geom_vline(xintercept = 1, linetype = "dashed", color = clr_neutral) +
   scale_color_manual(
     values = c("FALSE" = clr_neutral, "TRUE" = clr_primary),
     labels = c("n.s.", "p < 0.05")
@@ -1151,7 +1151,7 @@ roc_df <- (function(actual, prob) {
 
 ggplot(roc_df, aes(x = fpr, y = tpr)) +
   geom_line(color = clr_primary, linewidth = 1) +
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey50") +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = clr_neutral) +
   labs(
     title = "GLM Binomial – ROC Curve",
     subtitle = paste0("AUC = ", round(auc_val, 3)),
@@ -1872,7 +1872,7 @@ roc_df_nn <- data.frame(
 
 ggplot(roc_df_nn, aes(x = fpr, y = tpr)) +
   geom_line(color = clr_primary, linewidth = 1) +
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey50") +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = clr_neutral) +
   labs(
     title = "Neural Network – ROC Curve",
     subtitle = paste0("AUC = ", auc_val),
