@@ -1851,8 +1851,16 @@ ggplot(nn_df, aes(x = Actual, y = Predicted, fill = Count)) +
   scale_fill_gradient(low = clr_primary, high = clr_secondary) +
   scale_x_discrete(labels = c("0" = "Low (0)", "1" = "High (1)")) +
   scale_y_discrete(labels = c("0" = "Low (0)", "1" = "High (1)")) +
-  labs(title = "Neural Network – Confusion Matrix",
-       x = "Actual class", y = "Predicted class") +
+  labs(
+    title = "Neural Network – Confusion Matrix",
+    subtitle = paste0(
+      "Accuracy = ", round(acc, 3),
+      "  |  F1 = ", round(2 * (tp / (tp + fp)) * (tp / (tp + fn)) /
+                           ((tp / (tp + fp)) + (tp / (tp + fn))), 3),
+      "  |  AUC = ", auc_val
+    ),
+    x = "Actual class", y = "Predicted class"
+  ) +
   report_theme +
   theme(legend.position = "none", panel.grid = element_blank())
 ```
@@ -2169,8 +2177,15 @@ ggplot(svm_df, aes(x = Actual, y = Predicted, fill = Count)) +
   scale_fill_gradient(low = clr_primary, high = clr_secondary) +
   scale_x_discrete(labels = c("normal" = "Low (0)", "high" = "High (1)")) +
   scale_y_discrete(labels = c("normal" = "Low (0)", "high" = "High (1)")) +
-  labs(title = "Confusion Matrix — Tuned SVM",
-       x = "Actual class", y = "Predicted class") +
+  labs(
+    title = "Confusion Matrix — Tuned SVM",
+    subtitle = paste0(
+      "Accuracy = ", round(cm_best$overall["Accuracy"], 3),
+      "  |  F1 = ", round(cm_best$byClass["F1"], 3),
+      "  |  AUC = ", round(svm_cv_auc, 3)
+    ),
+    x = "Actual class", y = "Predicted class"
+  ) +
   report_theme +
   theme(legend.position = "none", panel.grid = element_blank())
 ```
