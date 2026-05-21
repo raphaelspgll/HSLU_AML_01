@@ -37,6 +37,7 @@ library(scales)
 library(broom) # tidy model output
 library(car) # VIF
 library(mgcv) # GAM
+library(gratia)
 library(nnet) # Neural Network
 library(ROCR)
 library(e1071) # SVM
@@ -1417,15 +1418,8 @@ The smooth terms reveal where non-linearity is present in the data:
 ### Visual Evidence
 
 ```{r gam-smooth-plots, fig.height=6}
-par(mfrow = c(2, 4), mar = c(4, 4, 3, 1))
-plot(
-  model_gam,
-  shade = TRUE,
-  seWithMean = TRUE,
-  ylab = "Effect on log(kWh_total)",
-  residuals = FALSE
-)
-par(mfrow = c(1, 1))
+gratia::draw(model_gam, residuals = FALSE, ci_level = 0.95) &
+  report_theme
 ```
 
 The eight panels show the estimated smooth function for each term in the model.
