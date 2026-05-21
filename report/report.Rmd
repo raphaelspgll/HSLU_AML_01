@@ -1966,6 +1966,7 @@ Further improvements are more likely to come from enhanced feature engineering
 or the inclusion of additional relevant variables rather than increasing model
 complexity. Cross-validation results for the Neural Network are reported in the
 Model Comparison section.
+
 ---
 
 ## Support Vector Machine (SVM) {#svm}
