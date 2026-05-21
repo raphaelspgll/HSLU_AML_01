@@ -191,9 +191,9 @@ the GAM will capture this through its flexible smooth terms.
 ```{r eda-building, fig.height=3.5}
 heapo %>%
   ggplot(aes(x = building_type, y = kWh_total, fill = building_type)) +
-  geom_boxplot(alpha = 0.7, outlier.size = 0.2, show.legend = FALSE) +
+  geom_boxplot(alpha = 0.7, outlier.size = 0.2) +
   scale_y_continuous(labels = comma) +
-  scale_fill_manual(values = c(clr_primary, clr_secondary)) +
+  scale_fill_manual(values = clr_builds, guide = "none") +
   labs(
     title = "Daily Consumption by Building Type",
     x = NULL,
