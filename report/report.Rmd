@@ -1819,11 +1819,6 @@ concentrated at lower values. However, noticeable overlap in the mid-range
 indicates that some observations cannot be clearly distinguished, which explains
 the presence of classification errors.
 
-The *confusion matrix* provides a direct summary of classification performance.
-Most observations lie on the diagonal, confirming a high number of correct
-predictions for both classes. Nevertheless, errors occur in both directions,
-highlighting that class separation is not complete.
-
 ```{r nn-pred-prob, echo=FALSE, fig.height=4, fig.width=6, fig.align='center'}
 nn_prob_df <- data.frame(
   index       = seq_along(pred_prob_1),
@@ -1847,6 +1842,11 @@ ggplot(nn_prob_df, aes(x = index, y = probability, color = actual)) +
   report_theme +
   theme(legend.position = "bottom")
 ```
+
+The *confusion matrix* provides a direct summary of classification performance.
+Most observations lie on the diagonal, confirming a high number of correct
+predictions for both classes. Nevertheless, errors occur in both directions,
+highlighting that class separation is not complete.
 
 ```{r nn-confmat, echo=FALSE, fig.height=4, fig.width=4.5, fig.align='center'}
 nn_df <- data.frame(
