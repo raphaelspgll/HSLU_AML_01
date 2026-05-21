@@ -1472,6 +1472,8 @@ ggplot(
     color = "Building type",
     fill = "Building type"
   ) +
+  scale_colour_manual(values = clr_builds) +
+  scale_fill_manual(values = clr_builds) +
   report_theme
 ```
 
@@ -1524,6 +1526,8 @@ ggplot(
     color = "Heat pump type",
     fill = "Heat pump type"
   ) +
+  scale_colour_manual(values = c("air-source" = clr_primary, "ground-source" = clr_secondary)) +
+  scale_fill_manual(values = c("air-source" = clr_primary, "ground-source" = clr_secondary)) +
   report_theme
 ```
 
