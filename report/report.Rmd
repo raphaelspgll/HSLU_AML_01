@@ -5,10 +5,10 @@ date: "`r Sys.Date()`"
 output:
   html_document:
     toc: true
-    toc_float: false
+    toc_float: true
     toc_depth: 3
     number_sections: true
-    theme: default
+    theme: flatly
     code_folding: hide
   pdf_document:
     toc: true
@@ -616,6 +616,11 @@ $$
 The log-link guarantees positive fitted values and supports a multiplicative
 interpretation of effects.
 
+One predictor warrants clarification: `share_weekend` is the monthly proportion
+of weekend days within a household–month (a continuous value between 0 and 1),
+and is distinct from the daily binary `is_weekend` flag used in the GLM Binomial
+and other daily-level models.
+
 ### Model Results
 
 The results are interpreted in terms of *percentage changes in the expected
@@ -663,6 +668,11 @@ associated with a substantially lower rate of high-consumption days (RR
 $\approx$ 0.665). However, this effect has a very wide confidence interval and
 becomes non-significant once overdispersion is accounted for, suggesting
 considerable uncertainty in this estimate.
+The negative direction here contrasts with the positive weekend effect in the
+GLM Binomial (OR = 1.57), which is expected: the two models operate at different
+aggregation levels — the Poisson model uses a monthly count weighted by
+`share_weekend`, while the GLM Binomial uses a daily binary `is_weekend`
+indicator.
 
 Overall, structural and household characteristics (building type, size, and
 number of residents) exhibit the strongest and most reliable effects, while
@@ -1744,8 +1754,8 @@ cat(deparse(formula(mod_nn)), "\n\n")
 mod_nn$call
 ```
 
-The neural network is specified with an architecture of (8–3–1), consisting of
-eight input nodes, one hidden layer with three neurons, and a single output
+The neural network is specified with an architecture of (8–25–1), consisting of
+eight input nodes, one hidden layer with 25 neurons, and a single output
 neuron for binary classification. This relatively simple structure is chosen to
 balance model flexibility with the risk of overfitting, allowing the network to
 capture non-linear relationships without introducing unnecessary complexity.
@@ -1754,7 +1764,7 @@ A non-linear activation function is applied in the hidden layer, enabling the
 model to learn complex patterns in the data. The output layer produces predicted
 probabilities for the high-consumption class.
 
-To improve generalisation, weight decay (set to 0.001) is included as a
+To improve generalisation, weight decay (set to 0.05) is included as a
 regularisation mechanism. This penalises large weights and helps reduce model
 variance. The network is trained using the nnet package with a sufficient number
 of iterations to ensure convergence.
