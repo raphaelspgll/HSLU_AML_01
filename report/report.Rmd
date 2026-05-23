@@ -1789,10 +1789,13 @@ knitr::kable(
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
-The neural network achieves an accuracy of approximately `r round(acc, 2)`, indicating solid
-predictive performance and a clear improvement over a naive classifier $(\approx
-0.50)$ given the balanced dataset. This suggests that the model captures
-meaningful structure in the data. The AUC of `r nn_auc_val` confirms strong discriminative ability across all classification thresholds.
+The neural network achieves an accuracy of approximately `r round(acc, 2)`. Because the binary
+target is defined using the 75th-percentile threshold, roughly 75% of observations
+belong to the low-consumption class; a naive classifier that always predicts "low"
+would therefore achieve a baseline accuracy of $\approx 0.75$. The model's accuracy
+must be assessed against this higher bar rather than a 50/50 split. The AUC of
+`r nn_auc_val` provides a threshold-independent measure and confirms discriminative
+ability beyond the class-imbalance baseline.
 
 Sensitivity (`r round(sensitivity, 3)`) exceeds specificity (`r round(specificity, 3)`), indicating that the model is
 more effective at identifying high-consumption events than low-consumption
@@ -1942,7 +1945,8 @@ serve as the practical evaluation instead.
 ### Key Findings
 
 * The neural network achieves solid predictive performance, with an accuracy of
-  approximately `r round(acc * 100, 1)`%, clearly outperforming a naive baseline.
+  approximately `r round(acc * 100, 1)`%, which should be interpreted against the
+  $\approx 75$% naive baseline arising from the 75/25 class split.
 
 * The model is more effective at identifying high-consumption events than low-
   consumption cases, as reflected in higher sensitivity compared to specificity.
@@ -1961,8 +1965,10 @@ serve as the practical evaluation instead.
 
 The neural network achieves solid predictive performance and successfully
 captures non-linear relationships in the data. With an accuracy of approximately
-`r round(acc * 100, 1)`%, it provides a meaningful improvement over baseline classification and
-demonstrates good overall discriminative ability.
+`r round(acc * 100, 1)`%, it demonstrates discriminative ability above the naive
+$\approx 75$% baseline that arises from the 75/25 class split, though the margin
+above that baseline is modest and performance is primarily constrained by the
+available predictors rather than model complexity.
 
 However, the presence of overlap in predicted probabilities indicates that the
 model cannot fully distinguish between the two classes. This suggests that
