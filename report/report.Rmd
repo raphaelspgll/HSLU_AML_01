@@ -12,7 +12,7 @@ output:
     code_folding: hide
   pdf_document:
     toc: true
-    toc_depth: '3'
+    toc_depth: 3
 subtitle: Applied Machine Learning and Predictive Modelling 1 – FS 2026
 ---
 
@@ -103,7 +103,7 @@ set of building, technology, and weather covariates.
 ## Variable Description
 
 | Variable | Type | Description |
-|---|---|---|
+|:---|:---|:---|
 | `log_kWh_total` | Continuous | Natural log of daily total electricity consumption (kWh). Response for LM and GAM. |
 | `heating_degree_days` | Continuous | Daily heating demand below the 12°C Swiss SIA base temperature (°C·day). |
 | `temp_avg` | Continuous | Daily average outdoor temperature (°C). |
@@ -589,8 +589,7 @@ changes (rate ratios).
 ### Model Setup
 
 ```{r poisson-modell, echo=FALSE}
-cat(deparse(formula(mod_pois)), "\n\n")
-mod_pois$call
+cat("```\n", deparse(formula(mod_pois)), "\n```\n")
 ```
 
 The response variable is the number of high-consumption days per household-month
@@ -2543,4 +2542,4 @@ Generative AI tools (primarily Claude and GitHub Copilot) were used throughout f
 
 Routine tasks went smoothly: boilerplate ggplot2 code, format conversions, first-draft prose describing model outputs. More complex tasks needed closer attention. Cross-validation code had subtle bugs (returning single-column data frames instead of vectors, using a mismatched response variable across models) that only surfaced during testing. AI-drafted coefficient interpretations occasionally overstated certainty or dropped caveats that mattered.
 
-Some decisions could not be delegated. Choosing the threshold for the high-consumption binary response and handling the incompatibility between the Neural Network's pre-computed predictions and the rest of the CV pipeline both required judgment calls that AI could help frame but not make. All generated code was reviewed and tested before use, and interpretive prose was checked against the actual model output rather than taken at face value.
+Some decisions could not be delegated. Choosing the threshold for the high-consumption binary response and handling the incompatibility between the Neural Network's pre-computed predictions and the rest of the CV pipeline both required judgment calls that AI could help frame but not make. All generated code was reviewed and tested before use; the cross-validation helpers, for instance, silently returned single-column data frames instead of vectors and carried a mismatched response variable across models — errors that only surfaced when we ran the full pipeline. Interpretive prose was likewise checked against actual model output rather than accepted at face value. Threshold decisions such as whether to classify high consumption at the household median or the 75th percentile had to be weighed against cross-model comparability ourselves; AI could frame the choice but could not make it.
