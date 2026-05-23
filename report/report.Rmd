@@ -998,7 +998,7 @@ compute_auc <- function(actual, prob) {
   sum(diff(fpr) * (tpr[-1] + tpr[-length(tpr)]) / 2)
 }
 
-auc_val <- compute_auc(actual, pred_prob)
+glm_auc_val <- compute_auc(actual, pred_prob)
 tp <- conf_mat["1", "1"]
 tn <- conf_mat["0", "0"]
 fp <- conf_mat["1", "0"]
@@ -1159,7 +1159,7 @@ ggplot(roc_df, aes(x = fpr, y = tpr)) +
   geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = clr_neutral) +
   labs(
     title = "GLM Binomial – ROC Curve",
-    subtitle = paste0("AUC = ", round(auc_val, 3)),
+    subtitle = paste0("AUC = ", round(glm_auc_val, 3)),
     x = "False Positive Rate",
     y = "True Positive Rate"
   ) +
@@ -1170,9 +1170,9 @@ The ROC curve traces the model's sensitivity against its false positive rate as
 the classification threshold varies from 0 to 1. The dashed diagonal represents
 a model that predicts at random (AUC = 0.5). The further the blue curve bows
 toward the top-left corner, the better the model separates the two classes
-regardless of threshold choice. With an AUC of `r round(auc_val, 3)`, the model
+regardless of threshold choice. With an AUC of `r round(glm_auc_val, 3)`, the model
 correctly ranks a randomly drawn high-consumption day above a randomly drawn
-low-consumption day `r round(auc_val * 100, 1)`% of the time, which is a
+low-consumption day `r round(glm_auc_val * 100, 1)`% of the time, which is a
 meaningful improvement over chance.
 
 ### Model Diagnostics
@@ -1203,7 +1203,7 @@ ggplot(conf_df, aes(x = Actual, y = Predicted, fill = Count)) +
       "  |  F1 = ",
       round(f1, 3),
       "  |  AUC = ",
-      round(auc_val, 3)
+      round(glm_auc_val, 3)
     ),
     x = "Actual class",
     y = "Predicted class",
@@ -1227,7 +1227,7 @@ the household's personal threshold and therefore genuinely ambiguous.
 
 ### Key Findings
 
-- The model achieves an AUC of `r round(auc_val, 3)` and an accuracy of
+- The model achieves an AUC of `r round(glm_auc_val, 3)` and an accuracy of
   `r round(accuracy * 100, 1)`% on the held-out test set, compared to a naive
   baseline of `r round(sum(actual == 0)/length(actual) * 100, 1)`%. AUC is the
   more informative metric given the 75/25 class split.
@@ -1252,7 +1252,7 @@ the household's personal threshold and therefore genuinely ambiguous.
 
 ### Conclusion
 
-The GLM Binomial achieves an AUC of `r round(auc_val, 3)` and a sensitivity of
+The GLM Binomial achieves an AUC of `r round(glm_auc_val, 3)` and a sensitivity of
 `r round(recall * 100, 1)`% using a per-household 75th percentile threshold. The
 most important finding is that structural household characteristics — building
 type, heat pump type, size, residents — become non-significant once the model
@@ -1711,8 +1711,12 @@ test data.
 
 The dataset consists of 99,838 observations and includes variables related to
 weather conditions, building characteristics, and household composition. The
-response variable, *high_consumption*, is binary and approximately balanced
-between the two classes.
+response variable, *high_consumption*, is binary. For the Neural Network,
+*high_consumption* is defined using each household's own median `log_kWh_total`
+as the threshold (rather than the 75th percentile used by the GLM Binomial and
+SVM), which produces an approximately 50/50 class split by construction. This
+different threshold definition means Neural Network results are not directly
+comparable to the GLM Binomial and SVM.
 
 To ensure valid model evaluation, the data is split into training (80%) and test
 (20%) sets using a stratified sampling approach. This preserves the class
@@ -1773,7 +1777,7 @@ specificity <- tn / (tn + fp)
 # ROC object (used by plots below)
 pred_roc <- ROCR::prediction(pred_prob_1, truth)
 perf_roc <- ROCR::performance(pred_roc, "tpr", "fpr")
-auc_val <- round(
+nn_auc_val <- round(
   as.numeric(ROCR::performance(pred_roc, "auc")@y.values[[1]]),
   3
 )
@@ -1784,7 +1788,7 @@ knitr::kable(
     Accuracy = round(acc, 3),
     Sensitivity = round(sensitivity, 3),
     Specificity = round(specificity, 3),
-    AUC = auc_val
+    AUC = nn_auc_val
   ),
   caption = "Neural Network Performance Metrics",
   table.attr = 'style="min-width: 380px"'
@@ -1795,7 +1799,7 @@ knitr::kable(
 The neural network achieves an accuracy of approximately `r round(acc, 2)`, indicating solid
 predictive performance and a clear improvement over a naive classifier $(\approx
 0.50)$ given the balanced dataset. This suggests that the model captures
-meaningful structure in the data. The AUC of `r auc_val` confirms strong discriminative ability across all classification thresholds.
+meaningful structure in the data. The AUC of `r nn_auc_val` confirms strong discriminative ability across all classification thresholds.
 
 Sensitivity (`r round(sensitivity, 3)`) exceeds specificity (`r round(specificity, 3)`), indicating that the model is
 more effective at identifying high-consumption events than low-consumption
@@ -1875,7 +1879,7 @@ ggplot(nn_df, aes(x = Actual, y = Predicted, fill = Count)) +
       "Accuracy = ", round(acc, 3),
       "  |  F1 = ", round(2 * (tp / (tp + fp)) * (tp / (tp + fn)) /
                            ((tp / (tp + fp)) + (tp / (tp + fn))), 3),
-      "  |  AUC = ", auc_val
+      "  |  AUC = ", nn_auc_val
     ),
     x = "Actual class", y = "Predicted class"
   ) +
@@ -1901,7 +1905,7 @@ ggplot(roc_df_nn, aes(x = fpr, y = tpr)) +
   geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = clr_neutral) +
   labs(
     title = "Neural Network – ROC Curve",
-    subtitle = paste0("AUC = ", auc_val),
+    subtitle = paste0("AUC = ", nn_auc_val),
     x = "False Positive Rate",
     y = "True Positive Rate"
   ) +
