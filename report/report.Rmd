@@ -1418,7 +1418,7 @@ The smooth terms reveal where non-linearity is present in the data:
   gain, but the relationship is not monotone.
 - **s(humidity_avg) (edf = 5.3):** Non-linear in shape but not significant
   overall (p = 0.118). Humidity may interact with perceived temperature in ways
-  not fully captured here.
+  not fully captured here. It is retained for consistency with the extended Linear Model predictor set, enabling a direct and controlled comparison between the two models.
 - **s(living_area) (edf = 9.0):** Highly significant (p < 0.001) and the most
   non-linear term. Consumption does not scale proportionally with floor area:
   medium-sized homes behave differently from small or very large ones.
@@ -2521,11 +2521,11 @@ capturing the non-linear cold-weather response of houses. The improvement is
 real but moderate: both models leave roughly two-thirds of day-to-day variation
 unexplained, which reflects individual household behaviour that weather and
 building characteristics alone cannot predict. For classification of high-
-consumption days, the SVM performed best (AUC = 0.842, accuracy = 83%) with
-the GLM Binomial close behind (AUC = 0.830, accuracy = 80%). For a client
+consumption days, the GLM Binomial performed best (AUC = `r round(class_summary[grepl("GLM", class_summary$Model), "CV AUC"], 3)`, accuracy = `r round(class_summary[grepl("GLM", class_summary$Model), "CV Accuracy"] * 100, 1)`%) with
+the SVM close behind (AUC = `r round(class_summary[grepl("SVM", class_summary$Model), "CV AUC"], 3)`, accuracy = `r round(class_summary[grepl("SVM", class_summary$Model), "CV Accuracy"] * 100, 1)`%). For a client
 prioritising transparency, the GLM Binomial is the recommended model: it
 identifies high-demand household-days with good accuracy and explains exactly
-why each prediction was made. The clearest practical takeaway is that upgrading
+why each prediction was made. The Neural Network also achieved competitive results (AUC = `r round(class_summary[grepl("Neural", class_summary$Model), "CV AUC"], 3)`, accuracy = `r round(class_summary[grepl("Neural", class_summary$Model), "CV Accuracy"] * 100, 1)`%), though it uses a household-median high-consumption threshold rather than the 75th percentile used by the other two models and is therefore not directly comparable. The clearest practical takeaway is that upgrading
 from air-source to ground-source heat pumps is the intervention most likely to
 reduce peak demand, and that larger households with air-source systems should be
 the first target for efficiency programmes.
