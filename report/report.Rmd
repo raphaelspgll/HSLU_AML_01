@@ -1972,9 +1972,7 @@ above that baseline is modest and performance is primarily constrained by the
 available predictors rather than model complexity.
 
 However, the presence of overlap in predicted probabilities indicates that the
-model cannot fully distinguish between the two classes. This suggests that
-performance is primarily constrained by the available predictors rather than by
-model complexity.
+model cannot fully distinguish between the two classes.
 
 From a practical perspective, the model can serve as a useful decision-support
 tool for identifying high-consumption events, although predictions should be
