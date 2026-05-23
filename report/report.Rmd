@@ -2109,7 +2109,7 @@ An SVM is used because it can find non-linear decision boundaries via kernel fun
 
 ### Data Preparation
 
-`high_consumption` labels a day as *high* if it falls in the top 25% of that household's own `log_kWh_total` distribution. For each of the `r n_distinct(heapo$Household_ID)` households, the 75th percentile is computed separately, so every household contributes exactly 25% high-consumption days by construction.
+`high_consumption` labels a day as *high* if it falls in the top 25% of that household's own `log_kWh_total` distribution. For each of the `r length(unique(heapo$Household_ID))` households, the 75th percentile is computed separately, so every household contributes exactly 25% high-consumption days by construction.
 
 After removing missing values, the dataset has 93,686 observations: 23,440 high-consumption days (25.0%) and 70,246 normal days (75.0%). `log_kWh_total` is excluded to prevent data leakage; the SVM must identify high-load days from weather and household characteristics alone.
 
