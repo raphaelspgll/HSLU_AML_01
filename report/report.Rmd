@@ -233,10 +233,7 @@ Model are fitted to `log_kWh_total`, the log-transformed daily electricity
 consumption. The GLM Binomial classifies household-days as high or low consumption using
 each household's own 75th percentile as the threshold, capturing the top 25%
 of days for each individual household. The Support Vector Machine uses each
-household's own 75th percentile, the same definition as the GLM Binomial. The Neural Network uses each
-household's own median. Because the Neural Network uses a different threshold
-definition, comparisons involving it in the Model Comparison section are
-indicative rather than fully controlled. The GLM Poisson
+household's own 75th percentile, the same definition as the GLM Binomial and the Neural Network. The GLM Poisson
 models the monthly count of high-consumption days per household, capturing
 longer-term demand patterns at a coarser aggregation. Model performance is
 evaluated in the comparison section: regression models are compared via
@@ -1714,12 +1711,7 @@ test data.
 
 The dataset consists of 99,838 observations and includes variables related to
 weather conditions, building characteristics, and household composition. The
-response variable, *high_consumption*, is binary. For the Neural Network,
-*high_consumption* is defined using each household's own median `log_kWh_total`
-as the threshold (rather than the 75th percentile used by the GLM Binomial and
-SVM), which produces an approximately 50/50 class split by construction. This
-different threshold definition means Neural Network results are not directly
-comparable to the GLM Binomial and SVM.
+response variable, *high_consumption*, is binary, defined using each household's own 75th percentile of `log_kWh_total` as the threshold — consistent with the GLM Binomial and SVM. By construction, exactly 25% of each household's days are classified as high-consumption.
 
 To ensure valid model evaluation, the data is split into training (80%) and test
 (20%) sets using a stratified sampling approach. This preserves the class
@@ -1740,8 +1732,8 @@ cat(deparse(formula(mod_nn)), "\n\n")
 mod_nn$call
 ```
 
-The neural network is specified with an architecture of (8–25–1), consisting of
-eight input nodes, one hidden layer with 25 neurons, and a single output
+The neural network is specified with an architecture of (9–25–1), consisting of
+nine input nodes, one hidden layer with 25 neurons, and a single output
 neuron for binary classification. This relatively simple structure is chosen to
 balance model flexibility with the risk of overfitting, allowing the network to
 capture non-linear relationships without introducing unnecessary complexity.
@@ -1918,7 +1910,7 @@ ggplot(roc_df_nn, aes(x = fpr, y = tpr)) +
 ### Model Diagnostics
 
 Neural network diagnostics focus on predictive performance rather than
-distributional assumptions. The chosen architecture (8–3–1) provides a balance
+distributional assumptions. The chosen architecture (9–25–1) provides a balance
 between flexibility and overfitting, allowing the model to capture non-linear
 relationships while maintaining stable generalisation.
 
@@ -1938,7 +1930,7 @@ Alternative network configurations were explored to assess the impact of model
 complexity. Increasing the number of hidden neurons led to slight improvements
 in training performance but did not translate into meaningful gains in test
 accuracy, indicating potential overfitting. Simpler architectures achieved
-comparable results with greater stability, supporting the choice of the 8–3–1
+comparable results with greater stability, supporting the choice of the 9–25–1
 specification.
 
 ### Coefficient Interpretation
@@ -2387,12 +2379,7 @@ if (file.exists("../models/cv_class_results.rds")) {
 }
 ```
 
-The table below compares all three classification models. The GLM Binomial and
-SVM both use each household's own 75th percentile as the high-consumption
-threshold; the Neural Network uses each household's own median. Because the
-Neural Network uses a different threshold definition, its results are not
-directly comparable to the other two. CV results are available for all three
-models.
+The table below compares all three classification models. All three use each household's own 75th percentile as the high-consumption threshold, making results directly comparable. CV results are available for all three models.
 
 ```{r class-comparison-table, echo=FALSE}
 if (!is.null(class_summary)) {
@@ -2400,8 +2387,7 @@ if (!is.null(class_summary)) {
     class_summary,
     caption = paste(
       "Classification model performance.",
-      "GLM Binomial and SVM: 5-fold CV, per-household 75th percentile threshold.",
-      "Neural Network: 5-fold CV, household-median threshold."
+      "All models: 5-fold CV, per-household 75th percentile threshold."
     )
   ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
@@ -2428,7 +2414,7 @@ if (!is.null(class_summary)) {
       report_theme +
       labs(
         title = "Classification model comparison",
-        subtitle = "GLM/SVM: per-household 75th percentile; NN: household median",
+        subtitle = "All models: per-household 75th percentile threshold",
         x = NULL,
         y = NULL
       )
@@ -2436,9 +2422,7 @@ if (!is.null(class_summary)) {
 }
 ```
 
-Because the three models use different threshold definitions, no single winner
-can be declared. Within the models that share the same threshold (GLM Binomial
-and SVM, both evaluated under the per-household 75th percentile CV), the GLM
+All three models share the same per-household 75th percentile threshold, making them directly comparable. The GLM
 Binomial achieves a higher AUC (`r round(class_summary[grepl("GLM", class_summary$Model), "CV AUC"], 3)` vs `r round(class_summary[grepl("SVM", class_summary$Model), "CV AUC"], 3)`) while accuracy is essentially tied (`r round(class_summary[grepl("GLM", class_summary$Model), "CV Accuracy"] * 100, 1)`% vs `r round(class_summary[grepl("SVM", class_summary$Model), "CV Accuracy"] * 100, 1)`%). The AUC gap reflects the GLM's stronger overall discrimination across all classification thresholds. Both models correctly identify roughly four out of five household-days. The GLM Binomial is the preferred choice: it matches the SVM on accuracy, outperforms it on AUC, and provides explicit odds ratios for each predictor. For a client who needs to explain predictions (for example, when flagging a household for an energy audit), this interpretability advantage is directly actionable.
 
 ## GLM Poisson (Standalone)
@@ -2525,7 +2509,7 @@ consumption days, the GLM Binomial performed best (AUC = `r round(class_summary[
 the SVM close behind (AUC = `r round(class_summary[grepl("SVM", class_summary$Model), "CV AUC"], 3)`, accuracy = `r round(class_summary[grepl("SVM", class_summary$Model), "CV Accuracy"] * 100, 1)`%). For a client
 prioritising transparency, the GLM Binomial is the recommended model: it
 identifies high-demand household-days with good accuracy and explains exactly
-why each prediction was made. The Neural Network also achieved competitive results (AUC = `r round(class_summary[grepl("Neural", class_summary$Model), "CV AUC"], 3)`, accuracy = `r round(class_summary[grepl("Neural", class_summary$Model), "CV Accuracy"] * 100, 1)`%). Note that it uses a household-median high-consumption threshold rather than the 75th percentile used by the other two models and is therefore not directly comparable. The clearest practical takeaway is that upgrading
+why each prediction was made. The Neural Network also achieved competitive results (AUC = `r round(class_summary[grepl("Neural", class_summary$Model), "CV AUC"], 3)`, accuracy = `r round(class_summary[grepl("Neural", class_summary$Model), "CV Accuracy"] * 100, 1)`%), evaluated under the same per-household 75th percentile threshold. The clearest practical takeaway is that upgrading
 from air-source to ground-source heat pumps is the intervention most likely to
 reduce peak demand, and that larger households with air-source systems should be
 the first target for efficiency programmes.
@@ -2534,4 +2518,4 @@ the first target for efficiency programmes.
 
 Generative AI tools (primarily Claude and GitHub Copilot) were used throughout for code generation, debugging, and text drafting. AI helped write data preprocessing pipelines, model fitting wrappers, cross-validation loops, and visualisations, and explained statistical concepts such as overdispersion in Poisson models, GAM smooth term interpretation, and SVM cost and kernel bandwidth parameters as they came up. Routine tasks went smoothly: boilerplate ggplot2 code, format conversions, and first-draft prose describing model outputs. More complex tasks needed closer attention — cross-validation helpers had subtle bugs (returning single-column data frames instead of vectors and carrying a mismatched response variable across models) that only surfaced during testing, and AI-drafted coefficient interpretations occasionally overstated certainty or omitted caveats that mattered.
 
-Some decisions could not be delegated. Choosing the threshold for the high-consumption binary response (household median vs. 75th percentile) and handling the incompatibility between the Neural Network's pre-computed predictions and the rest of the CV pipeline both required judgment calls that AI could help frame but not make. All generated code was reviewed and tested before use, and interpretive prose was checked against actual model output rather than accepted at face value.
+Some decisions could not be delegated. Handling the incompatibility between the Neural Network's pre-computed predictions and the rest of the CV pipeline required judgment calls that AI could help frame but not make. All generated code was reviewed and tested before use, and interpretive prose was checked against actual model output rather than accepted at face value.
