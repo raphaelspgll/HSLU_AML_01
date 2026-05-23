@@ -59,8 +59,6 @@ report_theme  <- theme_minimal(base_size = 12)
 heapo <- readRDS("../data_processed/heapo/heapo_modelling.rds")
 ```
 
----
-
 # Introduction
 
 With the rapid expansion of heat pump installations across Swiss households,
@@ -123,8 +121,6 @@ through 2024-02-29 and limited to households with at least 95% daily coverage to
 exclude partially observed installations. It was then randomly sampled to a
 maximum of 100,000 observations to comply with the course data size limit.
 The final dataset contains the same observations as described above.
-
----
 
 # Exploratory Data Analysis
 
@@ -222,8 +218,6 @@ categorical covariate in every model. For the client, the key implication is
 that cold spells and the building stock composition of a supply portfolio are
 the two dominant levers of aggregate demand, and any forecasting tool must
 capture both to be useful.
-
----
 
 # Modelling
 
@@ -567,8 +561,6 @@ The linear model identifies the main structural and weather-related drivers of d
 However, the model has **limited predictive value**. An adjusted R² of `r round(summary(heapo_lm)$adj.r.squared, 2)` leaves ~`r round((1 - summary(heapo_lm)$adj.r.squared) * 100, 0)`% of the variance unexplained. At the household-day level, predictions are too imprecise for operational use. Household-level heterogeneity is likely the cause: baseline consumption varies substantially across households in ways a cross-sectional model cannot capture.
 
 For inference, the model does its job: it gives directly interpretable coefficient estimates for every predictor. For forecasting, models with household-level random effects would be needed.
-
----
 
 ## GLM – Poisson {#glm-poisson}
 
@@ -914,8 +906,6 @@ While the quasi-Poisson model improves inference, a negative binomial model
 could be considered as a more flexible alternative, as it models the
 overdispersion through an explicit distributional parameter rather than a post-
 hoc correction.
-
----
 
 ## GLM – Binomial {#glm-binomial}
 
@@ -1282,8 +1272,6 @@ predictable from calendar and weather information alone, without needing to know
 anything about the household's physical characteristics. The model is
 transparent, interpretable, and provides a well-founded baseline for comparison
 with more flexible classification methods.
-
----
 
 ## Generalised Additive Model (GAM) {#gam}
 
@@ -1695,8 +1683,6 @@ extended LM) does not justify choosing it over the LM when interpretability is
 the priority. The detailed comparison using 5-fold cross-validation is presented
 in the Model Comparison section.
 
----
-
 ## Neural Network (NN) {#nn}
 *Lead: Raphaël Spagolla*
 
@@ -2002,8 +1988,6 @@ or the inclusion of additional relevant variables rather than increasing model
 complexity. Cross-validation results for the Neural Network are reported in the
 Model Comparison section.
 
----
-
 ## Support Vector Machine (SVM) {#svm}
 
 *Lead: Tharrmeehan Krishnathasan*
@@ -2298,8 +2282,6 @@ The limiting factor is not the model but the available features. High and normal
 
 Lowering the flagging threshold would recover more true positives at the cost of more false alarms, which may be acceptable in a probabilistic forecasting pipeline. At the default threshold, the model should not be the sole basis for high-consumption day decisions.
 
----
-
 # Model Comparison {#comparison}
 
 The six models do not all share the same response variable, so a single
@@ -2518,8 +2500,6 @@ The GLM Binomial sits in between — log-odds coefficients remain
 interpretable while classification performance is competitive. The right
 choice depends on whether the use case demands explainability or accuracy.
 
----
-
 # Conclusions {#conclusions}
 
 Across 127 Swiss households monitored daily from 2022 to 2024, cold weather
@@ -2549,8 +2529,6 @@ why each prediction was made. The Neural Network also achieved competitive resul
 from air-source to ground-source heat pumps is the intervention most likely to
 reduce peak demand, and that larger households with air-source systems should be
 the first target for efficiency programmes.
-
----
 
 # Use of Generative AI {#ai}
 
