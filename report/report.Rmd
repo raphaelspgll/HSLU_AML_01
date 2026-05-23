@@ -85,6 +85,7 @@ not only on explaining consumption variability across seasonal patterns,
 building characteristics, and technology choices, but also on quantifying the
 interaction between external factors such as outdoor temperature, heating degree
 days, and building type.
+
 The report is structured as follows: Section 2 presents exploratory data analysis; Section 3 fits and interprets six models — a Linear Model, GLM Poisson, GLM Binomial, Generalised Additive Model, Neural Network, and Support Vector Machine; Section 4 compares model performance; and Section 5 draws conclusions for energy suppliers and grid operators.
 
 
@@ -120,7 +121,6 @@ canton of Zurich. The modelling subset was restricted to the period 2022-01-01
 through 2024-02-29 and limited to households with at least 95% daily coverage to
 exclude partially observed installations. It was then randomly sampled to a
 maximum of 100,000 observations to comply with the course data size limit.
-The final dataset contains the same observations as described above.
 
 # Exploratory Data Analysis
 
@@ -2525,7 +2525,7 @@ consumption days, the GLM Binomial performed best (AUC = `r round(class_summary[
 the SVM close behind (AUC = `r round(class_summary[grepl("SVM", class_summary$Model), "CV AUC"], 3)`, accuracy = `r round(class_summary[grepl("SVM", class_summary$Model), "CV Accuracy"] * 100, 1)`%). For a client
 prioritising transparency, the GLM Binomial is the recommended model: it
 identifies high-demand household-days with good accuracy and explains exactly
-why each prediction was made. The Neural Network also achieved competitive results (AUC = `r round(class_summary[grepl("Neural", class_summary$Model), "CV AUC"], 3)`, accuracy = `r round(class_summary[grepl("Neural", class_summary$Model), "CV Accuracy"] * 100, 1)`%), though it uses a household-median high-consumption threshold rather than the 75th percentile used by the other two models and is therefore not directly comparable. The clearest practical takeaway is that upgrading
+why each prediction was made. The Neural Network also achieved competitive results (AUC = `r round(class_summary[grepl("Neural", class_summary$Model), "CV AUC"], 3)`, accuracy = `r round(class_summary[grepl("Neural", class_summary$Model), "CV Accuracy"] * 100, 1)`%). Note that it uses a household-median high-consumption threshold rather than the 75th percentile used by the other two models and is therefore not directly comparable. The clearest practical takeaway is that upgrading
 from air-source to ground-source heat pumps is the intervention most likely to
 reduce peak demand, and that larger households with air-source systems should be
 the first target for efficiency programmes.
