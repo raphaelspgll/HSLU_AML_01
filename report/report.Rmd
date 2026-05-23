@@ -590,7 +590,10 @@ print(formula(mod_pois))
 ```
 
 The response variable is the number of high-consumption days per household-month
-($n_{high\ days}$). Because the number of observed days can vary slightly across
+($n_{high\ days}$). A day is classified as a high-consumption day if its daily
+`kWh_total` exceeds the dataset-wide median — note that this differs from the
+per-household 75th percentile of `log_kWh_total` used in the GLM Binomial.
+Because the number of observed days can vary slightly across
 household–months, the model includes the logarithm of the observed days
 $(\log(n_{days}))$ as an offset. This adjustment effectively converts the
 outcome into a rate — high-consumption days per observed day — so that
