@@ -1797,12 +1797,12 @@ must be assessed against this higher bar rather than a 50/50 split. The AUC of
 `r nn_auc_val` provides a threshold-independent measure and confirms discriminative
 ability beyond the class-imbalance baseline.
 
-Sensitivity (`r round(sensitivity, 3)`) exceeds specificity (`r round(specificity, 3)`), indicating that the model is
-more effective at identifying high-consumption events than low-consumption
-cases. This suggests that patterns associated with high consumption are more
-strongly captured by the available predictors. While this may be advantageous in
-contexts where detecting high-consumption events is particularly important, it
-also implies a slightly higher rate of false positives. 
+Specificity (`r round(specificity, 3)`) exceeds sensitivity (`r round(sensitivity, 3)`), indicating that the model is
+more effective at identifying low-consumption days than high-consumption
+days. This is expected given the 75/25 class imbalance: with three times as many
+normal days as high-consumption days, the model has more signal for the majority
+class. The lower sensitivity reflects a higher rate of missed high-consumption
+events, which is the more costly error in capacity-planning contexts.
 
 Overall, the confusion matrix shows that the majority of observations are
 correctly classified, with most predictions concentrated along the diagonal.
@@ -1948,8 +1948,9 @@ serve as the practical evaluation instead.
   approximately `r round(acc * 100, 1)`%, which should be interpreted against the
   $\approx 75$% naive baseline arising from the 75/25 class split.
 
-* The model is more effective at identifying high-consumption events than low-
-  consumption cases, as reflected in higher sensitivity compared to specificity.
+* The model is more effective at identifying low-consumption days than high-
+  consumption days, as reflected in higher specificity compared to sensitivity.
+  This is expected given the 75/25 class imbalance.
 
 * The confusion matrix and ROC curve confirm good overall classification
   ability, although not perfect.
