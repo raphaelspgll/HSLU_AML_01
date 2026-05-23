@@ -878,10 +878,10 @@ rmse_quasi <- sqrt(mean((dat_count$n_high_days - dat_count$fitted_quasi)^2))
 
 knitr::kable(
   data.frame(
-    Model = c("Poisson", "Quasi-Poisson"),
-    RMSE = round(c(rmse_pois, rmse_quasi), 3)
+    Model = "Poisson",
+    RMSE = round(rmse_pois, 3)
   ),
-  caption = "Root Mean Squared Error for Poisson and quasi-Poisson models.",
+  caption = "Root Mean Squared Error for the Poisson model.",
   table.attr = 'style="min-width: 500px"'
 ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
