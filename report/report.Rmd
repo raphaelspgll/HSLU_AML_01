@@ -655,16 +655,11 @@ higher than those without $((1.130 - 1) \times 100\%)$. This likely reflects the
 greater energy input required by radiant floor systems to maintain comfort
 temperatures.
 
-**Weekend share:** A higher proportion of weekend days within a month is
-associated with a substantially lower rate of high-consumption days (RR
-$\approx$ 0.665). However, this effect has a very wide confidence interval and
-becomes non-significant once overdispersion is accounted for, suggesting
-considerable uncertainty in this estimate.
-The negative direction here contrasts with the positive weekend effect in the
-GLM Binomial (OR = 1.57), which is expected: the two models operate at different
-aggregation levels — the Poisson model uses a monthly count weighted by
-`share_weekend`, while the GLM Binomial uses a daily binary `is_weekend`
-indicator.
+**Weekend share:** This predictor has a very wide confidence interval and is
+non-significant once overdispersion is accounted for (quasi-Poisson p > 0.05).
+The direction of the raw Poisson estimate should not be interpreted. The two
+models are not directly comparable on this predictor, as they operate at
+different aggregation levels.
 
 Overall, structural and household characteristics (building type, size, and
 number of residents) exhibit the strongest and most reliable effects, while
