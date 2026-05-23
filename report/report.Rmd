@@ -119,8 +119,8 @@ The raw HEAPO dataset spans 2018 to 2024 across 438 monitored households in the
 canton of Zurich. The modelling subset was restricted to the period 2022-01-01
 through 2024-02-29 and limited to households with at least 95% daily coverage to
 exclude partially observed installations. It was then randomly sampled to a
-maximum of 100,000 observations to comply with the course data size limit. The
-final dataset contains `r nrow(heapo)` household-days across `r length(unique(heapo$Household_ID))` households.
+maximum of 100,000 observations to comply with the course data size limit.
+The final dataset contains the same observations as described above.
 
 ---
 
