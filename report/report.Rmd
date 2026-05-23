@@ -230,10 +230,10 @@ capture both to be useful.
 Six models are fitted to the HEAPO data, each targeting a response variable
 suited to its statistical family. The Linear Model and Generalised Additive
 Model are fitted to `log_kWh_total`, the log-transformed daily electricity
-consumption. The GLM Binomial classifies household-days as high or low consumption using
-each household's own 75th percentile as the threshold, capturing the top 25%
-of days for each individual household. The Support Vector Machine uses each
-household's own 75th percentile, the same definition as the GLM Binomial and the Neural Network. The GLM Poisson
+consumption. The GLM Binomial, Neural Network, and Support Vector Machine all classify
+household-days as high or low consumption using each household's own 75th
+percentile as the threshold, capturing the top 25% of days for each individual
+household. The GLM Poisson
 models the monthly count of high-consumption days per household, capturing
 longer-term demand patterns at a coarser aggregation. Model performance is
 evaluated in the comparison section: regression models are compared via
@@ -2522,4 +2522,4 @@ the first target for efficiency programmes.
 
 Generative AI tools (primarily Claude and GitHub Copilot) were used throughout for code generation, debugging, and text drafting. AI helped write data preprocessing pipelines, model fitting wrappers, cross-validation loops, and visualisations, and explained statistical concepts such as overdispersion in Poisson models, GAM smooth term interpretation, and SVM cost and kernel bandwidth parameters as they came up. Routine tasks went smoothly: boilerplate ggplot2 code, format conversions, and first-draft prose describing model outputs. More complex tasks needed closer attention — cross-validation helpers had subtle bugs (returning single-column data frames instead of vectors and carrying a mismatched response variable across models) that only surfaced during testing, and AI-drafted coefficient interpretations occasionally overstated certainty or omitted caveats that mattered.
 
-Some decisions could not be delegated. Handling the incompatibility between the Neural Network's pre-computed predictions and the rest of the CV pipeline required judgment calls that AI could help frame but not make. All generated code was reviewed and tested before use, and interpretive prose was checked against actual model output rather than accepted at face value.
+Some decisions could not be delegated. Integrating the Neural Network's externally pre-computed predictions with the shared CV pipeline required judgment calls that AI could help frame but not make. All generated code was reviewed and tested before use, and interpretive prose was checked against actual model output rather than accepted at face value.
