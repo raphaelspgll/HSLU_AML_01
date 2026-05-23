@@ -5,10 +5,10 @@ date: "`r Sys.Date()`"
 output:
   html_document:
     toc: true
-    toc_float: true
+    toc_float: false
     toc_depth: 3
     number_sections: true
-    theme: flatly
+    theme: default
     code_folding: hide
   pdf_document:
     toc: true
@@ -2449,7 +2449,7 @@ The GLM Poisson models `n_high_days` at the household–month level and
 cannot be placed in either comparison table. It is evaluated separately
 via five-fold CV RMSE on the count scale.
 
-```{r poisson-cv, echo=TRUE, cache=FALSE}
+```{r poisson-cv, echo=TRUE, cache=TRUE}
 set.seed(42)
 
 # Extract formula cleanly — detach from model environment to avoid memory bleed
