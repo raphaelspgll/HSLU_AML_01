@@ -1380,9 +1380,9 @@ knitr::kable(
 The parametric terms capture the **baseline level** shift between groups, while
 the `by =` smooths allow the heating-demand curve to differ in shape. Converting
 the parametric estimates with `(exp(coef) - 1) × 100` gives the percentage
-difference relative to the reference level (apartment, air-source heat pump):
+difference relative to the reference level (flat, air-source heat pump):
 
-- **Houses vs. apartments:** The parametric term for `building_typehouse` is
+- **Houses vs. flats:** The parametric term for `building_typehouse` is
   small and not statistically significant (p = 0.562). Once the model fits a
   separate heating-demand curve per building type, the baseline intercept gap
   disappears. The difference between building types is captured entirely by how
@@ -1399,8 +1399,8 @@ difference relative to the reference level (apartment, air-source heat pump):
 
 The smooth terms reveal where non-linearity is present in the data:
 
-- **s(HDD):apartment (edf = 0.75):** This smooth shrank almost to zero and is
-  not significant (p = 0.316). For apartments, the relationship between heating
+- **s(HDD):flat (edf = 0.75):** This smooth shrank almost to zero and is
+  not significant (p = 0.316). For flats, the relationship between heating
   demand and consumption is not clearly detectable once group-specific curves are
   allowed.
 - **s(HDD):house (edf = 5.3):** Highly significant (p < 0.001) and strongly
@@ -1491,11 +1491,11 @@ ggplot(
 ```
 
 This plot shows how the GAM's heating-demand curve differs between houses and
-apartments. Both groups consume more electricity on colder days, but houses
+flats. Both groups consume more electricity on colder days, but houses
 show a steeper and more curved response, particularly at high HDD values. This
 non-linearity, captured by the s(HDD):house smooth with edf = 5.3, would have
 been forced into a single linear slope by the LM's interaction term. The wider
-confidence band for apartments at extreme cold values reflects lower sample
+confidence band for flats at extreme cold values reflects lower sample
 density there.
 
 ```{r gam-pred-heatpump, fig.height=4, fig.align='center'}
@@ -1533,7 +1533,7 @@ ggplot(
   geom_line(linewidth = 1) +
   labs(
     title = "GAM – Predicted Daily Consumption by Heating Demand and Heat Pump Type",
-    subtitle = "Other predictors held at median; apartment building type",
+    subtitle = "Other predictors held at median; flat building type",
     x = "Heating Degree Days",
     y = "Predicted kWh/day",
     color = "Heat pump type",
@@ -1650,8 +1650,8 @@ actionable, and R² communicates model quality in plain percentage terms.
 - **Heating demand (HDD)** is non-linear for houses (edf = 5.3, p < 0.001),
   meaning the LM's linear interaction term understates the acceleration in
   consumption during the coldest days.
-- **HDD for apartments** shows no significant smooth effect (edf = 0.75,
-  p = 0.316): apartment consumption responds to cold weather in a way that is
+- **HDD for flats** shows no significant smooth effect (edf = 0.75,
+  p = 0.316): flat consumption responds to cold weather in a way that is
   well described by a straight line once group-specific curves are allowed.
 - **Ground-source heat pumps** consume
   `r round((1 - exp(coef(model_gam)["heatpump_typeground-source"])) * 100, 1)`%
@@ -1668,7 +1668,7 @@ actionable, and R² communicates model quality in plain percentage terms.
 ### Conclusion
 
 The GAM confirms that non-linearity is present in the data, but mostly in how
-houses respond to cold weather during the peak heating season. For apartments
+houses respond to cold weather during the peak heating season. For flats
 and both heat pump types, the heating-demand curve is close to linear, meaning
 the extended LM captures those effects adequately. The most actionable findings
 are consistent with the LM: ground-source heat pumps and lower occupancy reduce
@@ -2508,7 +2508,7 @@ choice depends on whether the use case demands explainability or accuracy.
 Across 127 Swiss households monitored daily from 2022 to 2024, cold weather
 is the strongest and most consistent driver of electricity consumption. The
 relationship is non-linear for houses: consumption accelerates sharply on the
-coldest winter days, while apartment consumption responds more gradually. The
+coldest winter days, while flat consumption responds more gradually. The
 single most actionable finding for an energy supplier or grid operator is heat
 pump type. Households with ground-source heat pumps use approximately 13% less
 electricity per day than those with air-source systems, holding all else equal,
