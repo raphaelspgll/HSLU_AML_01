@@ -2509,7 +2509,7 @@ choice depends on whether the use case demands explainability or accuracy.
 Across 127 Swiss households monitored daily from 2022 to 2024, cold weather
 is the strongest and most consistent driver of electricity consumption. The
 relationship is non-linear for houses: consumption accelerates sharply on the
-coldest winter days, while flat consumption responds more gradually. The
+coldest winter days, while no statistically detectable non-linear cold-weather response was found for flats. The
 single most actionable finding for an energy supplier or grid operator is heat
 pump type. Households with ground-source heat pumps use approximately 13% less
 electricity per day than those with air-source systems, holding all else equal,
