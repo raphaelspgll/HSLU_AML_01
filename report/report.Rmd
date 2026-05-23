@@ -589,7 +589,7 @@ changes (rate ratios).
 ### Model Setup
 
 ```{r poisson-modell, echo=FALSE}
-cat("```\n", deparse(formula(mod_pois)), "\n```\n")
+print(formula(mod_pois))
 ```
 
 The response variable is the number of high-consumption days per household-month
@@ -1733,8 +1733,8 @@ consistency and prevent data leakage.
 ### Model setup
 
 ```{r nn-modell, echo=TRUE}
-cat(deparse(formula(mod_nn)), "\n\n")
-mod_nn$call
+print(formula(mod_nn))
+print(mod_nn$call)
 ```
 
 The neural network is specified with an architecture of (8–3–1), consisting of
