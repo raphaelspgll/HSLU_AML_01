@@ -256,16 +256,22 @@ and accuracy.
 ```{r import-lm, echo=FALSE, message=FALSE, warning=FALSE}
 heapo_lm <- readRDS("../models/linear_model/heapo_lm.rds")
 
-heapo_mlm_simple <- lm(
-  log_kWh_total ~ heating_degree_days +
-    sunshine_hours +
-    humidity_avg +
-    living_area +
-    n_residents +
-    building_type +
-    heatpump_type,
-  data = heapo
-)
+mlm_simple_path <- "../models/linear_model/heapo_mlm_simple.rds"
+if (file.exists(mlm_simple_path)) {
+  heapo_mlm_simple <- readRDS(mlm_simple_path)
+} else {
+  heapo_mlm_simple <- lm(
+    log_kWh_total ~ heating_degree_days +
+      sunshine_hours +
+      humidity_avg +
+      living_area +
+      n_residents +
+      building_type +
+      heatpump_type,
+    data = heapo
+  )
+  saveRDS(heapo_mlm_simple, mlm_simple_path)
+}
 ```
 
 ### Objective
@@ -1734,8 +1740,8 @@ consistency and prevent data leakage.
 ### Model setup
 
 ```{r nn-modell, echo=TRUE}
-print(formula(mod_nn))
-print(mod_nn$call)
+cat(deparse(formula(mod_nn)), "\n\n")
+mod_nn$call
 ```
 
 The neural network is specified with an architecture of (8–3–1), consisting of
