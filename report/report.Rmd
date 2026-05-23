@@ -86,6 +86,7 @@ not only on explaining consumption variability across seasonal patterns,
 building characteristics, and technology choices, but also on quantifying the
 interaction between external factors such as outdoor temperature, heating degree
 days, and building type.
+The report is structured as follows: Section 2 presents exploratory data analysis; Section 3 fits and interprets six models — a Linear Model, GLM Poisson, GLM Binomial, Generalised Additive Model, Neural Network, and Support Vector Machine; Section 4 compares model performance; and Section 5 draws conclusions for energy suppliers and grid operators.
 
 
 ## Dataset
