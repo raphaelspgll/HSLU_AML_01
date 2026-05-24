@@ -15,18 +15,19 @@
 # ------------------------------------------------------------
 suppressPackageStartupMessages({
   library(dplyr)
+  library(here)
 })
 
 # ------------------------------------------------------------
 # Paths  (all defined once here — edit only this section)
 # ------------------------------------------------------------
-path_in       <- "../../data_processed/heapo/heapo_modelling.rds"
-path_count    <- "../../data_processed/poisson/dat_count.rds"
-path_mod_pois <- "../../models/poisson_glm/mod_pois.rds"
-path_mod_quas <- "../../models/poisson_glm/mod_quasi.rds"
-path_rr       <- "../../models/poisson_glm/coeff_rate_ratios.csv"
-path_disp     <- "../../models/poisson_glm/dispersion_val.rds"
-path_comp     <- "../../models/poisson_glm/quasi_vs_pois_se_pvals.csv"
+path_in       <- here("data_processed/heapo/heapo_modelling.rds")
+path_count    <- here("data_processed/poisson/dat_count.rds")
+path_mod_pois <- here("models/poisson_glm/mod_pois.rds")
+path_mod_quas <- here("models/poisson_glm/mod_quasi.rds")
+path_rr       <- here("models/poisson_glm/coeff_rate_ratios.csv")
+path_disp     <- here("models/poisson_glm/dispersion_val.rds")
+path_comp     <- here("models/poisson_glm/quasi_vs_pois_se_pvals.csv")
 
 # Create output directories if missing
 dir.create(dirname(path_count),    recursive = TRUE, showWarnings = FALSE)
