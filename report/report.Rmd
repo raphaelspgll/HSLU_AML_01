@@ -341,7 +341,7 @@ temperatures.
 
 The coefficient plot below summarises the direction and significance of all predictors in the extended model.
 
-```{r lm-coef-plot, echo=FALSE, fig.height=5, fig.width=7, out.width="80%", fig.align="center"}
+```{r lm-coef-plot, echo=FALSE, fig.height=5, fig.width=7, out.width="100%", fig.align="center"}
 cis <- confint(heapo_lm)
 
 coef_df <- tibble(
