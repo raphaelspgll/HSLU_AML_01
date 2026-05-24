@@ -307,10 +307,9 @@ tidy(heapo_lm) %>%
   ) %>%
   knitr::kable(
     col.names = c("Predictor", "Estimate", "Std. Error", "t value", "p value"),
-    caption = "Extended MLR: coefficient estimates",
-    table.attr = 'style="min-width: 380px"'
+    caption = "Extended MLR: coefficient estimates"
   ) %>%
-  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 ```
 
 All predictors are significant at the 0.001 level except `humidity_avg` (p = 0.165), which adds nothing once the other weather variables are included. Effects on log energy consumption, holding all other variables constant:
@@ -448,10 +447,9 @@ data.frame(
   VIF = round(as.numeric(vif_vals), 2)
 ) %>%
   knitr::kable(
-    caption = "Variance Inflation Factors (VIF) — extended model",
-    table.attr = 'style="min-width: 420px"'
+    caption = "Variance Inflation Factors (VIF) — extended model"
   ) %>%
-  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 ```
 
 Most predictors have VIF below 3, indicating no problematic multicollinearity.
@@ -527,10 +525,9 @@ tibble(
   )
 ) %>%
   knitr::kable(
-    caption = "LM model comparison — Adj. R² on full data; MAE from 5-fold CV",
-    table.attr = 'style="min-width: 520px"'
+    caption = "LM model comparison — Adj. R² on full data; MAE from 5-fold CV"
   ) %>%
-  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 ```
 
 The simple model achieves an adjusted R² of `r round(summary(heapo_mlm_simple)$adj.r.squared, 4)`. Adding the two interaction terms improves this to `r round(summary(heapo_lm)$adj.r.squared, 4)`, a real but modest gain. Five-fold CV MAE is roughly `r round(lm_ext_cv_mae, 1)` kWh/day for the extended model. The interaction terms are meaningful, but overall explanatory power remains limited on this dataset.
@@ -876,10 +873,9 @@ knitr::kable(
     Model = "Poisson",
     RMSE = round(rmse_pois, 3)
   ),
-  caption = "Root Mean Squared Error for the Poisson model.",
-  table.attr = 'style="min-width: 500px"'
+  caption = "Root Mean Squared Error for the Poisson model."
 ) %>%
-  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 
 ```
 The RMSE of `r round(rmse_pois, 3)` days reflects substantial residual spread, partly explained by the high overdispersion ($\hat{\phi}$ = `r round(phi_q, 2)`). Note that the quasi-Poisson model produces identical fitted values and therefore the same RMSE, as it only affects standard errors and inference, not point predictions.
@@ -1352,10 +1348,9 @@ knitr::kable(
   ),
   caption = "GAM – Smooth Terms",
   col.names = c("Smooth Term", "EDF", "F", "p-value"),
-  row.names = FALSE,
-  table.attr = 'style="min-width: 220px"'
+  row.names = FALSE
 ) %>%
-  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 ```
 
 ```{r gam-parametric-table}
@@ -1371,10 +1366,9 @@ knitr::kable(
   ),
   caption = "GAM – Parametric Terms",
   col.names = c("Term", "Estimate", "Std. Error", "t-value", "p-value"),
-  row.names = FALSE,
-  table.attr = 'style="min-width: 260px"'
+  row.names = FALSE
 ) %>%
-  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 ```
 
 The parametric terms capture the **baseline level** shift between groups, while
@@ -1783,10 +1777,9 @@ knitr::kable(
     Specificity = round(specificity, 3),
     AUC = nn_auc_val
   ),
-  caption = "Neural Network Performance Metrics",
-  table.attr = 'style="min-width: 380px"'
+  caption = "Neural Network Performance Metrics"
 ) %>%
-  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 ```
 
 The neural network achieves an accuracy of approximately `r round(acc, 2)`. Because the binary
@@ -2100,10 +2093,9 @@ prop.table(table(train_data$high_consumption)) %>%
   rename(Class = Var1, Proportion = Freq) %>%
   mutate(Proportion = round(Proportion, 3)) %>%
   knitr::kable(
-    caption = "Class balance in the training set",
-    table.attr = 'style="min-width: 380px"'
+    caption = "Class balance in the training set"
   ) %>%
-  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 ```
 
 ### Model Setup
@@ -2137,10 +2129,9 @@ bind_rows(
   )
 ) %>%
   knitr::kable(
-    caption = "SVM model comparison on test set",
-    table.attr = 'style="min-width: 380px"'
+    caption = "SVM model comparison on test set"
   ) %>%
-  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 ```
 
 ```{r svm-cv-table, echo=FALSE}
@@ -2152,10 +2143,9 @@ if (!is.na(svm_cv_auc)) {
       `CV Accuracy` = round(svm_cv_acc, 3),
       check.names = FALSE
     ),
-    caption = "Tuned SVM — 5-fold cross-validation performance (per-household 75th percentile threshold)",
-    table.attr = 'style="min-width: 720px"'
+    caption = "Tuned SVM — 5-fold cross-validation performance (per-household 75th percentile threshold)"
   ) %>%
-  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 } else {
   cat(
     "*CV results not available. Run R/08_model_comparison_cv_classification.R first.*"
