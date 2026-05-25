@@ -2138,7 +2138,7 @@ cm_baseline <- confusionMatrix(pred_baseline, test_y, positive = "high")
 best_C <- svm_caret$bestTune$C
 best_sigma <- round(svm_caret$bestTune$sigma, 4)
 
-# 5-fold CV results (pre-computed by R/08_model_comparison_cv_classification.R)
+# 5-fold CV results (pre-computed by R/04_model_comparison_cv_classification.R)
 if (file.exists("../models/cv_class_results.rds")) {
   cv_class <- readRDS("../models/cv_class_results.rds")
   svm_cv_row <- cv_class[grepl("SVM", cv_class$Model), ]
@@ -2225,7 +2225,7 @@ if (!is.na(svm_cv_auc)) {
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 } else {
   cat(
-    "*CV results not available. Run R/08_model_comparison_cv_classification.R first.*"
+    "*CV results not available. Run R/04_model_comparison_cv_classification.R first.*"
   )
 }
 ```
@@ -2382,7 +2382,7 @@ if (!is.null(reg_summary)) {
   ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 } else {
-  cat("*Table not available. Run R/07_model_comparison_cv.R first.*")
+  cat("*Table not available. Run R/04_model_comparison_cv.R first.*")
 }
 ```
 
@@ -2465,7 +2465,7 @@ if (!is.null(class_summary)) {
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 } else {
   cat(
-    "*CV table not available. Run R/08_model_comparison_cv_classification.R then 01_nn_pipeline.R first.*"
+    "*CV table not available. Run R/04_model_comparison_cv_classification.R then R/3.5_neural_network.R first.*"
   )
 }
 ```
