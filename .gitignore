@@ -39,5 +39,4 @@ report/*_cache/
 report/*_files/
 
 # compiled report output
-report/report.html
 .positai
