@@ -86,7 +86,11 @@ building characteristics, and technology choices, but also on quantifying the
 interaction between external factors such as outdoor temperature, heating degree
 days, and building type.
 
-The report is structured as follows: Section 2 presents exploratory data analysis; Section 3 fits and interprets six models — a Linear Model, GLM Poisson, GLM Binomial, Generalised Additive Model, Neural Network, and Support Vector Machine; Section 4 compares model performance; and Section 5 draws conclusions for energy suppliers and grid operators.
+The report is structured as follows. Section 2 presents exploratory data
+analysis. Section 3 fits and interprets six models, namely a Linear Model,
+GLM Poisson, GLM Binomial, Generalised Additive Model, Neural Network, and
+Support Vector Machine. Section 4 compares model performance. Section 5
+draws conclusions for energy suppliers and grid operators.
 
 
 ## Dataset
@@ -109,7 +113,7 @@ set of building, technology, and weather covariates.
 | `heating_degree_days` | Continuous | Daily heating demand below the 12°C Swiss SIA base temperature (°C·day). |
 | `temp_avg` | Continuous | Daily average outdoor temperature (°C). |
 | `living_area` | Continuous | Heated floor area of the household (m²). |
-| `building_type` | Categorical (>2 levels) | Building category (flat, house, or other). |
+| `building_type` | Categorical (>2 levels) | Building type, either "appartment" or "house". |
 | `heatpump_type` | Categorical (2 levels) | Heat pump technology: air-source or ground-source. |
 | `n_residents` | Count | Number of permanent household members. |
 | `is_weekend` | Binary | 1 if Saturday or Sunday, 0 otherwise. |
@@ -207,12 +211,12 @@ weather, as the modelling section will confirm. Building type therefore carries
 real structural signal and is included as a predictor in all models.
 
 Taken together, the three plots tell a consistent story. Electricity demand is
-primarily a seasonal phenomenon: the portfolio shifts from a low-consumption
+primarily a seasonal phenomenon. The portfolio shifts from a low-consumption
 summer baseline driven by domestic appliances to a high-consumption winter
 regime dominated by heat pump space heating. Within that seasonal pattern,
 building type is the strongest structural separator, with houses drawing
 roughly twice the daily energy of flats at any given temperature. These
-findings directly shape the modelling choices below: the response is
+findings directly shape the modelling choices below. The response is
 log-transformed to stabilise variance, heating degree days enter as the
 primary continuous weather predictor, and building type is retained as a
 categorical covariate in every model. For the client, the key implication is
@@ -911,7 +915,7 @@ binomial family** to answer exactly that question. The response variable
 `high_consumption` is a binary indicator that equals 1 if the household's daily
 `log_kWh_total` exceeds that household's own 75th percentile and 0 otherwise.
 Using a per-household threshold means the model is not distinguishing houses
-from flats — each household's own consumption baseline is already accounted for.
+from flats. Each household's own consumption baseline is already accounted for.
 Instead, the model learns what drives a day to be in the top 25% for a given
 household, regardless of its size or type. By modelling the log-odds of high
 consumption as a linear function of weather conditions, building characteristics,
@@ -1009,9 +1013,9 @@ specificity <- tn / (tn + fp)
 ```
 
 Coefficients from a binomial GLM are expressed as **odds ratios** (OR =
-exp(coefficient)): a value above 1 increases the odds that a day falls in the
-top 25% of a household's own consumption, below 1 decreases it, relative to the
-reference category.
+exp(coefficient)). A value above 1 increases the odds that a day falls in the
+top 25% of a household's own consumption, and a value below 1 decreases it,
+relative to the reference category.
 
 ```{r glm-binomial-coef-table, echo=FALSE}
 glm_cs <- coef(summary(model_glm))
@@ -1045,21 +1049,21 @@ knitr::kable(
   col.names = c("Term", "Estimate", "OR", "CI Low", "CI High", "p-value"),
   caption = paste(
     "GLM Binomial: coefficient estimates and odds ratios.",
-    "Month dummies omitted here; all effects shown in the OR plot below."
+    "Month dummies omitted here. All effects shown in the OR plot below."
   )
 ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 ```
 
 A striking result of using the per-household threshold is that structural
-predictors — building type, heat pump type, living area, and number of residents
-— are all statistically non-significant. This is expected: because the threshold
-is set individually for each household, these characteristics are already
+predictors (building type, heat pump type, living area, and number of residents)
+are all statistically non-significant. This is expected because the threshold
+is set individually for each household, and these characteristics are already
 accounted for in the baseline. The model is therefore answering a different and
-more useful question: **given how this household normally behaves, what makes a
-specific day unusually high?**
+more useful question. Given how this household normally behaves, what makes a
+specific day unusually high?
 
-Key findings from the coefficient table:
+The coefficient table reveals several key patterns.
 
 - **Weekend:** The dominant predictor, with OR =
   `r round(exp(coef(model_glm)["is_weekend"]), 2)`. Days falling on a Saturday
@@ -1087,8 +1091,8 @@ Key findings from the coefficient table:
 - **Month:** Spring and autumn show the strongest reductions relative to January.
   April and October have the lowest odds (OR
   `r round(exp(coef(model_glm)["month4"]), 2)` and
-  `r round(exp(coef(model_glm)["month10"]), 2)` respectively) — transition
-  months when neither heating nor cooling is needed. Notably, June and July are
+  `r round(exp(coef(model_glm)["month10"]), 2)` respectively), as these are
+  transition months when neither heating nor cooling is needed. Notably, June and July are
   not significantly different from January (p = 0.31 and 0.09), suggesting that
   some households also produce high-consumption days in summer, likely from
   heat pump cooling or increased hot water use. December is likewise
@@ -1246,8 +1250,8 @@ performs well beyond what the modest accuracy gain over the naive baseline sugge
   baseline of `r round(sum(actual == 0)/length(actual) * 100, 1)`%. AUC is the
   more informative metric given the 75/25 class split.
 - **Weekend is the dominant predictor** (OR =
-  `r round(exp(coef(model_glm)["is_weekend"]), 2)`). Occupancy patterns — not
-  structural characteristics — are the strongest driver of within-household
+  `r round(exp(coef(model_glm)["is_weekend"]), 2)`). Occupancy patterns, not
+  structural characteristics, are the strongest driver of within-household
   demand spikes.
 - **Building type, heat pump type, living area, floor heating, and number of
   residents are all non-significant.** The per-household threshold neutralises
@@ -1273,8 +1277,9 @@ The GLM Binomial achieves an AUC of `r round(glm_auc_val, 3)` and a sensitivity 
 The sensitivity of 63.5% is a known limitation, one in three high-consumption 
 days goes undetected, which should be weighed against the strong AUC of 0.896 
 when deciding whether this model is sufficient for operational use. The
-most important finding is that structural household characteristics — building
-type, heat pump type, size, residents — become non-significant once the model
+most important finding is that structural household characteristics (building
+type, heat pump type, size, and number of residents) become non-significant once
+the model
 conditions on each household's own baseline. Day-to-day variation in consumption
 is driven primarily by weekend occupancy and cold weather, not by what kind of
 building or heat pump a household has.
@@ -1292,15 +1297,15 @@ with more flexible classification methods.
 ### Objective
 
 The Linear Model assumes that each predictor affects the response in a straight
-line. For energy consumption, this is often too rigid: the relationship between
+line. For energy consumption, this is often too rigid. The relationship between
 heating demand and electricity use may differ between houses and flats, and
 between heat pump types, in ways that cannot be captured by fixed linear slopes.
 A **Generalised Additive Model (GAM)** relaxes this assumption by replacing
 fixed slopes with flexible smooth functions, while remaining fully interpretable
 through its component plots. Here we model `log_kWh_total` using **exactly the
-same predictors as the extended Linear Model**: heating degree days (interacted
-with building type and heat pump type), sunshine hours, humidity, living area,
-and the number of residents. The GAM replaces the LM's explicit interaction
+same predictors as the extended Linear Model**, namely heating degree days
+(interacted with building type and heat pump type), sunshine hours, humidity,
+living area, and the number of residents. The GAM replaces the LM's explicit interaction
 terms with `by =` smooths, which allow the shape of the heating-demand curve to
 vary freely between groups. This makes the comparison between the two models
 direct and fair.
@@ -1390,7 +1395,7 @@ knitr::kable(
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 ```
 
-The smooth terms reveal where non-linearity is present in the data:
+The smooth terms reveal where non-linearity is present in the data.
 
 - **s(HDD):flat (edf = 0.8):** The smooth shows a mild positive trend but with a 
   very wide confidence band, reflecting high uncertainty. The non-significance 
@@ -1419,9 +1424,8 @@ The smooth terms reveal where non-linearity is present in the data:
 - **s(humidity_avg) (edf = 5.3):** Non-linear in shape but not significant
   overall (p = 0.118). Humidity may interact with perceived temperature in ways
   not fully captured here. It is retained to enable a direct and controlled 
-  comparison between the LM and 
-  GAM on identical predictors — dropping it did not meaningfully change the other 
-  coefficients.
+  comparison between the LM and GAM on identical predictors. Dropping it did
+  not meaningfully change the other coefficients.
 - **s(living_area) (edf = 9.0):** Highly significant (p < 0.001) and the most
   non-linear term. Consumption does not scale proportionally with floor area,
   medium-sized homes behave differently from small or very large ones.
@@ -1452,7 +1456,7 @@ knitr::kable(
 
 While the `by =` smooths allow the heating-demand curve to differ in shape. Converting
 the parametric estimates with `(exp(coef) - 1) × 100` gives the percentage
-difference relative to the reference level (flat, air-source heat pump):
+difference relative to the reference level (flat, air-source heat pump).
 
 - **Houses vs. flats:** The parametric term for `building_typehouse` is
   small and not statistically significant (p = 0.562). Once the model fits a
@@ -1493,7 +1497,7 @@ The seven panels show the estimated smooth function for each term in the model.
 The y-axis is the additive contribution to `log_kWh_total`, where positive
 values increase predicted consumption and negative values decrease it. The shaded
 bands are 95% confidence intervals. The effective degrees of freedom (edf) on
-each panel title indicates curvature: edf = 1 is a straight line and higher
+each panel title indicates curvature. An edf of 1 is a straight line and higher
 values indicate more complex shapes. The s(HDD):house smooth (edf = 5.3) shows
 the most visible curvature, confirming that cold-weather response is the main
 source of non-linearity for houses.
@@ -1703,12 +1707,12 @@ The **R² of `r round(r2_gam * 100, 1)`%** tells the same story from a different
 angle. The eight predictors explain roughly a third of the day-to-day variation
 in consumption, and the remaining two-thirds is driven by factors not available
 in this dataset. Compared to the extended Linear Model (R² = 27.4%, MAE =
-10.96 kWh/day), the GAM achieves a modest improvement: R² rises by 3.6
+10.96 kWh/day), the GAM achieves a modest improvement. R² rises by 3.6
 percentage points and MAE falls by approximately 0.4 kWh/day. This improvement
 is real but small, suggesting that the LM's linear approximation is adequate for
 most of the predictors in this dataset.
 
-A note on why RMSE was not used: RMSE on the log scale is mathematically correct
+A note on why RMSE was not used. RMSE on the log scale is mathematically correct
 but has no intuitive unit that a client can relate to. MAE in kWh is directly
 actionable, and R² communicates model quality in plain percentage terms.
 
@@ -1718,7 +1722,7 @@ actionable, and R² communicates model quality in plain percentage terms.
   meaning the LM's linear interaction term understates the acceleration in
   consumption during the coldest days.
 - **HDD for flats** shows no significant smooth effect (edf = 0.8,
-  p = 0.316): flat consumption responds to cold weather in a way that is
+  p = 0.316). Flat consumption responds to cold weather in a way that is
   well described by a straight line once group-specific curves are allowed.
 - **Ground-source heat pumps** consume
   `r round((1 - exp(coef(model_gam)["heatpump_typeground-source"])) * 100, 1)`%
@@ -1726,8 +1730,8 @@ actionable, and R² communicates model quality in plain percentage terms.
 - **Each additional resident** adds
   `r round((exp(coef(model_gam)["n_residents"]) - 1) * 100, 1)`% to daily
   consumption (p < 0.001).
-- **Living area** is the most non-linear predictor (edf = 9.0, p < 0.001):
-  consumption does not scale proportionally with floor area.
+- **Living area** is the most non-linear predictor (edf = 9.0, p < 0.001).
+  Consumption does not scale proportionally with floor area.
 - The GAM achieves an R² of `r round(r2_gam * 100, 1)`% and a MAE of
   `r round(gam_mae_kwh, 1)` kWh/day, improving on the extended LM by about 0.4
   kWh/day.
@@ -1738,7 +1742,7 @@ The GAM confirms that non-linearity is present in the data, but mostly in how
 houses respond to cold weather during the peak heating season. For flats
 and both heat pump types, the heating-demand curve is close to linear, meaning
 the extended LM captures those effects adequately. The most actionable findings
-are consistent with the LM: ground-source heat pumps and lower occupancy reduce
+are consistent with the LM. Ground-source heat pumps and lower occupancy reduce
 consumption significantly. The GAM's modest improvement in predictive accuracy
 (MAE of `r round(gam_mae_kwh, 1)` kWh/day versus 10.96 kWh/day for the
 extended LM) does not justify choosing it over the LM when interpretability is
