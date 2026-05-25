@@ -205,7 +205,7 @@ heapo %>%
   report_theme
 ```
 
-Houses consume substantially more electricity per day than flats, with medians
+Houses consume substantially more electricity per day than apartments, with medians
 differing by roughly a factor of two. This gap persists after controlling for
 weather, as the modelling section will confirm. Building type therefore carries
 real structural signal and is included as a predictor in all models.
@@ -215,7 +215,7 @@ primarily a seasonal phenomenon. The portfolio shifts from a low-consumption
 summer baseline driven by domestic appliances to a high-consumption winter
 regime dominated by heat pump space heating. Within that seasonal pattern,
 building type is the strongest structural separator, with houses drawing
-roughly twice the daily energy of flats at any given temperature. These
+roughly twice the daily energy of apartments at any given temperature. These
 findings directly shape the modelling choices below. The response is
 log-transformed to stabilise variance, heating degree days enter as the
 primary continuous weather predictor, and building type is retained as a
@@ -319,7 +319,7 @@ tidy(heapo_lm) %>%
 
 All predictors are significant at the 0.001 level except `humidity_avg` (p = 0.165), which adds nothing once the other weather variables are included. Effects on log energy consumption, holding all other variables constant:
 
-**Heating degree days** (β = 0.021, p < 0.001): Each additional HDD increases log consumption by ~2.1% for air-source pump households in flats (the baseline group).
+**Heating degree days** (β = 0.021, p < 0.001): Each additional HDD increases log consumption by ~2.1% for air-source pump households in apartments (the baseline group).
 
 **Sunshine hours** (β = −0.015, p < 0.001): An additional sunshine hour reduces
 consumption by ~1.5%, reflecting lower heating demand on brighter days.
@@ -328,13 +328,13 @@ consumption by ~1.5%, reflecting lower heating demand on brighter days.
 increases consumption by ~14.3% ($e^{0.134} - 1$), the second strongest effect
 after the temperature-building interaction.
 
-**Building type — house** (β = 0.220, p < 0.001): Houses consume ~24.6% more than flats at baseline, before accounting for their greater sensitivity to cold (see interaction below).
+**Building type — house** (β = 0.220, p < 0.001): Houses consume ~24.6% more than apartments at baseline, before accounting for their greater sensitivity to cold (see interaction below).
 
 **Heat pump type — ground-source** (β = −0.143, p < 0.001): Ground-source pump
 households consume ~13.3% less than air-source households at the baseline
 temperature.
 
-**Interaction: HDD × house** (β = 0.039, p < 0.001): Houses are substantially *more* sensitive to cold than flats: each additional HDD adds 3.9% to log consumption, the largest interaction effect in the model.
+**Interaction: HDD × house** (β = 0.039, p < 0.001): Houses are substantially *more* sensitive to cold than apartments: each additional HDD adds 3.9% to log consumption, the largest interaction effect in the model.
 
 **Interaction: HDD × ground-source** (β = −0.003, p < 0.001): Ground-source pump
 households are slightly *less* sensitive to cold than air-source households,
@@ -539,13 +539,13 @@ The simple model achieves an adjusted R² of `r round(summary(heapo_mlm_simple)$
 
 ### Key Findings
 
-**Heating degree days is the dominant weather driver:** Cold weather is the primary positive predictor of energy consumption. The interaction term (β = 0.039, p < 0.001) shows that houses are more sensitive to cold than flats, consistent with lower thermal efficiency.
+**Heating degree days is the dominant weather driver:** Cold weather is the primary positive predictor of energy consumption. The interaction term (β = 0.039, p < 0.001) shows that houses are more sensitive to cold than apartments, consistent with lower thermal efficiency.
 
 **Household size has the strongest marginal effect:** With β = 0.134, each
 additional resident increases daily consumption by ~14.3%, making it the largest
 single-predictor effect in the model after the building type interaction.
 
-**Houses consume substantially more, especially in winter:** Both the baseline offset (β = 0.220, house vs. flat) and the temperature interaction (β = 0.039) point the same way: houses start higher and get more sensitive to cold as temperatures drop.
+**Houses consume substantially more, especially in winter:** Both the baseline offset (β = 0.220, house vs. apartments) and the temperature interaction (β = 0.039) point the same way: houses start higher and get more sensitive to cold as temperatures drop.
 
 **Ground-source heat pumps are more efficient and more stable:** They consume ~13.3% less at baseline and respond less to temperature swings (interaction β = −0.003), consistent with the efficiency advantage of ground-source systems at low outdoor temperatures.
 
@@ -620,8 +620,8 @@ and other daily-level models.
 The results are interpreted in terms of *percentage changes in the expected
 rate*, holding all other variables constant.
 
-**Building type (house vs flat):** Households living in houses have a rate of
-high-consumption days approximately 363% higher than those living in flats
+**Building type (house vs apartments):** Households living in houses have a rate of
+high-consumption days approximately 363% higher than those living in apartments
 $((4.632 - 1) \times 100\%)$. This is by far the strongest effect in the model,
 clearly visible in the boxplot, and indicates that building type is the dominant
 structural driver of consumption patterns.
@@ -672,8 +672,8 @@ temperature captures an important environmental influence.
 To complement the model output, the plots below provide direct visual support
 for the main relationships in the data.
 
-The *boxplot by building type* shows a striking separation between flats
-and houses. Flats cluster tightly with a median close to 3 high-consumption
+The *boxplot by building type* shows a striking separation between apartments
+and houses. Apartments cluster tightly with a median close to 3 high-consumption
 days and only two mild outliers, while houses display a median around 16 days
 with a very wide interquartile range extending from nearly 0 to 28. This large
 difference in both level and spread confirms that building type is the dominant
@@ -709,7 +709,7 @@ ggplot(dat_count, aes(x = temp_avg, y = n_high_days)) +
 ```
 
 The *rate-ratio plot* below summarises all model effects on a log scale. *House
-(vs flat)* stands far to the right of the reference line (RR $\approx$ 4.6),
+(vs Apartments)* stands far to the right of the reference line (RR $\approx$ 4.6),
 confirming it as the dominant effect. *Weekend share* lies furthest to the left
 but with a very wide CI crossing 1, indicating high uncertainty. *Temperature*
 and *ground-source heat pump* show clear reductions (RR < 1), while *floor
@@ -738,7 +738,7 @@ coef_df$term <- dplyr::recode(
   coef_df$term,
   "temp_avg" = "Temperature",
   "living_area" = "Living area",
-  "building_typehouse" = "House (vs flat)",
+  "building_typehouse" = "House (vs Apartments)",
   "heatpump_typeground-source" = "Ground-source heat pump",
   "has_floor_heating1" = "Floor heating",
   "n_residents" = "Number of residents",
@@ -799,7 +799,7 @@ over-interpreted.
 
 The table and plot below show the SE inflation across all predictors. The effect
 is proportional — predictors with larger SEs to begin with (e.g., *weekend
-share*, *house vs flat*) show the largest absolute increase, while those with
+share*, *house vs apartments*) show the largest absolute increase, while those with
 very small SEs (e.g., *living area*, *number of residents*) are inflated by a
 smaller absolute amount but the same factor $\sqrt{\hat{\phi}}$.
 
@@ -821,7 +821,7 @@ comp_table <- pois_tidy %>%
       term,
       "temp_avg" = "Temperature",
       "living_area" = "Living area",
-      "building_typehouse" = "House (vs flat)",
+      "building_typehouse" = "House (vs apartments)",
       "heatpump_typeground-source" = "Ground-source heat pump",
       "has_floor_heating1" = "Floor heating",
       "n_residents" = "Number of residents",
@@ -915,7 +915,7 @@ binomial family** to answer exactly that question. The response variable
 `high_consumption` is a binary indicator that equals 1 if the household's daily
 `log_kWh_total` exceeds that household's own 75th percentile and 0 otherwise.
 Using a per-household threshold means the model is not distinguishing houses
-from flats. Each household's own consumption baseline is already accounted for.
+from apartments. Each household's own consumption baseline is already accounted for.
 Instead, the model learns what drives a day to be in the top 25% for a given
 household, regardless of its size or type. By modelling the log-odds of high
 consumption as a linear function of weather conditions, building characteristics,
@@ -1298,7 +1298,7 @@ with more flexible classification methods.
 
 The Linear Model assumes that each predictor affects the response in a straight
 line. For energy consumption, this is often too rigid. The relationship between
-heating demand and electricity use may differ between houses and flats, and
+heating demand and electricity use may differ between houses and apartments, and
 between heat pump types, in ways that cannot be captured by fixed linear slopes.
 A **Generalised Additive Model (GAM)** relaxes this assumption by replacing
 fixed slopes with flexible smooth functions, while remaining fully interpretable
@@ -1397,10 +1397,10 @@ knitr::kable(
 
 The smooth terms reveal where non-linearity is present in the data.
 
-- **s(HDD):flat (edf = 0.8):** The smooth shows a mild positive trend but with a 
+- **s(HDD):apartment (edf = 0.8):** The smooth shows a mild positive trend but with a 
   very wide confidence band, reflecting high uncertainty. The non-significance 
   (p = 0.316) is due to this uncertainty rather than the effect being absent.
-  For flats, colder days are associated with higher consumption but the 
+  For apartments, colder days are associated with higher consumption but the 
   uncertainty is too large to pin down the exact shape of this relationship. 
   This likely reflects higher variability in flat consumption patterns rather 
   than the absence of a heating effect.
@@ -1458,7 +1458,7 @@ While the `by =` smooths allow the heating-demand curve to differ in shape. Conv
 the parametric estimates with `(exp(coef) - 1) × 100` gives the percentage
 difference relative to the reference level (flat, air-source heat pump).
 
-- **Houses vs. flats:** The parametric term for `building_typehouse` is
+- **Houses vs. apartments:** The parametric term for `building_typehouse` is
   small and not statistically significant (p = 0.562). Once the model fits a
   separate heating-demand curve per building type, the baseline intercept gap
   disappears. The difference between building types is captured entirely by how
@@ -1553,11 +1553,11 @@ ggplot(
 ```
 
 This plot shows how the GAM's heating-demand curve differs between houses and
-flats. Both groups consume more electricity on colder days, but houses
+apartments. Both groups consume more electricity on colder days, but houses
 show a steeper and more curved response, particularly at high HDD values. This
 non-linearity, captured by the s(HDD):house smooth with edf = 5.3, would have
 been forced into a single linear slope by the LM's interaction term. The wider
-confidence band for flats at extreme cold values reflects lower sample
+confidence band for apartments at extreme cold values reflects lower sample
 density there.
 
 ```{r gam-pred-heatpump, fig.height=4, fig.align='center'}
@@ -1595,7 +1595,7 @@ ggplot(
   geom_line(linewidth = 1) +
   labs(
     title = "GAM – Predicted Daily Consumption by Heating Demand and Heat Pump Type",
-    subtitle = "Other predictors held at median; flat building type",
+    subtitle = "Other predictors held at median; apartment building type",
     x = "Heating Degree Days",
     y = "Predicted kWh/day",
     color = "Heat pump type",
@@ -1721,7 +1721,7 @@ actionable, and R² communicates model quality in plain percentage terms.
 - **Heating demand (HDD)** is non-linear for houses (edf = 5.3, p < 0.001),
   meaning the LM's linear interaction term understates the acceleration in
   consumption during the coldest days.
-- **HDD for flats** shows no significant smooth effect (edf = 0.8,
+- **HDD for apartments** shows no significant smooth effect (edf = 0.8,
   p = 0.316). Flat consumption responds to cold weather in a way that is
   well described by a straight line once group-specific curves are allowed.
 - **Ground-source heat pumps** consume
@@ -1739,7 +1739,7 @@ actionable, and R² communicates model quality in plain percentage terms.
 ### Conclusion
 
 The GAM confirms that non-linearity is present in the data, but mostly in how
-houses respond to cold weather during the peak heating season. For flats
+houses respond to cold weather during the peak heating season. For apartments
 and both heat pump types, the heating-demand curve is close to linear, meaning
 the extended LM captures those effects adequately. The most actionable findings
 are consistent with the LM. Ground-source heat pumps and lower occupancy reduce
@@ -2449,7 +2449,9 @@ if (file.exists("../models/cv_class_results.rds")) {
 }
 ```
 
-The table below compares all three classification models. All three use each household's own 75th percentile as the high-consumption threshold, making results directly comparable. CV results are available for all three models.
+The table below compares all three classification models. All three use each 
+household's own 75th percentile as the high-consumption threshold, making 
+results directly comparable. CV results are available for all three models.
 
 ```{r class-comparison-table, echo=FALSE}
 if (!is.null(class_summary)) {
@@ -2556,33 +2558,49 @@ choice depends on whether the use case demands explainability or accuracy.
 
 # Conclusions {#conclusions}
 
-Across 127 Swiss households monitored daily from 2022 to 2024, cold weather
-is the strongest and most consistent driver of electricity consumption. The
-relationship is non-linear for houses: consumption accelerates sharply on the
-coldest winter days, while no statistically detectable non-linear cold-weather response was found for flats. The
-single most actionable finding for an energy supplier or grid operator is heat
-pump type. Households with ground-source heat pumps use approximately 13% less
-electricity per day than those with air-source systems, holding all else equal,
-and this difference is stable across seasons and building types. Occupancy also
-matters: every additional resident adds roughly 14% to daily demand, which
-suggests that family size should be a key variable in any demand forecasting or
-household segmentation tool.
+Across 127 Swiss households monitored daily from 2022 to 2024, this analysis
+identified the key drivers of heat pump electricity consumption and built a
+foundation for demand modelling relevant to grid operators and energy suppliers.
 
-On the modelling side, the Generalised Additive Model achieved the best
-predictive accuracy for daily consumption (mean error of 10.6 kWh/day, R² of
-31%), improving on the extended Linear Model (11.0 kWh/day, R² of 27%) by
-capturing the non-linear cold-weather response of houses. The improvement is
-real but moderate: both models leave roughly two-thirds of day-to-day variation
-unexplained, which reflects individual household behaviour that weather and
-building characteristics alone cannot predict. For classification of high-
-consumption days, the GLM Binomial performed best (AUC = `r round(class_summary[grepl("GLM", class_summary$Model), "CV AUC"], 3)`, accuracy = `r round(class_summary[grepl("GLM", class_summary$Model), "CV Accuracy"] * 100, 1)`%) with
-the SVM close behind (AUC = `r round(class_summary[grepl("SVM", class_summary$Model), "CV AUC"], 3)`, accuracy = `r round(class_summary[grepl("SVM", class_summary$Model), "CV Accuracy"] * 100, 1)`%). For a client
-prioritising transparency, the GLM Binomial is the recommended model: it
-identifies high-demand household-days with good accuracy and explains exactly
-why each prediction was made. The Neural Network also achieved competitive results (AUC = `r round(class_summary[grepl("Neural", class_summary$Model), "CV AUC"], 3)`, accuracy = `r round(class_summary[grepl("Neural", class_summary$Model), "CV Accuracy"] * 100, 1)`%), evaluated under the same per-household 75th percentile threshold. The clearest practical takeaway is that upgrading
-from air-source to ground-source heat pumps is the intervention most likely to
-reduce peak demand, and that larger households with air-source systems should be
-the first target for efficiency programmes.
+Cold weather is the strongest structural driver of daily consumption, but its
+effect is not uniform. Houses show a sharply accelerating response on the
+coldest winter days, a pattern that has direct implications for load forecasting
+during cold snaps and that a plain linear model understates. Beyond weather,
+heat pump type and occupancy are the two most consistent predictors across all
+models. Ground-source heat pumps consume approximately 13% less electricity per
+day than air-source systems, and every additional resident adds roughly 14% to
+daily demand regardless of building type or season.
+
+For classifying unusually high-demand days, weekend occupancy is the single
+strongest predictor, with cold weather second. Structural characteristics become
+non-significant once the model accounts for each household's own baseline,
+meaning demand spikes are driven by behaviour and weather rather than building
+or system properties.
+
+The GAM achieved the best predictive accuracy for daily consumption with a MAE
+of 10.6 kWh per day and an R² of 31%, modestly improving on the Linear Model.
+Both models leave roughly two thirds of day-to-day variation unexplained,
+pointing to the value of incorporating behavioural signals in future work. For
+classification, the Neural Network achieved the strongest performance with an
+AUC of `r round(class_summary[grepl("Neural", class_summary$Model), "CV AUC"], 3)`
+and accuracy of `r round(class_summary[grepl("Neural", class_summary$Model), "CV Accuracy"] * 100, 1)`%,
+with the SVM close behind at an AUC of
+`r round(class_summary[grepl("SVM", class_summary$Model), "CV AUC"], 3)`
+and accuracy of
+`r round(class_summary[grepl("SVM", class_summary$Model), "CV Accuracy"] * 100, 1)`%.
+For a client prioritising transparency, the GLM Binomial is recommended,
+achieving an AUC of
+`r round(class_summary[grepl("GLM", class_summary$Model), "CV AUC"], 3)`
+and accuracy of
+`r round(class_summary[grepl("GLM", class_summary$Model), "CV Accuracy"] * 100, 1)`%
+while remaining fully interpretable.
+
+The practical implication for energy suppliers and grid operators is to target
+demand management programmes at larger households with air-source systems during
+cold weather peaks, where high occupancy and less efficient heating combine to
+produce the sharpest load spikes. Weekend time-of-use tariffs or demand response
+incentives offer an additional lever for flattening the load peaks that drive
+balancing energy costs.
 
 # Use of Generative AI {#ai}
 
