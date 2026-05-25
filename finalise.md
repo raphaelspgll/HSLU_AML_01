@@ -33,79 +33,63 @@ Items marked **[ALL]** require input from all three members before the section c
 - [x] **Conclusions section written.** 10 non-technical sentences covering
   key drivers (HDD non-linearity for houses, −13% ground-source, +14% per
   resident), best models, and client takeaway.
-
-- [ ] **GLM Binomial: confirm new threshold definition with Tharrmeehan.**
-  The threshold was changed from household median to **per-household 75th
-  percentile**. Tharrmeehan must refit the SVM to this same definition so that
-  the classification comparison is valid. Agree on which threshold to use as
-  the shared standard and confirm in a team message.
-- [ ] **Regenerate `cv_class_results.rds` once SVM is refitted.** The current
-  file was computed before the GLM Binomial threshold change and still uses the
-  global 75th percentile for both models. Once Tharrmeehan refits the SVM to
-  the per-household 75th percentile, rerun the classification CV script so both
-  rows use the same threshold. The table caption already flags this as stale.
+- [x] **Threshold consistency verified.** Full audit (2026-05-25) confirmed
+  that all four models (GLM Binomial, NN, SVM, and the CV classification script)
+  define `high_consumption` identically: per-household 75th percentile of
+  `log_kWh_total` via `quantile(0.75)` per `Household_ID`. All prose references
+  are consistent. No changes were needed.
+- [x] **Punctuation fixes — Intro, EDA, GLM Binomial, GAM.** All em dashes,
+  semicolons, and sentence-connecting colons replaced with plain sentences.
+  building_type table corrected to "appartment" or "house".
+  Changes are on branch `feature/punctuation-fixes` — merge PR before submission.
 
 ---
 
 ### Tharrmeehan Krishnathasan
 
-- [ ] **SVM: refit the model with the per-household 75th percentile
-  threshold.** *(Description updated — no longer household median.)* The GLM
-  Binomial now defines high consumption as each household's own 75th percentile
-  of `log_kWh_total`. Refit the SVM to the same definition: derive
-  `high_consumption` per household using `group_by(Household_ID) |>
-  summarise(hh_q75 = quantile(log_kWh_total, 0.75))`, join back, and use that
-  binary variable as the SVM response. Overwrite `models/svm/heapo_svm.rds`
-  and update all performance metrics and the Data Preparation subsection.
+- [x] **SVM: refit the model with the per-household 75th percentile threshold.**
+  Confirmed (2026-05-25): the report code computes `hh_q75` per `Household_ID`
+  using `quantile(0.75)` and loads `heapo_svm_hh_q75.rds`. The old global
+  threshold model is no longer referenced anywhere.
 - [x] **SVM: fix the doParallel reference in the report.** No reference to
   doParallel or parallelisation remains anywhere in the report.
 - [x] **LM: replace RMSE on log scale with MAE in kWh.** The comparison table
   already uses `CV MAE (kWh/day)` and the prose references MAE throughout.
+- [ ] **Fix punctuation in LM and SVM sections.** Check for and remove em
+  dashes (—), en dashes (–), semicolons, and sentence-connecting colons in
+  running prose. Each contributor is responsible for their own sections.
 
 ---
 
 ### Raphaël Spagolla
 
-- [ ] **Neural Network: add AUC.** The ROC curve is plotted but the AUC value
-  is never stated in the NN section itself. The AUC is already computed inline
-  in the Model Comparison chunk (`nn_auc`). Report it explicitly in the NN
-  performance summary and in the text.
-- [ ] **Neural Network: update the CV paragraph.** The Conclusion subsection
-  currently states that "more robust evaluation methods, such as
-  cross-validation, could provide more stable performance estimates". Replace
-  this with a sentence pointing to the Model Comparison section, e.g.
-  "Cross-validation results for the comparable models are reported in the Model
-  Comparison section; the Neural Network is evaluated on a held-out 80/20
-  split due to the pre-computed prediction format."
-- [ ] **Neural Network: add a feature importance note.** Add a short paragraph
-  acknowledging that nnet weights are not directly interpretable as
-  coefficients, explaining why (non-linear transformations between layers), and
-  noting that model performance in the comparison section provides the practical
-  evaluation instead.
-- [ ] **GLM Poisson: write the standalone CV sub-section.** The
-  `## GLM Poisson (Standalone)` sub-section in Model Comparison is currently
-  empty. Add 5-fold CV RMSE on `n_high_days`, present the result, and state
-  explicitly that the Poisson model targets a different aggregation level
-  (monthly count) and cannot be placed in the classification table.
+- [x] **Neural Network: add AUC.** AUC is stated in the performance table and
+  in the prose of the NN section.
+- [x] **Neural Network: update the CV paragraph.** Conclusion now points to the
+  Model Comparison section instead of suggesting future CV work.
+- [x] **Neural Network: add a feature importance note.** Paragraph added
+  explaining that nnet weights are not directly interpretable and that model
+  performance metrics serve as the practical evaluation.
+- [x] **GLM Poisson: write the standalone CV sub-section.** 5-fold CV RMSE on
+  `n_high_days` is computed inline in the Model Comparison section, result
+  presented, and incomparability with classification models stated explicitly.
+- [ ] **Fix punctuation in Poisson and NN sections.** Check for and remove em
+  dashes (—), en dashes (–), semicolons, and sentence-connecting colons in
+  running prose. Each contributor is responsible for their own sections.
 
 ---
 
 ### All three members
 
-- [ ] **Classification CV: regenerate once SVM threshold is fixed.** See
-  Emanuel's open item above. All three must agree on the shared threshold
-  before regenerating.
+- [ ] **Merge `feature/punctuation-fixes` PR.** Emanuel's punctuation and
+  building_type table fixes are on this branch. Merge before final knit.
 - [ ] **Check all plots have a written explanation.** Scan the compiled HTML
   and flag any figure not followed by an interpretation paragraph. Pay
   particular attention to SVM and NN diagnostic plots.
-- [ ] **Check for em dashes and semicolons in prose.** The report convention
-  forbids em dashes (—), en dashes (–), and semicolons in running body text.
-  Note: the AI Usage paragraph currently contains em dashes and must be fixed
-  before submission. Each contributor checks their own sections.
-- [ ] **Verify building_type levels in the Variable Description table.** The
-  table in the Introduction still lists "flat, house, or other". The data and
-  all model outputs show only two levels: "appartment" (note the spelling) and
-  "house". Correct the table entry.
+- [ ] **Regenerate `cv_class_results.rds`.** Threshold is confirmed consistent
+  across all models. Run `R/08_model_comparison_cv_classification.R` to
+  regenerate a clean version and confirm the classification CV table renders
+  correctly with all three models.
 
 ---
 
