@@ -139,7 +139,7 @@
 \subtitle{Applied Machine Learning and Predictive Modelling 1 -- FS
 2026}
 \author{Emanuel Lemma, Raphaël Spagolla, Tharrmeehan Krishnathasan}
-\date{2026-05-17}
+\date{2026-05-25}
 
 \begin{document}
 \maketitle
@@ -160,15 +160,15 @@
 \FunctionTok{library}\NormalTok{(broom) }\CommentTok{\# tidy model output}
 \FunctionTok{library}\NormalTok{(car) }\CommentTok{\# VIF}
 \FunctionTok{library}\NormalTok{(mgcv) }\CommentTok{\# GAM}
+\FunctionTok{library}\NormalTok{(gratia)}
 \FunctionTok{library}\NormalTok{(nnet) }\CommentTok{\# Neural Network}
 \FunctionTok{library}\NormalTok{(ROCR)}
 \FunctionTok{library}\NormalTok{(e1071) }\CommentTok{\# SVM}
 \FunctionTok{library}\NormalTok{(caret) }\CommentTok{\# Cross{-}validation}
 \FunctionTok{library}\NormalTok{(kernlab) }\CommentTok{\# SVM kernels}
+\FunctionTok{library}\NormalTok{(gridExtra)}
 \end{Highlighting}
 \end{Shaded}
-
-\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
 \section{Introduction}\label{introduction}
 
@@ -200,6 +200,13 @@ characteristics, and technology choices, but also on quantifying the
 interaction between external factors such as outdoor temperature,
 heating degree days, and building type.
 
+The report is structured as follows. Section 2 presents exploratory data
+analysis. Section 3 fits and interprets six models, namely a Linear
+Model, GLM Poisson, GLM Binomial, Generalised Additive Model, Neural
+Network, and Support Vector Machine. Section 4 compares model
+performance. Section 5 draws conclusions for energy suppliers and grid
+operators.
+
 \subsection{Dataset}\label{dataset}
 
 \textbf{Source:} HEAPO -- Household Energy and Smart Meter Data (Zenodo,
@@ -211,7 +218,7 @@ covers 99838 household-days across 127 households observed between 2022
 and 2024, paired with daily weather data from the corresponding
 measurement region. Each observation represents one household on one
 calendar day, with daily electricity consumption as the primary outcome
-alongside a rich set of building, technology, and weather covariates.
+alongside a set of building, technology, and weather covariates.
 
 \subsection{Variable Description}\label{variable-description}
 
@@ -241,7 +248,7 @@ the 12°C Swiss SIA base temperature (°C·day). \\
 \texttt{living\_area} & Continuous & Heated floor area of the household
 (m²). \\
 \texttt{building\_type} & Categorical (\textgreater2 levels) & Building
-category (flat, house, or other). \\
+type, either ``appartment'' or ``house''. \\
 \texttt{heatpump\_type} & Categorical (2 levels) & Heat pump technology:
 air-source or ground-source. \\
 \texttt{n\_residents} & Count & Number of permanent household
@@ -250,7 +257,8 @@ members. \\
 \texttt{has\_floor\_heating} & Binary & 1 if floor heating system
 present, 0 otherwise. \\
 \texttt{high\_consumption} & Binary & 1 if daily kWh exceeds the
-household-level median. Response for GLM Binomial and SVM. \\
+household's own 75th percentile (top 25\% of that household's days).
+Response for GLM Binomial. \\
 \end{longtable}
 }
 
@@ -259,10 +267,7 @@ in the canton of Zurich. The modelling subset was restricted to the
 period 2022-01-01 through 2024-02-29 and limited to households with at
 least 95\% daily coverage to exclude partially observed installations.
 It was then randomly sampled to a maximum of 100,000 observations to
-comply with the course data size limit. The final dataset contains 99838
-household-days across 127 households.
-
-\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+comply with the course data size limit.
 
 \section{Exploratory Data Analysis}\label{exploratory-data-analysis}
 
@@ -270,8 +275,10 @@ Daily electricity consumption (\texttt{kWh\_total}) is right-skewed on
 the raw scale and approximately symmetric after log transformation. The
 log-transformed variable \texttt{log\_kWh\_total} is used as the
 continuous response in all regression models. The binary variable
-\texttt{high\_consumption} is derived from it: a day is classified as
-high consumption if daily usage exceeds the household-level median.
+\texttt{high\_consumption} is derived from it. A day is classified as
+high consumption if daily \texttt{log\_kWh\_total} exceeds that
+household's own 75th percentile, flagging the top 25\% of consumption
+days for each individual household.
 
 \subsection{Seasonal Pattern}\label{seasonal-pattern}
 
@@ -280,18 +287,18 @@ high consumption if daily usage exceeds the household-level median.
 \NormalTok{heapo }\SpecialCharTok{\%\textgreater{}\%}
   \FunctionTok{mutate}\NormalTok{(}\AttributeTok{Month =} \FunctionTok{month}\NormalTok{(date, }\AttributeTok{label =} \ConstantTok{TRUE}\NormalTok{, }\AttributeTok{abbr =} \ConstantTok{TRUE}\NormalTok{)) }\SpecialCharTok{\%\textgreater{}\%}
   \FunctionTok{ggplot}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ Month, }\AttributeTok{y =}\NormalTok{ kWh\_total)) }\SpecialCharTok{+}
-  \FunctionTok{geom\_boxplot}\NormalTok{(}\AttributeTok{fill =} \StringTok{"steelblue"}\NormalTok{, }\AttributeTok{alpha =} \FloatTok{0.7}\NormalTok{, }\AttributeTok{outlier.size =} \FloatTok{0.2}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{geom\_boxplot}\NormalTok{(}\AttributeTok{fill =}\NormalTok{ clr\_primary, }\AttributeTok{alpha =} \FloatTok{0.7}\NormalTok{, }\AttributeTok{outlier.size =} \FloatTok{0.2}\NormalTok{) }\SpecialCharTok{+}
   \FunctionTok{scale\_y\_continuous}\NormalTok{(}\AttributeTok{labels =}\NormalTok{ comma) }\SpecialCharTok{+}
   \FunctionTok{labs}\NormalTok{(}
     \AttributeTok{title =} \StringTok{"Daily Electricity Consumption by Month"}\NormalTok{,}
     \AttributeTok{x =} \ConstantTok{NULL}\NormalTok{,}
     \AttributeTok{y =} \StringTok{"kWh per day"}
 \NormalTok{  ) }\SpecialCharTok{+}
-  \FunctionTok{theme\_minimal}\NormalTok{()}
+\NormalTok{  report\_theme}
 \end{Highlighting}
 \end{Shaded}
 
-\pandocbounded{\includegraphics[keepaspectratio]{report_files/report_files/figure-latex/eda-seasonal-1.pdf}}
+\begin{center}\includegraphics{report_files/figure-latex/eda-seasonal-1} \end{center}
 
 Consumption in winter months (December to February) is roughly three to
 five times higher than in summer (June to August), driven almost
@@ -306,7 +313,7 @@ vs.~Consumption}\label{heating-degree-days-vs.-consumption}
 
 \textbf{Heating Degree Days (HDD)} quantify daily heating demand as the
 temperature shortfall below the 12°C Swiss SIA base temperature. A day
-averaging 2°C contributes 10 HDD; days above 12°C contribute zero. HDD
+averaging 2°C contributes 10 HDD, days above 12°C contribute zero. HDD
 is a more direct proxy for heat pump workload than raw outdoor
 temperature.
 
@@ -315,8 +322,8 @@ temperature.
 \NormalTok{heapo }\SpecialCharTok{\%\textgreater{}\%}
   \FunctionTok{slice\_sample}\NormalTok{(}\AttributeTok{n =} \DecValTok{15000}\NormalTok{) }\SpecialCharTok{\%\textgreater{}\%}
   \FunctionTok{ggplot}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ heating\_degree\_days, }\AttributeTok{y =}\NormalTok{ kWh\_total)) }\SpecialCharTok{+}
-  \FunctionTok{geom\_point}\NormalTok{(}\AttributeTok{alpha =} \FloatTok{0.08}\NormalTok{, }\AttributeTok{size =} \FloatTok{0.5}\NormalTok{, }\AttributeTok{color =} \StringTok{"steelblue"}\NormalTok{) }\SpecialCharTok{+}
-  \FunctionTok{geom\_smooth}\NormalTok{(}\AttributeTok{method =} \StringTok{"loess"}\NormalTok{, }\AttributeTok{color =} \StringTok{"tomato"}\NormalTok{, }\AttributeTok{se =} \ConstantTok{FALSE}\NormalTok{, }\AttributeTok{linewidth =} \DecValTok{1}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{geom\_point}\NormalTok{(}\AttributeTok{alpha =} \FloatTok{0.08}\NormalTok{, }\AttributeTok{size =} \FloatTok{0.5}\NormalTok{, }\AttributeTok{color =}\NormalTok{ clr\_primary) }\SpecialCharTok{+}
+  \FunctionTok{geom\_smooth}\NormalTok{(}\AttributeTok{method =} \StringTok{"loess"}\NormalTok{, }\AttributeTok{color =}\NormalTok{ clr\_secondary, }\AttributeTok{se =} \ConstantTok{FALSE}\NormalTok{, }\AttributeTok{linewidth =} \DecValTok{1}\NormalTok{) }\SpecialCharTok{+}
   \FunctionTok{scale\_y\_continuous}\NormalTok{(}\AttributeTok{labels =}\NormalTok{ comma) }\SpecialCharTok{+}
   \FunctionTok{labs}\NormalTok{(}
     \AttributeTok{title =} \StringTok{"Heating Degree Days vs. Daily Consumption"}\NormalTok{,}
@@ -324,18 +331,20 @@ temperature.
     \AttributeTok{x =} \StringTok{"Heating Degree Days (HDD)"}\NormalTok{,}
     \AttributeTok{y =} \StringTok{"kWh per day"}
 \NormalTok{  ) }\SpecialCharTok{+}
-  \FunctionTok{theme\_minimal}\NormalTok{()}
+\NormalTok{  report\_theme}
 \end{Highlighting}
 \end{Shaded}
 
-\pandocbounded{\includegraphics[keepaspectratio]{report_files/report_files/figure-latex/eda-hdd-1.pdf}}
+\begin{center}\includegraphics{report_files/figure-latex/eda-hdd-1} \end{center}
 
-The relationship is strongly positive and close to linear across the
-observed HDD range. The loess smoother confirms that no sharp threshold
-or strong curvature is present, which justifies treating HDD as a
-continuous predictor in the Linear Model. A slight levelling off at very
-high HDD values is visible, and the GAM will capture this through its
-flexible smooth terms.
+The relationship is positive and seams to be linear across the observed
+HDD range, with consumption measured form 0 to 125 kWh per day at 0
+heating degree days , which hints to the base load of the building
+types. The loess smoother confirms that no sharp threshold or strong
+curvature is present, which justifies treating HDD as a continuous
+predictor in the Linear Model. A slight levelling off at very high HDD
+values is visible, and the GAM will capture this through its flexible
+smooth terms.
 
 \subsection{Consumption by Building
 Type}\label{consumption-by-building-type}
@@ -344,19 +353,19 @@ Type}\label{consumption-by-building-type}
 \begin{Highlighting}[]
 \NormalTok{heapo }\SpecialCharTok{\%\textgreater{}\%}
   \FunctionTok{ggplot}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ building\_type, }\AttributeTok{y =}\NormalTok{ kWh\_total, }\AttributeTok{fill =}\NormalTok{ building\_type)) }\SpecialCharTok{+}
-  \FunctionTok{geom\_boxplot}\NormalTok{(}\AttributeTok{alpha =} \FloatTok{0.7}\NormalTok{, }\AttributeTok{outlier.size =} \FloatTok{0.2}\NormalTok{, }\AttributeTok{show.legend =} \ConstantTok{FALSE}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{geom\_boxplot}\NormalTok{(}\AttributeTok{alpha =} \FloatTok{0.7}\NormalTok{, }\AttributeTok{outlier.size =} \FloatTok{0.2}\NormalTok{) }\SpecialCharTok{+}
   \FunctionTok{scale\_y\_continuous}\NormalTok{(}\AttributeTok{labels =}\NormalTok{ comma) }\SpecialCharTok{+}
-  \FunctionTok{scale\_fill\_manual}\NormalTok{(}\AttributeTok{values =} \FunctionTok{c}\NormalTok{(}\StringTok{"steelblue"}\NormalTok{, }\StringTok{"tomato"}\NormalTok{)) }\SpecialCharTok{+}
+  \FunctionTok{scale\_fill\_manual}\NormalTok{(}\AttributeTok{values =}\NormalTok{ clr\_builds, }\AttributeTok{guide =} \StringTok{"none"}\NormalTok{) }\SpecialCharTok{+}
   \FunctionTok{labs}\NormalTok{(}
     \AttributeTok{title =} \StringTok{"Daily Consumption by Building Type"}\NormalTok{,}
     \AttributeTok{x =} \ConstantTok{NULL}\NormalTok{,}
     \AttributeTok{y =} \StringTok{"kWh per day"}
 \NormalTok{  ) }\SpecialCharTok{+}
-  \FunctionTok{theme\_minimal}\NormalTok{()}
+\NormalTok{  report\_theme}
 \end{Highlighting}
 \end{Shaded}
 
-\pandocbounded{\includegraphics[keepaspectratio]{report_files/report_files/figure-latex/eda-building-1.pdf}}
+\begin{center}\includegraphics{report_files/figure-latex/eda-building-1} \end{center}
 
 Houses consume substantially more electricity per day than flats, with
 medians differing by roughly a factor of two. This gap persists after
@@ -365,13 +374,13 @@ type therefore carries real structural signal and is included as a
 predictor in all models.
 
 Taken together, the three plots tell a consistent story. Electricity
-demand is primarily a seasonal phenomenon: the portfolio shifts from a
+demand is primarily a seasonal phenomenon. The portfolio shifts from a
 low-consumption summer baseline driven by domestic appliances to a
 high-consumption winter regime dominated by heat pump space heating.
 Within that seasonal pattern, building type is the strongest structural
 separator, with houses drawing roughly twice the daily energy of flats
 at any given temperature. These findings directly shape the modelling
-choices below: the response is log-transformed to stabilise variance,
+choices below. The response is log-transformed to stabilise variance,
 heating degree days enter as the primary continuous weather predictor,
 and building type is retained as a categorical covariate in every model.
 For the client, the key implication is that cold spells and the building
@@ -379,24 +388,20 @@ stock composition of a supply portfolio are the two dominant levers of
 aggregate demand, and any forecasting tool must capture both to be
 useful.
 
-\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
-
 \section{Modelling}\label{modelling}
 
 Six models are fitted to the HEAPO data, each targeting a response
 variable suited to its statistical family. The Linear Model and
 Generalised Additive Model are fitted to \texttt{log\_kWh\_total}, the
-log-transformed daily electricity consumption. The GLM Binomial
-classifies household-days as high or low consumption relative to each
-household's own median. The Support Vector Machine classifies days as
-high consumption using the global 75th percentile of daily kWh as the
-threshold (top 25\% of usage). The Neural Network uses each household's
-own median as its high-consumption threshold. The GLM Poisson models the
-monthly count of high-consumption days per household, capturing
-longer-term demand patterns at a coarser aggregation. Model performance
-is evaluated in the comparison section: regression models are compared
-via five-fold cross-validation MAE in kWh and R²; classification models
-via AUC and accuracy.
+log-transformed daily electricity consumption. The GLM Binomial, Neural
+Network, and Support Vector Machine all classify household-days as high
+or low consumption using each household's own 75th percentile as the
+threshold, capturing the top 25\% of days for each individual household.
+The GLM Poisson models the monthly count of high-consumption days per
+household, capturing longer-term demand patterns at a coarser
+aggregation. Model performance is evaluated in the comparison section:
+regression models are compared via five-fold cross-validation MAE in kWh
+and R²; classification models via AUC and accuracy.
 
 \subsection{Linear Model (LM)}\label{lm}
 
@@ -404,32 +409,32 @@ via AUC and accuracy.
 
 \subsubsection{Objective}\label{objective}
 
-The aim of this analysis is to model daily household energy consumption
-(\(\text{log\_kWh\_total}\)), the natural logarithm of total daily
-kilowatt-hour usage. Log-transforming energy consumption is standard
-practice: it is strictly positive, right-skewed on the original scale,
-and approximately normal after transformation, making linear regression
-appropriate.
+This section models daily household energy consumption as
+\(\text{log\_kWh\_total}\), the natural logarithm of total daily
+kilowatt-hour usage. The log transformation is standard for energy data:
+daily kWh is strictly positive and right-skewed in raw form, and
+approximately normal on the log scale.
 
-Predictors include weather conditions (heating degree days, sunshine
+Predictors cover weather conditions (heating degree days, sunshine
 hours, humidity), building characteristics (building type, living area,
-heat pump type), and household composition (number of residents). By
-including interaction terms, the model also captures how the sensitivity
-to cold weather differs across building and heat pump types.
+heat pump type), and household composition (number of residents). Two
+interaction terms are added to test whether cold-weather sensitivity
+differs by building type and heat pump technology.
 
 \subsubsection{Model Setup}\label{model-setup}
 
 Two models are estimated:
 
-\textbf{Simple MLR} --- all seven predictors with main effects only.
-This serves as an interpretable baseline capturing the additive
-relationships between predictors and log energy consumption:
+\textbf{Simple MLR:} all seven predictors with main effects only, as an
+interpretable baseline for the additive relationships between predictors
+and log energy consumption:
 
 \[
 \log(\text{kWh}_i) = \beta_0 + \beta_1\,\text{HDD}_i + \beta_2\,\text{Sunshine}_i + \cdots + \beta_7\,\text{HeatpumpType}_i + \varepsilon_i
 \]
 
-\textbf{Extended MLR} --- adds two domain-motivated interaction terms:
+\textbf{Extended MLR:} adds two interaction terms motivated by domain
+knowledge:
 
 \begin{itemize}
 \tightlist
@@ -447,72 +452,38 @@ relationships between predictors and log energy consumption:
 All coefficients are on the log scale: a coefficient of 0.05 means a 5\%
 multiplicative change in kWh for a one-unit increase in the predictor.
 
-Note that the panel structure of the data (multiple daily observations
-per household) means the i.i.d. assumption of standard OLS is not fully
-met --- standard errors may be slightly understated due to
-within-household correlation.
+The panel structure (multiple observations per household) means the
+i.i.d. assumption of standard OLS is not fully met; standard errors may
+be slightly understated due to within-household correlation.
 
 \subsubsection{Model Results}\label{model-results}
 
-\begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.5595}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1071}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1310}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.0952}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1071}}@{}}
-\caption{Extended MLR: coefficient estimates}\tabularnewline
-\toprule\noalign{}
-\begin{minipage}[b]{\linewidth}\raggedright
-Predictor
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-Estimate
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-Std. Error
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-t value
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-p value
-\end{minipage} \\
-\midrule\noalign{}
-\endfirsthead
-\toprule\noalign{}
-\begin{minipage}[b]{\linewidth}\raggedright
-Predictor
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-Estimate
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-Std. Error
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-t value
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-p value
-\end{minipage} \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-heating\_degree\_days & 0.0212 & 0.0029 & 7.42 & 0.000000 \\
-sunshine\_hours & -0.0154 & 0.0009 & -16.62 & 0.000000 \\
-humidity\_avg & 0.0005 & 0.0003 & 1.39 & 0.165000 \\
-living\_area & 0.0004 & 0.0000 & 9.78 & 0.000000 \\
-n\_residents & 0.1336 & 0.0026 & 50.88 & 0.000000 \\
-building\_typehouse & 0.2199 & 0.0329 & 6.68 & 0.000000 \\
-heatpump\_typeground-source & -0.1427 & 0.0085 & -16.79 & 0.000000 \\
-heating\_degree\_days:heatpump\_typeground-source & -0.0027 & 0.0007 &
--3.63 & 0.000283 \\
-heating\_degree\_days:building\_typehouse & 0.0392 & 0.0029 & 13.72 &
-0.000000 \\
-\end{longtable}
+\begin{longtabu} to \linewidth {>{\raggedright}X>{\raggedleft}X>{\raggedleft}X>{\raggedleft}X>{\raggedleft}X}
+\caption{\label{tab:lm-coef-table}Extended MLR: coefficient estimates}\\
+\toprule
+Predictor & Estimate & Std. Error & t value & p value\\
+\midrule
+heating\_degree\_days & 0.0212 & 0.0029 & 7.42 & 0.000000\\
+sunshine\_hours & -0.0154 & 0.0009 & -16.62 & 0.000000\\
+humidity\_avg & 0.0005 & 0.0003 & 1.39 & 0.165000\\
+living\_area & 0.0004 & 0.0000 & 9.78 & 0.000000\\
+n\_residents & 0.1336 & 0.0026 & 50.88 & 0.000000\\
+\addlinespace
+building\_typehouse & 0.2199 & 0.0329 & 6.68 & 0.000000\\
+heatpump\_typeground-source & -0.1427 & 0.0085 & -16.79 & 0.000000\\
+heating\_degree\_days:heatpump\_typeground-source & -0.0027 & 0.0007 & -3.63 & 0.000283\\
+heating\_degree\_days:building\_typehouse & 0.0392 & 0.0029 & 13.72 & 0.000000\\
+\bottomrule
+\end{longtabu}
 
-All predictors are statistically significant at the 0.001 level, with
-the exception of \texttt{humidity\_avg} (p = 0.165), which does not
-contribute meaningfully once the other variables are included. Key
-effects on log energy consumption, holding all other variables constant:
+All predictors are significant at the 0.001 level except
+\texttt{humidity\_avg} (p = 0.165), which adds nothing once the other
+weather variables are included. Effects on log energy consumption,
+holding all other variables constant:
 
 \textbf{Heating degree days} (β = 0.021, p \textless{} 0.001): Each
 additional HDD increases log consumption by \textasciitilde2.1\% for
-air-source pump households in flats --- the baseline group. This is the
-reference effect before interaction adjustments.
+air-source pump households in flats (the baseline group).
 
 \textbf{Sunshine hours} (β = −0.015, p \textless{} 0.001): An additional
 sunshine hour reduces consumption by \textasciitilde1.5\%, reflecting
@@ -524,19 +495,18 @@ additional resident increases consumption by \textasciitilde14.3\%
 temperature-building interaction.
 
 \textbf{Building type --- house} (β = 0.220, p \textless{} 0.001):
-Houses consume \textasciitilde24.6\% more than flats at the baseline
-temperature, even before accounting for their greater sensitivity to
-cold (see interaction below).
+Houses consume \textasciitilde24.6\% more than flats at baseline, before
+accounting for their greater sensitivity to cold (see interaction
+below).
 
 \textbf{Heat pump type --- ground-source} (β = −0.143, p \textless{}
 0.001): Ground-source pump households consume \textasciitilde13.3\% less
 than air-source households at the baseline temperature.
 
 \textbf{Interaction: HDD × house} (β = 0.039, p \textless{} 0.001):
-Houses are substantially \emph{more} sensitive to cold than flats ---
-each additional HDD increases log consumption by an additional 3.9\% for
-house households. This is the largest interaction effect and confirms
-that houses are less thermally efficient.
+Houses are substantially \emph{more} sensitive to cold than flats: each
+additional HDD adds 3.9\% to log consumption, the largest interaction
+effect in the model.
 
 \textbf{Interaction: HDD × ground-source} (β = −0.003, p \textless{}
 0.001): Ground-source pump households are slightly \emph{less} sensitive
@@ -546,22 +516,19 @@ efficiency of ground-source systems at low outdoor temperatures.
 \subsubsection{Visual Evidence}\label{visual-evidence}
 
 The coefficient plot below summarises the direction and significance of
-all predictors in the extended model. Coefficients whose 95\% confidence
-intervals do not cross zero are statistically distinguishable from no
-effect.
+all predictors in the extended model.
 
-\begin{center}\includegraphics[width=0.9\linewidth]{report_files/figure-latex/lm-coef-plot-1} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{report_files/figure-latex/lm-coef-plot-1} \end{center}
 
 The scatterplot of observed versus fitted values on the log scale
 illustrates the model's predictive fit. Points near the diagonal
-indicate accurate predictions; systematic deviations would suggest model
-misspecification.
+indicate accurate predictions.
 
-\pandocbounded{\includegraphics[keepaspectratio]{report_files/report_files/figure-latex/lm-obs-vs-fit-1.pdf}}
+\begin{center}\includegraphics[width=0.7\linewidth]{report_files/figure-latex/lm-obs-vs-fit-1} \end{center}
 
 \subsubsection{Model Diagnostics}\label{model-diagnostics}
 
-\pandocbounded{\includegraphics[keepaspectratio]{report_files/report_files/figure-latex/lm-diagnostics-1.pdf}}
+\begin{center}\includegraphics{report_files/figure-latex/lm-diagnostics-1} \end{center}
 
 \begin{itemize}
 \tightlist
@@ -579,70 +546,53 @@ misspecification.
   that disproportionately influence the fit.
 \end{itemize}
 
-\begin{longtable}[]{@{}lr@{}}
-\caption{Variance Inflation Factors (VIF) --- extended
-model}\tabularnewline
-\toprule\noalign{}
-Predictor & VIF \\
-\midrule\noalign{}
-\endfirsthead
-\toprule\noalign{}
-Predictor & VIF \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-heating\_degree\_days & 61.55 \\
-sunshine\_hours & 2.28 \\
-humidity\_avg & 2.09 \\
-living\_area & 1.04 \\
-n\_residents & 1.03 \\
-building\_type & 2.18 \\
-heatpump\_type & 2.15 \\
-heating\_degree\_days:heatpump\_type & 2.86 \\
-heating\_degree\_days:building\_type & 61.44 \\
-\end{longtable}
+\begin{longtabu} to \linewidth {>{\raggedright}X>{\raggedleft}X}
+\caption{\label{tab:lm-vif}Variance Inflation Factors (VIF) — extended model}\\
+\toprule
+Predictor & VIF\\
+\midrule
+heating\_degree\_days & 61.55\\
+sunshine\_hours & 2.28\\
+humidity\_avg & 2.09\\
+living\_area & 1.04\\
+n\_residents & 1.03\\
+\addlinespace
+building\_type & 2.18\\
+heatpump\_type & 2.15\\
+heating\_degree\_days:heatpump\_type & 2.86\\
+heating\_degree\_days:building\_type & 61.44\\
+\bottomrule
+\end{longtabu}
 
 Most predictors have VIF below 3, indicating no problematic
 multicollinearity. The exception is \texttt{heating\_degree\_days} (VIF
 = 61.55) and its interaction with \texttt{building\_typehouse} (VIF =
-61.44). These elevated values arise directly from the interaction term
---- both terms share the same underlying variable --- and are therefore
-expected and do not invalidate the model or inflate coefficient
-uncertainty in practice.
+61.44). These elevated values are expected for interaction terms and do
+not invalidate the model or inflate coefficient uncertainty.
 
-\begin{longtable}[]{@{}lrr@{}}
-\caption{LM model comparison --- Adj. R² on full data; MAE from 5-fold
-CV}\tabularnewline
-\toprule\noalign{}
-Model & Adj. R² & CV MAE (kWh/day) \\
-\midrule\noalign{}
-\endfirsthead
-\toprule\noalign{}
-Model & Adj. R² & CV MAE (kWh/day) \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-Simple MLR (main effects) & 0.2727 & 10.97 \\
-Extended MLR (+ interactions) & 0.2743 & 10.96 \\
-\end{longtable}
+\begin{longtabu} to \linewidth {>{\raggedright}X>{\raggedleft}X>{\raggedleft}X}
+\caption{\label{tab:lm-model-comparison}LM model comparison — Adj. R² on full data; MAE from 5-fold CV}\\
+\toprule
+Model & Adj. R² & CV MAE (kWh/day)\\
+\midrule
+Simple MLR (main effects) & 0.2727 & 10.97\\
+Extended MLR (+ interactions) & 0.2743 & 10.96\\
+\bottomrule
+\end{longtabu}
 
 The simple model achieves an adjusted R² of 0.2727. Adding the two
-interaction terms improves this to 0.2743 --- a real but modest gain.
-The five-fold cross-validation MAE provides the most interpretable
-out-of-sample error measure: predictions are off by roughly 11 kWh/day
-on average for the extended model. This confirms the interaction terms
-are meaningful while also highlighting that the overall explanatory
-power of a linear model is limited on this dataset.
+interaction terms improves this to 0.2743, a real but modest gain.
+Five-fold CV MAE is roughly 11 kWh/day for the extended model. The
+interaction terms are meaningful, but overall explanatory power remains
+limited on this dataset.
 
 \subsubsection{Key Findings}\label{key-findings}
 
 \textbf{Heating degree days is the dominant weather driver:} Cold
-weather is the primary positive predictor of energy consumption, with an
-effect that is further amplified in houses (interaction β = 0.039, p
-\textless{} 0.001) --- confirming that houses are thermally less
-efficient than flats.
+weather is the primary positive predictor of energy consumption. The
+interaction term (β = 0.039, p \textless{} 0.001) shows that houses are
+more sensitive to cold than flats, consistent with lower thermal
+efficiency.
 
 \textbf{Household size has the strongest marginal effect:} With β =
 0.134, each additional resident increases daily consumption by
@@ -651,52 +601,41 @@ the model after the building type interaction.
 
 \textbf{Houses consume substantially more, especially in winter:} Both
 the baseline offset (β = 0.220, house vs.~flat) and the temperature
-interaction (β = 0.039) point in the same direction --- houses face
-higher base consumption and are more sensitive to cold.
+interaction (β = 0.039) point the same way: houses start higher and get
+more sensitive to cold as temperatures drop.
 
 \textbf{Ground-source heat pumps are more efficient and more stable:}
 They consume \textasciitilde13.3\% less at baseline and respond less to
-temperature swings (interaction β = −0.003), consistent with the known
-efficiency advantage of ground-source systems.
+temperature swings (interaction β = −0.003), consistent with the
+efficiency advantage of ground-source systems at low outdoor
+temperatures.
 
-\textbf{Humidity is not a useful predictor:} After controlling for other
-variables, \texttt{humidity\_avg} is not statistically significant (p =
-0.165) and contributes negligible explanatory power.
+\textbf{Humidity is not a useful predictor:} \texttt{humidity\_avg} is
+not significant (p = 0.165) once the other weather variables are
+controlled for.
 
 \textbf{Overall explanatory power is limited:} The extended model
-explains only \textasciitilde27.4\% of the variance in log daily
-consumption (adj. R² = 0.2743). On the original kWh scale the mean
-absolute error is approximately 11 kWh/day (5-fold CV), meaning a
-typical prediction deviates by that amount from the observed daily
-consumption.
+explains \textasciitilde27.4\% of the variance in log daily consumption
+(adj. R² = 0.2743). On the original kWh scale, mean absolute error is 11
+kWh/day (5-fold CV).
 
 \subsubsection{Conclusion}\label{conclusion}
 
-The linear model successfully identifies the key structural and
-weather-related drivers of daily household energy consumption and
-provides clear, interpretable coefficient estimates. All predictors
-except humidity are statistically significant, and the interaction terms
-meaningfully capture the heterogeneous effect of cold weather across
-building and pump types.
+The linear model identifies the main structural and weather-related
+drivers of daily household energy consumption. All predictors except
+humidity are significant, and the interaction terms show that cold
+weather affects houses and ground-source pump households differently.
 
-However, the model is of \textbf{limited usefulness for prediction}. An
-adjusted R² of 0.27 means the model leaves \textasciitilde73\% of the
-variance in daily consumption unexplained. At the household-day level,
-predictions are too imprecise to serve as a reliable forecasting tool.
-The likely cause is the strong household-level heterogeneity that a
-cross-sectional linear model cannot capture --- different households
-have very different baseline consumption levels regardless of the
-measured predictors.
+However, the model has \textbf{limited predictive value}. An adjusted R²
+of 0.27 leaves \textasciitilde73\% of the variance unexplained. At the
+household-day level, predictions are too imprecise for operational use.
+Household-level heterogeneity is likely the cause: baseline consumption
+varies substantially across households in ways a cross-sectional model
+cannot capture.
 
-The model is better suited for \textbf{inference and understanding
-drivers} than for prediction. It provides a statistically well-grounded
-description of which factors are associated with higher consumption and
-by how much, which is valuable for policy and planning contexts. For
-operational forecasting, more flexible models with household-level
-effects (e.g., mixed models, GAMs, or tree- based methods) would be
-needed.
-
-\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+For inference, the model does its job: it gives directly interpretable
+coefficient estimates for every predictor. For forecasting, models with
+household-level random effects would be needed.
 
 \subsection{GLM -- Poisson}\label{glm-poisson}
 
@@ -720,19 +659,19 @@ interpretation of results in terms of relative changes (rate ratios).
 \subsubsection{Model Setup}\label{model-setup-1}
 
 \begin{verbatim}
-## n_high_days ~ heating_degree_days + temp_avg + living_area +      building_type + heatpump_type + has_floor_heating + n_residents +      share_weekend
-\end{verbatim}
-
-\begin{verbatim}
-## glm(formula = form, family = poisson(link = "log"), data = dat_count, 
-##     offset = log_n_days)
+## n_high_days ~ heating_degree_days + temp_avg + living_area + 
+##     building_type + heatpump_type + has_floor_heating + n_residents + 
+##     share_weekend
 \end{verbatim}
 
 The response variable is the number of high-consumption days per
-household-month (\(n_{high\ days}\)). Because the number of observed
-days can vary slightly across household--months, the model includes the
-logarithm of the observed days \((\log(n_{days}))\) as an offset. This
-adjustment effectively converts the outcome into a rate ---
+household-month (\(n_{high\ days}\)). A day is classified as a
+high-consumption day if its daily \texttt{log\_kWh\_total} exceeds that
+household's own 75th percentile, consistent with the threshold used in
+the GLM Binomial and throughout the report. Because the number of
+observed days can vary slightly across household--months, the model
+includes the logarithm of the observed days \((\log(n_{days}))\) as an
+offset. This adjustment effectively converts the outcome into a rate ---
 high-consumption days per observed day --- so that observations remain
 comparable even when exposure differs between months.
 
@@ -744,6 +683,12 @@ To model these rates, a Poisson GLM with a log-link is fitted:
 
 The log-link guarantees positive fitted values and supports a
 multiplicative interpretation of effects.
+
+One predictor warrants clarification: \texttt{share\_weekend} is the
+monthly proportion of weekend days within a household--month (a
+continuous value between 0 and 1), and is distinct from the daily binary
+\texttt{is\_weekend} flag used in the GLM Binomial and other daily-level
+models.
 
 \subsubsection{Model Results}\label{model-results-1}
 
@@ -793,11 +738,12 @@ approximately 13\% higher than those without
 input required by radiant floor systems to maintain comfort
 temperatures.
 
-\textbf{Weekend share:} A higher proportion of weekend days within a
-month is associated with a substantially lower rate of high-consumption
-days (RR \(\approx\) 0.665). However, this effect has a very wide
-confidence interval and becomes non-significant once overdispersion is
-accounted for, suggesting considerable uncertainty in this estimate.
+\textbf{Weekend share:} This predictor has a very wide confidence
+interval and is non-significant once overdispersion is accounted for
+(quasi-Poisson p \textgreater{} 0.05). The direction of the raw Poisson
+estimate should not be interpreted. The two models are not directly
+comparable on this predictor, as they operate at different aggregation
+levels.
 
 Overall, structural and household characteristics (building type, size,
 and number of residents) exhibit the strongest and most reliable
@@ -837,18 +783,17 @@ while \emph{floor heating}, \emph{number of residents}, and \emph{living
 area} show moderate to small increases. \emph{Heating degree days} sits
 right at 1 and is the only non-significant predictor (shown in grey).
 
-\pandocbounded{\includegraphics[keepaspectratio]{report_files/report_files/figure-latex/glm-poisson-rr-plot-1.pdf}}
+\begin{center}\includegraphics{report_files/figure-latex/glm-poisson-rr-plot-1} \end{center}
 
 \subsubsection{Model Diagnostics}\label{model-diagnostics-1}
 
 A key assumption of the Poisson GLM is \emph{equidispersion}, i.e., that
 the conditional variance equals the conditional mean. We assess this by
 comparing the residual deviance to the residual degrees of freedom. For
-the fitted Poisson model, the residual deviance is
-\ensuremath{2.75296\times 10^{4}} on 3291 df, yielding a ratio of 8.37.
-Since this substantially exceeds 1, there is strong evidence of
-\emph{overdispersion} --- the Poisson model underestimates standard
-errors and overstates statistical significance.
+the fitted Poisson model, the residual deviance is 27,529.6 on 3291 df,
+yielding a ratio of 8.37. Since this substantially exceeds 1, there is
+strong evidence of \emph{overdispersion} --- the Poisson model
+underestimates standard errors and overstates statistical significance.
 
 We therefore refit the model using a \emph{quasi-Poisson} family, which
 retains identical point estimates but inflates standard errors by
@@ -865,7 +810,7 @@ absolute increase, while those with very small SEs (e.g., \emph{living
 area}, \emph{number of residents}) are inflated by a smaller absolute
 amount but the same factor \(\sqrt{\hat{\phi}}\).
 
-\pandocbounded{\includegraphics[keepaspectratio]{report_files/report_files/figure-latex/quasi-se-plot-1.pdf}}
+\begin{center}\includegraphics{report_files/figure-latex/quasi-se-plot-1} \end{center}
 
 \subsubsection{Goodness of Fit}\label{goodness-of-fit}
 
@@ -874,31 +819,20 @@ counts and report the Root Mean Squared Error (RMSE). The
 observed-vs-fitted plot is rendered as a hexbin to handle overplotting
 given the large number of observations.
 
-\begin{longtable}[]{@{}lr@{}}
-\caption{Root Mean Squared Error for Poisson and quasi-Poisson
-models.}\tabularnewline
-\toprule\noalign{}
-Model & RMSE \\
-\midrule\noalign{}
-\endfirsthead
-\toprule\noalign{}
-Model & RMSE \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-Poisson & 9.452 \\
-Quasi-Poisson & 9.452 \\
-\end{longtable}
+\begin{longtabu} to \linewidth {>{\raggedright}X>{\raggedleft}X}
+\caption{\label{tab:goodness-of-fit}Root Mean Squared Error for the Poisson model.}\\
+\toprule
+Model & RMSE\\
+\midrule
+Poisson & 9.452\\
+\bottomrule
+\end{longtabu}
 
-\pandocbounded{\includegraphics[keepaspectratio]{report_files/report_files/figure-latex/goodness-of-fit-1.pdf}}
-
-The RMSE of 9.452 days reflects the residual spread visible in the plot
---- predictions are reasonably centred along the identity line but with
-substantial scatter, partly explained by the high overdispersion
-(\(\hat{\phi}\) = 7.74). Note that the quasi-Poisson model produces
-identical fitted values and therefore the same RMSE, as it only affects
-standard errors and inference, not point predictions.
+The RMSE of 9.452 days reflects substantial residual spread, partly
+explained by the high overdispersion (\(\hat{\phi}\) = 7.74). Note that
+the quasi-Poisson model produces identical fitted values and therefore
+the same RMSE, as it only affects standard errors and inference, not
+point predictions.
 
 \subsubsection{Conclusion}\label{conclusion-1}
 
@@ -919,24 +853,26 @@ model could be considered as a more flexible alternative, as it models
 the overdispersion through an explicit distributional parameter rather
 than a post- hoc correction.
 
-\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
-
 \subsection{GLM -- Binomial}\label{glm-binomial}
 
 \emph{Lead: Emanuel Lemma}
 
 \subsubsection{Objective}\label{objective-2}
 
-Can we predict whether a given household-day will see above-average
-electricity consumption before it happens? This section fits a
-\textbf{Generalised Linear Model with a binomial family} to answer
-exactly that question. The response variable \texttt{high\_consumption}
-is a binary indicator that equals 1 if the household's daily electricity
-use exceeds its own median and 0 otherwise. By modelling the log- odds
-of high consumption as a linear function of weather conditions, building
+Can we predict whether a given day will be unusually high-consumption
+for a specific household? This section fits a \textbf{Generalised Linear
+Model with a binomial family} to answer exactly that question. The
+response variable \texttt{high\_consumption} is a binary indicator that
+equals 1 if the household's daily \texttt{log\_kWh\_total} exceeds that
+household's own 75th percentile and 0 otherwise. Using a per-household
+threshold means the model is not distinguishing houses from flats. Each
+household's own consumption baseline is already accounted for. Instead,
+the model learns what drives a day to be in the top 25\% for a given
+household, regardless of its size or type. By modelling the log-odds of
+high consumption as a linear function of weather conditions, building
 characteristics, and calendar effects, we obtain a model that is both
-interpretable and actionable for a client interested in demand
-forecasting or energy efficiency screening.
+interpretable and actionable for a client interested in understanding
+what drives demand spikes at the household level.
 
 \subsubsection{Model Setup}\label{model-setup-2}
 
@@ -944,7 +880,19 @@ forecasting or energy efficiency screening.
 \begin{Highlighting}[]
 \FunctionTok{set.seed}\NormalTok{(}\DecValTok{42}\NormalTok{)}
 
+\NormalTok{hh\_q75 }\OtherTok{\textless{}{-}}\NormalTok{ heapo }\SpecialCharTok{|\textgreater{}}
+  \FunctionTok{group\_by}\NormalTok{(Household\_ID) }\SpecialCharTok{|\textgreater{}}
+  \FunctionTok{summarise}\NormalTok{(}
+    \AttributeTok{hh\_q75 =} \FunctionTok{quantile}\NormalTok{(log\_kWh\_total, }\FloatTok{0.75}\NormalTok{, }\AttributeTok{na.rm =} \ConstantTok{TRUE}\NormalTok{),}
+    \AttributeTok{.groups =} \StringTok{"drop"}
+\NormalTok{  )}
+
 \NormalTok{df\_glm }\OtherTok{\textless{}{-}}\NormalTok{ heapo }\SpecialCharTok{|\textgreater{}}
+  \FunctionTok{left\_join}\NormalTok{(hh\_q75, }\AttributeTok{by =} \StringTok{"Household\_ID"}\NormalTok{) }\SpecialCharTok{|\textgreater{}}
+  \FunctionTok{mutate}\NormalTok{(}
+    \AttributeTok{high\_consumption =} \FunctionTok{as.integer}\NormalTok{(log\_kWh\_total }\SpecialCharTok{\textgreater{}=}\NormalTok{ hh\_q75),}
+    \AttributeTok{month =} \FunctionTok{as.factor}\NormalTok{(month)}
+\NormalTok{  ) }\SpecialCharTok{|\textgreater{}}
   \FunctionTok{select}\NormalTok{(}
 \NormalTok{    high\_consumption,}
 \NormalTok{    heating\_degree\_days,}
@@ -957,10 +905,6 @@ forecasting or energy efficiency screening.
 \NormalTok{    is\_weekend,}
 \NormalTok{    month}
 \NormalTok{  ) }\SpecialCharTok{|\textgreater{}}
-  \FunctionTok{mutate}\NormalTok{(}
-    \AttributeTok{high\_consumption =} \FunctionTok{as.integer}\NormalTok{(high\_consumption),}
-    \AttributeTok{month =} \FunctionTok{as.factor}\NormalTok{(month)}
-\NormalTok{  ) }\SpecialCharTok{|\textgreater{}}
   \FunctionTok{drop\_na}\NormalTok{()}
 
 \NormalTok{train\_idx }\OtherTok{\textless{}{-}} \FunctionTok{sample}\NormalTok{(}\FunctionTok{nrow}\NormalTok{(df\_glm), }\FloatTok{0.8} \SpecialCharTok{*} \FunctionTok{nrow}\NormalTok{(df\_glm))}
@@ -971,19 +915,26 @@ forecasting or energy efficiency screening.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\ControlFlowTok{if}\NormalTok{ (}\SpecialCharTok{!}\FunctionTok{file.exists}\NormalTok{(}\StringTok{"../models/glm\_binomial/glm\_binomial.rds"}\NormalTok{)) \{}
+\ControlFlowTok{if}\NormalTok{ (}\SpecialCharTok{!}\FunctionTok{file.exists}\NormalTok{(}\StringTok{"../models/glm\_binomial/glm\_binomial\_hh\_q75.rds"}\NormalTok{)) \{}
 \NormalTok{  model\_glm }\OtherTok{\textless{}{-}} \FunctionTok{glm}\NormalTok{(high\_consumption }\SpecialCharTok{\textasciitilde{}}\NormalTok{ ., }\AttributeTok{data =}\NormalTok{ train\_df, }\AttributeTok{family =}\NormalTok{ binomial)}
-  \FunctionTok{saveRDS}\NormalTok{(model\_glm, }\StringTok{"../models/glm\_binomial/glm\_binomial.rds"}\NormalTok{)}
+  \FunctionTok{saveRDS}\NormalTok{(model\_glm, }\StringTok{"../models/glm\_binomial/glm\_binomial\_hh\_q75.rds"}\NormalTok{)}
 \NormalTok{\} }\ControlFlowTok{else}\NormalTok{ \{}
-\NormalTok{  model\_glm }\OtherTok{\textless{}{-}} \FunctionTok{readRDS}\NormalTok{(}\StringTok{"../models/glm\_binomial/glm\_binomial.rds"}\NormalTok{)}
+\NormalTok{  model\_glm }\OtherTok{\textless{}{-}} \FunctionTok{readRDS}\NormalTok{(}\StringTok{"../models/glm\_binomial/glm\_binomial\_hh\_q75.rds"}\NormalTok{)}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
 
-The dataset is restricted to ten predictors covering weather conditions,
-building characteristics, and calendar effects, then split into 80\%
-training and 20\% test sets. The model is fitted with \texttt{glm()}
-using \texttt{family\ =\ binomial}, which models the log-odds of high
+For each of the 127 households, the 75th percentile of their
+\texttt{log\_kWh\_total} is computed and used as that household's
+personal high-consumption threshold. A day is labelled 1 if it falls in
+the top 25\% of that household's own consumption distribution. By
+construction, every household contributes exactly 25\% high-consumption
+days, so building type and household size are absorbed into the
+threshold and do not mechanically drive the outcome. The dataset is
+restricted to nine predictors covering weather conditions, building
+characteristics, and calendar effects, then split into 80\% training and
+20\% test sets. The model is fitted with \texttt{glm()} using
+\texttt{family\ =\ binomial}, which models the log-odds of high
 consumption as a linear combination of predictors. The saved model is
 reloaded on subsequent knits to avoid refitting.
 
@@ -1008,7 +959,7 @@ reloaded on subsequent knits to avoid refitting.
   \FunctionTok{sum}\NormalTok{(}\FunctionTok{diff}\NormalTok{(fpr) }\SpecialCharTok{*}\NormalTok{ (tpr[}\SpecialCharTok{{-}}\DecValTok{1}\NormalTok{] }\SpecialCharTok{+}\NormalTok{ tpr[}\SpecialCharTok{{-}}\FunctionTok{length}\NormalTok{(tpr)]) }\SpecialCharTok{/} \DecValTok{2}\NormalTok{)}
 \NormalTok{\}}
 
-\NormalTok{auc\_val }\OtherTok{\textless{}{-}} \FunctionTok{compute\_auc}\NormalTok{(actual, pred\_prob)}
+\NormalTok{glm\_auc\_val }\OtherTok{\textless{}{-}} \FunctionTok{compute\_auc}\NormalTok{(actual, pred\_prob)}
 \NormalTok{tp }\OtherTok{\textless{}{-}}\NormalTok{ conf\_mat[}\StringTok{"1"}\NormalTok{, }\StringTok{"1"}\NormalTok{]}
 \NormalTok{tn }\OtherTok{\textless{}{-}}\NormalTok{ conf\_mat[}\StringTok{"0"}\NormalTok{, }\StringTok{"0"}\NormalTok{]}
 \NormalTok{fp }\OtherTok{\textless{}{-}}\NormalTok{ conf\_mat[}\StringTok{"1"}\NormalTok{, }\StringTok{"0"}\NormalTok{]}
@@ -1020,100 +971,86 @@ reloaded on subsequent knits to avoid refitting.
 \end{Highlighting}
 \end{Shaded}
 
-\begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.2903}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.2903}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.0968}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.0753}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.0753}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.0860}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.0860}}@{}}
-\caption{GLM Binomial: coefficient estimates and odds ratios. Month
-dummies omitted here; all effects shown in the OR plot
-below.}\tabularnewline
-\toprule\noalign{}
-\begin{minipage}[b]{\linewidth}\raggedright
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-Term
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-Estimate
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-OR
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-CI Low
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-CI High
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-p-value
-\end{minipage} \\
-\midrule\noalign{}
-\endfirsthead
-\toprule\noalign{}
-\begin{minipage}[b]{\linewidth}\raggedright
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-Term
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-Estimate
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-OR
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-CI Low
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-CI High
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-p-value
-\end{minipage} \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-building\_typehouse & building\_typehouse & 2.516 & 12.378 & 10.054 &
-15.239 & 0 \\
-has\_floor\_heating & has\_floor\_heating & 0.348 & 1.416 & 1.355 &
-1.480 & 0 \\
-heatpump\_typeground-source & heatpump\_typeground-source & -0.293 &
-0.746 & 0.721 & 0.773 & 0 \\
-n\_residents & n\_residents & 0.248 & 1.282 & 1.262 & 1.302 & 0 \\
-is\_weekend & is\_weekend & 0.221 & 1.247 & 1.201 & 1.295 & 0 \\
-temp\_avg & temp\_avg & -0.059 & 0.943 & 0.934 & 0.951 & 0 \\
-heating\_degree\_days & heating\_degree\_days & 0.057 & 1.059 & 1.050 &
-1.067 & 0 \\
-living\_area & living\_area & 0.003 & 1.003 & 1.003 & 1.003 & 0 \\
-\end{longtable}
-
 Coefficients from a binomial GLM are expressed as \textbf{odds ratios}
-(OR = exp(coefficient)): a value above 1 increases the odds of high
-consumption, below 1 decreases it, relative to the reference category.
+(OR = exp(coefficient)). A value above 1 increases the odds that a day
+falls in the top 25\% of a household's own consumption, and a value
+below 1 decreases it, relative to the reference category.
 
-Key findings from the coefficient table:
+\begin{longtabu} to \linewidth {>{\raggedright}X>{\raggedleft}X>{\raggedleft}X>{\raggedleft}X>{\raggedleft}X>{\raggedleft}X}
+\caption{\label{tab:glm-binomial-coef-table}GLM Binomial: coefficient estimates and odds ratios. Month dummies omitted here. All effects shown in the OR plot below.}\\
+\toprule
+Term & Estimate & OR & CI Low & CI High & p-value\\
+\midrule
+is\_weekend & 0.452 & 1.571 & 1.500 & 1.645 & 0.000\\
+temp\_avg & -0.194 & 0.823 & 0.808 & 0.840 & 0.000\\
+heating\_degree\_days & 0.062 & 1.064 & 1.045 & 1.084 & 0.000\\
+has\_floor\_heating & -0.047 & 0.955 & 0.904 & 1.008 & 0.096\\
+heatpump\_typeground-source & 0.023 & 1.024 & 0.980 & 1.069 & 0.292\\
+\addlinespace
+building\_typehouse & -0.022 & 0.978 & 0.822 & 1.164 & 0.803\\
+n\_residents & 0.008 & 1.008 & 0.988 & 1.027 & 0.441\\
+living\_area & 0.000 & 1.000 & 1.000 & 1.000 & 0.765\\
+\bottomrule
+\end{longtabu}
+
+A striking result of using the per-household threshold is that
+structural predictors (building type, heat pump type, living area, and
+number of residents) are all statistically non-significant. This is
+expected because the threshold is set individually for each household,
+and these characteristics are already accounted for in the baseline. The
+model is therefore answering a different and more useful question. Given
+how this household normally behaves, what makes a specific day unusually
+high?
+
+The coefficient table reveals several key patterns.
 
 \begin{itemize}
 \tightlist
 \item
-  \textbf{Building type (house vs flat):} The dominant structural
-  driver. Houses have an OR of 12.38 relative to flats, meaning their
-  odds of a high-consumption day are 1138\% higher, all else equal. The
-  gap reflects larger floor areas and greater heating demand.
+  \textbf{Weekend:} The dominant predictor, with OR = 1.57. Days falling
+  on a Saturday or Sunday have 57\% higher odds of being a top-25\%
+  consumption day for that household. Households spend more time at home
+  on weekends, increasing both heating and appliance usage regardless of
+  building type or size.
 \item
-  \textbf{Ground-source heat pump:} Households with a ground-source
-  system have an OR of 0.75, meaning 25\% lower odds of high consumption
-  than air-source households. This is consistent with the higher
-  seasonal efficiency of ground-source systems.
+  \textbf{Average temperature:} Each additional degree Celsius reduces
+  the odds by 17.7\% (OR = 0.823, p \textless{} 0.001). Colder days push
+  households above their own typical usage level through increased heat
+  pump operation.
 \item
-  \textbf{Floor heating:} OR = NA, a modest positive association likely
-  driven by confounding with building size, as floor heating is more
-  common in larger houses.
+  \textbf{Heating degree days:} Each additional HDD increases the odds
+  by 6.4\% (OR = 1.064, p \textless{} 0.001). HDD and temperature are
+  collinear and together capture the thermal load on the heat pump. Both
+  are retained because HDD captures heating demand only and is zero on
+  warm days, while temp\_avg can detect cooling demand from reversible
+  heat pumps, a pattern HDD alone would miss entirely.
 \item
-  \textbf{Heating degree days:} Each additional degree-day multiplies
-  the odds of high consumption by 1.0586. The per-unit effect is small
-  but accumulates substantially over cold stretches.
+  \textbf{Building type, heat pump type, living area, number of
+  residents, floor heating:} None of these are statistically significant
+  (all p \textgreater{} 0.05). Once the model conditions on a
+  household's own 75th percentile, these structural characteristics
+  carry no additional explanatory power for day-to-day variation in
+  consumption.
 \item
-  \textbf{Month:} Summer months carry substantially lower odds than
-  January (the reference month). The full range of seasonal month
-  effects is visible in the odds ratio plot below.
+  \textbf{Month:} Spring and autumn show the strongest reductions
+  relative to January. April and October have the lowest odds (OR 0.29
+  and 0.28 respectively), as these are transition months when neither
+  heating nor cooling is needed. Notably, June and July are not
+  significantly different from January (p = 0.31 and 0.09), suggesting
+  that some households also produce high-consumption days in summer,
+  likely from heat pump cooling or increased hot water use. December is
+  likewise indistinguishable from January (p = 0.41). The full seasonal
+  pattern is visible in the odds ratio plot below.
 \end{itemize}
 
 \subsubsection{Visual Evidence}\label{visual-evidence-2}
+
+Each point shows the estimated odds ratio for one predictor, with 95\%
+confidence intervals. Points to the right of the dashed line (OR
+\textgreater{} 1) increase the odds of high consumption, and points to
+the left decrease them. Blue points are statistically significant (p
+\textless{} 0.05) and grey points are not. The log scale ensures that
+effects of equal magnitude in both directions appear symmetrically.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -1139,33 +1076,35 @@ Key findings from the coefficient table:
 \NormalTok{) }\SpecialCharTok{+}
   \FunctionTok{geom\_point}\NormalTok{(}\AttributeTok{size =} \FloatTok{2.5}\NormalTok{) }\SpecialCharTok{+}
   \FunctionTok{geom\_errorbarh}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{xmin =}\NormalTok{ ci\_low, }\AttributeTok{xmax =}\NormalTok{ ci\_high), }\AttributeTok{height =} \FloatTok{0.3}\NormalTok{) }\SpecialCharTok{+}
-  \FunctionTok{geom\_vline}\NormalTok{(}\AttributeTok{xintercept =} \DecValTok{1}\NormalTok{, }\AttributeTok{linetype =} \StringTok{"dashed"}\NormalTok{, }\AttributeTok{color =} \StringTok{"grey50"}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{geom\_vline}\NormalTok{(}\AttributeTok{xintercept =} \DecValTok{1}\NormalTok{, }\AttributeTok{linetype =} \StringTok{"dashed"}\NormalTok{, }\AttributeTok{color =}\NormalTok{ clr\_neutral) }\SpecialCharTok{+}
   \FunctionTok{scale\_color\_manual}\NormalTok{(}
-    \AttributeTok{values =} \FunctionTok{c}\NormalTok{(}\StringTok{"FALSE"} \OtherTok{=} \StringTok{"grey60"}\NormalTok{, }\StringTok{"TRUE"} \OtherTok{=} \StringTok{"steelblue"}\NormalTok{),}
+    \AttributeTok{values =} \FunctionTok{c}\NormalTok{(}\StringTok{"FALSE"} \OtherTok{=}\NormalTok{ clr\_neutral, }\StringTok{"TRUE"} \OtherTok{=}\NormalTok{ clr\_primary),}
     \AttributeTok{labels =} \FunctionTok{c}\NormalTok{(}\StringTok{"n.s."}\NormalTok{, }\StringTok{"p \textless{} 0.05"}\NormalTok{)}
 \NormalTok{  ) }\SpecialCharTok{+}
   \FunctionTok{scale\_x\_log10}\NormalTok{() }\SpecialCharTok{+}
   \FunctionTok{labs}\NormalTok{(}
-    \AttributeTok{title =} \StringTok{"GLM Binomial – Odds Ratios (95\% CI)"}\NormalTok{,}
+    \AttributeTok{title =} \StringTok{"GLM Binomial – Odds Ratios with 95\% CIs"}\NormalTok{,}
     \AttributeTok{x =} \StringTok{"Odds Ratio (log scale)"}\NormalTok{,}
     \AttributeTok{y =} \ConstantTok{NULL}\NormalTok{,}
     \AttributeTok{color =} \ConstantTok{NULL}
 \NormalTok{  ) }\SpecialCharTok{+}
-  \FunctionTok{theme\_minimal}\NormalTok{()}
+\NormalTok{  report\_theme}
 \end{Highlighting}
 \end{Shaded}
 
-\pandocbounded{\includegraphics[keepaspectratio]{report_files/report_files/figure-latex/glm-binomial-or-1.pdf}}
+\begin{center}\includegraphics{report_files/figure-latex/glm-binomial-or-1} \end{center}
 
-Each point shows the estimated odds ratio for one predictor, with 95\%
-confidence intervals. Points to the right of the dashed line (OR
-\textgreater{} 1) increase the odds of high consumption, and points to
-the left decrease them. Blue points are statistically significant (p
-\textless{} 0.05) and grey points are not. The log scale ensures that
-effects of equal magnitude in both directions appear symmetrically. The
-wide spread of odds ratios, from heat pump type on the left to building
-type on the right, indicates that structural household characteristics
-matter far more than calendar or weather effects alone.
+The wide spread of odds ratios shows that calendar effects, particularly
+month dummies, drive the largest deviations from OR = 1, while
+structural household characteristics (building type, heat pump type)
+cluster near the reference line and are statistically non-significant,
+as expected by the modell setup.
+
+The ROC curve traces the model's sensitivity against its false positive
+rate as the classification threshold varies from 0 to 1. The dashed
+diagonal represents a model that predicts at random (AUC = 0.5). The
+further the blue curve bows toward the top-left corner, the better the
+model separates the two classes regardless of threshold choice.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -1181,30 +1120,34 @@ matter far more than calendar or weather effects alone.
 \NormalTok{\})(actual, pred\_prob)}
 
 \FunctionTok{ggplot}\NormalTok{(roc\_df, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ fpr, }\AttributeTok{y =}\NormalTok{ tpr)) }\SpecialCharTok{+}
-  \FunctionTok{geom\_line}\NormalTok{(}\AttributeTok{color =} \StringTok{"steelblue"}\NormalTok{, }\AttributeTok{linewidth =} \DecValTok{1}\NormalTok{) }\SpecialCharTok{+}
-  \FunctionTok{geom\_abline}\NormalTok{(}\AttributeTok{slope =} \DecValTok{1}\NormalTok{, }\AttributeTok{intercept =} \DecValTok{0}\NormalTok{, }\AttributeTok{linetype =} \StringTok{"dashed"}\NormalTok{, }\AttributeTok{color =} \StringTok{"grey50"}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{geom\_line}\NormalTok{(}\AttributeTok{color =}\NormalTok{ clr\_primary, }\AttributeTok{linewidth =} \DecValTok{1}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{geom\_abline}\NormalTok{(}\AttributeTok{slope =} \DecValTok{1}\NormalTok{, }\AttributeTok{intercept =} \DecValTok{0}\NormalTok{, }\AttributeTok{linetype =} \StringTok{"dashed"}\NormalTok{, }\AttributeTok{color =}\NormalTok{ clr\_neutral) }\SpecialCharTok{+}
   \FunctionTok{labs}\NormalTok{(}
     \AttributeTok{title =} \StringTok{"GLM Binomial – ROC Curve"}\NormalTok{,}
-    \AttributeTok{subtitle =} \FunctionTok{paste0}\NormalTok{(}\StringTok{"AUC = "}\NormalTok{, }\FunctionTok{round}\NormalTok{(auc\_val, }\DecValTok{3}\NormalTok{)),}
+    \AttributeTok{subtitle =} \FunctionTok{paste0}\NormalTok{(}\StringTok{"AUC = "}\NormalTok{, }\FunctionTok{round}\NormalTok{(glm\_auc\_val, }\DecValTok{3}\NormalTok{)),}
     \AttributeTok{x =} \StringTok{"False Positive Rate"}\NormalTok{,}
     \AttributeTok{y =} \StringTok{"True Positive Rate"}
 \NormalTok{  ) }\SpecialCharTok{+}
-  \FunctionTok{theme\_minimal}\NormalTok{()}
+\NormalTok{  report\_theme}
 \end{Highlighting}
 \end{Shaded}
 
-\pandocbounded{\includegraphics[keepaspectratio]{report_files/report_files/figure-latex/glm-binomial-roc-1.pdf}}
+\begin{center}\includegraphics{report_files/figure-latex/glm-binomial-roc-1} \end{center}
 
-The ROC curve traces the model's sensitivity against its false positive
-rate as the classification threshold varies from 0 to 1. The dashed
-diagonal represents a model that predicts at random (AUC = 0.5). The
-further the blue curve bows toward the top-left corner, the better the
-model separates the two classes regardless of threshold choice. With an
-AUC of 0.832, the model correctly ranks a randomly drawn
-high-consumption day above a randomly drawn low-consumption day 83.2\%
+With an AUC of 0.896, the model correctly ranks a randomly drawn
+high-consumption day above a randomly drawn low-consumption day 89.6\%
 of the time, which is a meaningful improvement over chance.
 
 \subsubsection{Model Diagnostics}\label{model-diagnostics-2}
+
+The confusion matrix shows the model's classifications on the held-out
+test set. The model correctly identifies 63.5\% of true high-
+consumption days (sensitivity) and 92.6\% of true low-consumption days
+(specificity). Because the per-household 75th percentile produces a
+75/25 class split, a naive classifier that always predicts normal would
+achieve around 74.7\% accuracy. The model's accuracy of 85.2\% is only
+10.5 percentage points above this baseline, so AUC is the more
+informative metric.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -1214,7 +1157,7 @@ of the time, which is a meaningful improvement over chance.
   \AttributeTok{Count =} \FunctionTok{c}\NormalTok{(tn, fn, fp, tp),}
   \AttributeTok{Label =} \FunctionTok{c}\NormalTok{(}\StringTok{"TN"}\NormalTok{, }\StringTok{"FN"}\NormalTok{, }\StringTok{"FP"}\NormalTok{, }\StringTok{"TP"}\NormalTok{)}
 \NormalTok{)}
-\FunctionTok{ggplot}\NormalTok{(conf\_df, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ Actual, }\AttributeTok{y =}\NormalTok{ Predicted, }\AttributeTok{fill =}\NormalTok{ Count)) }\SpecialCharTok{+}
+\FunctionTok{ggplot}\NormalTok{(conf\_df, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ Actual, }\AttributeTok{y =}\NormalTok{ Predicted, }\AttributeTok{fill =}\NormalTok{ Label)) }\SpecialCharTok{+}
   \FunctionTok{geom\_tile}\NormalTok{(}\AttributeTok{color =} \StringTok{"white"}\NormalTok{, }\AttributeTok{linewidth =} \FloatTok{1.2}\NormalTok{) }\SpecialCharTok{+}
   \FunctionTok{geom\_text}\NormalTok{(}
     \FunctionTok{aes}\NormalTok{(}\AttributeTok{label =} \FunctionTok{paste0}\NormalTok{(Label, }\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{, Count)),}
@@ -1222,7 +1165,8 @@ of the time, which is a meaningful improvement over chance.
     \AttributeTok{fontface =} \StringTok{"bold"}\NormalTok{,}
     \AttributeTok{color =} \StringTok{"white"}
 \NormalTok{  ) }\SpecialCharTok{+}
-  \FunctionTok{scale\_fill\_gradient}\NormalTok{(}\AttributeTok{low =} \StringTok{"steelblue"}\NormalTok{, }\AttributeTok{high =} \StringTok{"tomato"}\NormalTok{) }\SpecialCharTok{+}
+\FunctionTok{scale\_fill\_manual}\NormalTok{(}\AttributeTok{values =} \FunctionTok{c}\NormalTok{(}\StringTok{"TN"} \OtherTok{=}\NormalTok{ clr\_primary, }\StringTok{"TP"} \OtherTok{=}\NormalTok{ clr\_primary,}
+                             \StringTok{"FP"} \OtherTok{=}\NormalTok{ clr\_secondary, }\StringTok{"FN"} \OtherTok{=}\NormalTok{ clr\_secondary)) }\SpecialCharTok{+}
   \FunctionTok{scale\_x\_discrete}\NormalTok{(}\AttributeTok{labels =} \FunctionTok{c}\NormalTok{(}\StringTok{"0"} \OtherTok{=} \StringTok{"Low (0)"}\NormalTok{, }\StringTok{"1"} \OtherTok{=} \StringTok{"High (1)"}\NormalTok{)) }\SpecialCharTok{+}
   \FunctionTok{scale\_y\_discrete}\NormalTok{(}\AttributeTok{labels =} \FunctionTok{c}\NormalTok{(}\StringTok{"0"} \OtherTok{=} \StringTok{"Low (0)"}\NormalTok{, }\StringTok{"1"} \OtherTok{=} \StringTok{"High (1)"}\NormalTok{)) }\SpecialCharTok{+}
   \FunctionTok{labs}\NormalTok{(}
@@ -1233,63 +1177,84 @@ of the time, which is a meaningful improvement over chance.
       \StringTok{"  |  F1 = "}\NormalTok{,}
       \FunctionTok{round}\NormalTok{(f1, }\DecValTok{3}\NormalTok{),}
       \StringTok{"  |  AUC = "}\NormalTok{,}
-      \FunctionTok{round}\NormalTok{(auc\_val, }\DecValTok{3}\NormalTok{)}
+      \FunctionTok{round}\NormalTok{(glm\_auc\_val, }\DecValTok{3}\NormalTok{)}
 \NormalTok{    ),}
     \AttributeTok{x =} \StringTok{"Actual class"}\NormalTok{,}
     \AttributeTok{y =} \StringTok{"Predicted class"}\NormalTok{,}
     \AttributeTok{fill =} \StringTok{"Count"}
 \NormalTok{  ) }\SpecialCharTok{+}
-  \FunctionTok{theme\_minimal}\NormalTok{(}\AttributeTok{base\_size =} \DecValTok{13}\NormalTok{) }\SpecialCharTok{+}
+\NormalTok{  report\_theme }\SpecialCharTok{+}
   \FunctionTok{theme}\NormalTok{(}\AttributeTok{legend.position =} \StringTok{"none"}\NormalTok{, }\AttributeTok{panel.grid =} \FunctionTok{element\_blank}\NormalTok{())}
 \end{Highlighting}
 \end{Shaded}
 
-\pandocbounded{\includegraphics[keepaspectratio]{report_files/report_files/figure-latex/glm-binomial-confmat-1.pdf}}
+\begin{center}\includegraphics{report_files/figure-latex/glm-binomial-confmat-1} \end{center}
 
-The confusion matrix shows the model's classifications on the held-out
-test set. The model correctly identifies 77.2\% of true high-
-consumption days (sensitivity) and 75.6\% of true low- consumption days
-(specificity). Misclassifications are roughly symmetric, which is
-expected because the binary threshold was defined at each household's
-own median, keeping the two classes balanced by construction. The
-remaining errors occur mainly on days where consumption is only
-marginally above or below average and therefore genuinely ambiguous.
+The remaining errors occur mainly on days where consumption is only
+marginally above or below the household's personal threshold and
+therefore genuinely ambiguous. The F1 score of 0.685 summarises the
+balance between precision and recall into a single number, useful here
+because the 75/25 class split means accuracy alone is misleading. The
+AUC of 0.896 measures the model's ability to rank a randomly drawn
+high-consumption day above a randomly drawn low-consumption day,
+regardless of the classification threshold chosen. Together, F1 and AUC
+confirm that the model performs well beyond what the modest accuracy
+gain over the naive baseline suggests.
 
 \subsubsection{Key Findings}\label{key-findings-1}
 
 \begin{itemize}
 \tightlist
 \item
-  Overall classification accuracy is 76.4\% on the held- out test set,
-  with an AUC of 0.832.
+  The model achieves an AUC of 0.896 and an accuracy of 85.2\% on the
+  held-out test set, compared to a naive baseline of 74.7\%. AUC is the
+  more informative metric given the 75/25 class split.
 \item
-  \textbf{Building type} is the dominant predictor: houses have
-  substantially higher odds of high consumption than flats, driven by
-  larger floor areas and greater heating demand.
+  \textbf{Weekend is the dominant predictor} (OR = 1.57). Occupancy
+  patterns, not structural characteristics, are the strongest driver of
+  within-household demand spikes.
 \item
-  \textbf{Ground-source heat pumps} reduce the odds of high consumption
-  relative to air-source systems, reflecting their higher seasonal
-  efficiency.
+  \textbf{Building type, heat pump type, living area, floor heating, and
+  number of residents are all non-significant.} The per-household
+  threshold neutralises these structural differences. The model is
+  explaining day-to-day variation around each household's own baseline,
+  not variation between households.
 \item
-  \textbf{Weather effects} (heating degree days, temperature) operate as
-  expected but are secondary to structural household characteristics.
+  \textbf{Cold weather drives high-consumption days} through both the
+  temperature coefficient (OR = 0.823 per °C) and HDD (OR = 1.064 per
+  HDD).
 \item
-  The model is well-calibrated: sensitivity and specificity are nearly
-  equal, reflecting the balanced binary outcome defined at each
-  household's own median.
+  \textbf{Spring and autumn are low-risk seasons.} April and October
+  show the largest reductions relative to January. June and July are not
+  significantly different from January, indicating that some households
+  generate high-consumption days in summer as well, likely from cooling
+  or increased hot water use.
+\item
+  \textbf{Sensitivity of 63.5\%} means the model correctly flags roughly
+  two thirds of actual high-consumption days but also misses one in
+  three demand spikes entirely. A client using this model for
+  operational alerting should be aware of this limitation.
 \end{itemize}
 
 \subsubsection{Conclusion}\label{conclusion-2}
 
-The GLM Binomial achieves an overall accuracy of 76.4\% and an AUC of
-0.832. Building type and heat pump technology are the dominant
-structural drivers of whether a household-day is classified as
-high-consumption. Weather effects are present but secondary. The model
-provides a transparent and interpretable baseline for consumption
-classification and lays the groundwork for comparison with more flexible
-methods in the following sections.
+The GLM Binomial achieves an AUC of 0.896 and a sensitivity of 63.5\%
+using a per-household 75th percentile threshold. The sensitivity of
+63.5\% is a known limitation, one in three high-consumption days goes
+undetected, which should be weighed against the strong AUC of 0.896 when
+deciding whether this model is sufficient for operational use. The most
+important finding is that structural household characteristics (building
+type, heat pump type, size, and number of residents) become
+non-significant once the model conditions on each household's own
+baseline. Day-to-day variation in consumption is driven primarily by
+weekend occupancy and cold weather, not by what kind of building or heat
+pump a household has.
 
-\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+For the client, this means that demand spikes at the household level are
+predictable from calendar and weather information alone, without needing
+to know anything about the household's physical characteristics. The
+model is transparent, interpretable, and provides a well-founded
+baseline for comparison with more flexible classification methods.
 
 \subsection{Generalised Additive Model (GAM)}\label{gam}
 
@@ -1299,16 +1264,19 @@ methods in the following sections.
 
 The Linear Model assumes that each predictor affects the response in a
 straight line. For energy consumption, this is often too rigid. The
-relationship between outdoor temperature and electricity use may
-accelerate sharply below a certain cold threshold, and living area may
-show diminishing returns at very large sizes. A \textbf{Generalised
+relationship between heating demand and electricity use may differ
+between houses and flats, and between heat pump types, in ways that
+cannot be captured by fixed linear slopes. A \textbf{Generalised
 Additive Model (GAM)} relaxes this assumption by replacing fixed slopes
 with flexible smooth functions, while remaining fully interpretable
-through its component plots. Here we model \texttt{log\_kWh\_total}, the
-daily total electricity consumption on a log scale, using the same key
-predictors as the Linear Model. This allows a direct comparison of
-predictive performance and a visual check on whether non-linearity is
-actually present in the data.
+through its component plots. Here we model \texttt{log\_kWh\_total}
+using \textbf{exactly the same predictors as the extended Linear Model},
+namely heating degree days (interacted with building type and heat pump
+type), sunshine hours, humidity, living area, and the number of
+residents. The GAM replaces the LM's explicit interaction terms with
+\texttt{by\ =} smooths, which allow the shape of the heating-demand
+curve to vary freely between groups. This makes the comparison between
+the two models direct and fair.
 
 \subsubsection{Model Setup}\label{model-setup-3}
 
@@ -1318,10 +1286,12 @@ actually present in the data.
   \FunctionTok{select}\NormalTok{(}
 \NormalTok{    log\_kWh\_total,}
 \NormalTok{    heating\_degree\_days,}
-\NormalTok{    temp\_avg,}
+\NormalTok{    sunshine\_hours,}
+\NormalTok{    humidity\_avg,}
 \NormalTok{    living\_area,}
 \NormalTok{    building\_type,}
-\NormalTok{    heatpump\_type}
+\NormalTok{    heatpump\_type,}
+\NormalTok{    n\_residents}
 \NormalTok{  ) }\SpecialCharTok{|\textgreater{}}
   \FunctionTok{drop\_na}\NormalTok{()}
 
@@ -1334,134 +1304,238 @@ actually present in the data.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\ControlFlowTok{if}\NormalTok{ (}\SpecialCharTok{!}\FunctionTok{file.exists}\NormalTok{(}\StringTok{"../models/gam/gam\_model.rds"}\NormalTok{)) \{}
+\ControlFlowTok{if}\NormalTok{ (}\SpecialCharTok{!}\FunctionTok{file.exists}\NormalTok{(}\StringTok{"../models/gam/gam\_model\_v2.rds"}\NormalTok{)) \{}
 \NormalTok{  model\_gam }\OtherTok{\textless{}{-}}\NormalTok{ mgcv}\SpecialCharTok{::}\FunctionTok{gam}\NormalTok{(}
-\NormalTok{    log\_kWh\_total }\SpecialCharTok{\textasciitilde{}} \FunctionTok{s}\NormalTok{(heating\_degree\_days) }\SpecialCharTok{+}
-      \FunctionTok{s}\NormalTok{(temp\_avg) }\SpecialCharTok{+}
-      \FunctionTok{s}\NormalTok{(living\_area) }\SpecialCharTok{+}
+\NormalTok{    log\_kWh\_total }\SpecialCharTok{\textasciitilde{}}
+      \FunctionTok{s}\NormalTok{(heating\_degree\_days, }\AttributeTok{by =}\NormalTok{ building\_type) }\SpecialCharTok{+}
+      \FunctionTok{s}\NormalTok{(heating\_degree\_days, }\AttributeTok{by =}\NormalTok{ heatpump\_type) }\SpecialCharTok{+}
 \NormalTok{      building\_type }\SpecialCharTok{+}
-\NormalTok{      heatpump\_type,}
+\NormalTok{      heatpump\_type }\SpecialCharTok{+}
+      \FunctionTok{s}\NormalTok{(sunshine\_hours) }\SpecialCharTok{+}
+      \FunctionTok{s}\NormalTok{(humidity\_avg) }\SpecialCharTok{+}
+      \FunctionTok{s}\NormalTok{(living\_area) }\SpecialCharTok{+}
+\NormalTok{      n\_residents,}
     \AttributeTok{family =}\NormalTok{ gaussian,}
     \AttributeTok{data =}\NormalTok{ gam\_train}
 \NormalTok{  )}
-  \FunctionTok{saveRDS}\NormalTok{(model\_gam, }\StringTok{"../models/gam/gam\_model.rds"}\NormalTok{)}
+  \FunctionTok{saveRDS}\NormalTok{(model\_gam, }\StringTok{"../models/gam/gam\_model\_v2.rds"}\NormalTok{)}
 \NormalTok{\} }\ControlFlowTok{else}\NormalTok{ \{}
-\NormalTok{  model\_gam }\OtherTok{\textless{}{-}} \FunctionTok{readRDS}\NormalTok{(}\StringTok{"../models/gam/gam\_model.rds"}\NormalTok{)}
+\NormalTok{  model\_gam }\OtherTok{\textless{}{-}} \FunctionTok{readRDS}\NormalTok{(}\StringTok{"../models/gam/gam\_model\_v2.rds"}\NormalTok{)}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
 
-The model uses three continuous predictors as smooth terms and two
-categorical predictors as parametric terms. The smooth terms allow each
-continuous variable to enter the model with a flexible, data-driven
-shape. The model is fitted via the \texttt{mgcv} package using penalised
-regression splines with automatic smoothness selection.
+The model uses \texttt{by\ =} smooths for heating degree days, which
+allow the heating- demand curve to take a completely different shape for
+each building type and heat pump type, equivalent to the interaction
+terms in the extended LM but without constraining the relationship to be
+linear. All smooths are penalised regression splines with automatic
+smoothness selection via restricted maximum likelihood.
+
+\begin{align}
+\log(\text{kWh}_i) = \; & \alpha + \beta_1 \text{building type}_i + \beta_2 \text{heatpump type}_i + \beta_3 \text{n residents}_i \\
+& + s(\text{HDD}_i \mid \text{building type}_i) + s(\text{HDD}_i \mid \text{heatpump type}_i) \\
+& + s(\text{sunshine hours}_i) + s(\text{humidity avg}_i) + s(\text{living area}_i) + \epsilon_i
+\end{align}
+
+where \(s(\cdot)\) denotes penalised regression splines with automatic
+smoothness selection via Restricted Maximum Likelihood (REML), which
+balances fit and smoothness automatically, and the \(by =\) smooths
+allow the shape of the heating-demand curve to vary freely between
+groups rather than constraining it to a fixed linear slope.
 
 \subsubsection{Model Results}\label{model-results-3}
+
+The table below summarises the estimated degrees of freedom, F-statistic
+and significance for each smooth term in the model.
 
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{s\_gam }\OtherTok{\textless{}{-}} \FunctionTok{summary}\NormalTok{(model\_gam)}
-\NormalTok{coef\_p }\OtherTok{\textless{}{-}}\NormalTok{ s\_gam}\SpecialCharTok{$}\NormalTok{p.coef}
-\NormalTok{se\_p }\OtherTok{\textless{}{-}}\NormalTok{ s\_gam}\SpecialCharTok{$}\NormalTok{se}
-\NormalTok{coef\_df\_gam }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{(}
-  \AttributeTok{term =} \FunctionTok{names}\NormalTok{(coef\_p),}
-  \AttributeTok{estimate =} \FunctionTok{round}\NormalTok{(coef\_p, }\DecValTok{4}\NormalTok{),}
-  \AttributeTok{se =} \FunctionTok{round}\NormalTok{(se\_p[}\FunctionTok{names}\NormalTok{(coef\_p)], }\DecValTok{4}\NormalTok{),}
-  \AttributeTok{effect\_pct =} \FunctionTok{round}\NormalTok{((}\FunctionTok{exp}\NormalTok{(coef\_p) }\SpecialCharTok{{-}} \DecValTok{1}\NormalTok{) }\SpecialCharTok{*} \DecValTok{100}\NormalTok{, }\DecValTok{1}\NormalTok{)}
-\NormalTok{)}
-\FunctionTok{print}\NormalTok{(coef\_df\_gam)}
+\NormalTok{s\_tab }\OtherTok{\textless{}{-}} \FunctionTok{as.data.frame}\NormalTok{(s\_gam}\SpecialCharTok{$}\NormalTok{s.table)}
+\NormalTok{s\_tab }\OtherTok{\textless{}{-}} \FunctionTok{cbind}\NormalTok{(}\AttributeTok{Term =} \FunctionTok{rownames}\NormalTok{(s\_tab), s\_tab)}
+\NormalTok{knitr}\SpecialCharTok{::}\FunctionTok{kable}\NormalTok{(}
+  \FunctionTok{data.frame}\NormalTok{(}
+    \AttributeTok{Term =}\NormalTok{ s\_tab}\SpecialCharTok{$}\NormalTok{Term,}
+    \AttributeTok{EDF =} \FunctionTok{round}\NormalTok{(s\_tab}\SpecialCharTok{$}\NormalTok{edf, }\DecValTok{1}\NormalTok{),}
+    \AttributeTok{F =} \FunctionTok{round}\NormalTok{(s\_tab}\SpecialCharTok{$}\NormalTok{F, }\DecValTok{2}\NormalTok{),}
+    \AttributeTok{p.value =} \FunctionTok{formatC}\NormalTok{(s\_tab[[}\StringTok{"p{-}value"}\NormalTok{]], }\AttributeTok{digits =} \DecValTok{3}\NormalTok{, }\AttributeTok{format =} \StringTok{"g"}\NormalTok{)}
+\NormalTok{  ),}
+  \AttributeTok{caption =} \StringTok{"GAM – Smooth Terms"}\NormalTok{,}
+  \AttributeTok{col.names =} \FunctionTok{c}\NormalTok{(}\StringTok{"Smooth Term"}\NormalTok{, }\StringTok{"EDF"}\NormalTok{, }\StringTok{"F"}\NormalTok{, }\StringTok{"p{-}value"}\NormalTok{),}
+  \AttributeTok{row.names =} \ConstantTok{FALSE}
+\NormalTok{) }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{kable\_styling}\NormalTok{(}\AttributeTok{bootstrap\_options =} \FunctionTok{c}\NormalTok{(}\StringTok{"striped"}\NormalTok{, }\StringTok{"hover"}\NormalTok{), }\AttributeTok{full\_width =} \ConstantTok{TRUE}\NormalTok{)}
 \end{Highlighting}
 \end{Shaded}
 
-\begin{verbatim}
-##                                                  term estimate     se
-## (Intercept)                               (Intercept)   2.8524 0.0319
-## building_typehouse                 building_typehouse   0.1068 0.0323
-## heatpump_typeground-source heatpump_typeground-source  -0.1333 0.0062
-##                            effect_pct
-## (Intercept)                    1632.9
-## building_typehouse               11.3
-## heatpump_typeground-source      -12.5
-\end{verbatim}
+\begin{longtabu} to \linewidth {>{\raggedright}X>{\raggedleft}X>{\raggedleft}X>{\raggedright}X}
+\caption{\label{tab:gam-smooth-table}GAM – Smooth Terms}\\
+\toprule
+Smooth Term & EDF & F & p-value\\
+\midrule
+s(heating\_degree\_days):building\_typeappartment & 0.8 & 1.34 & 0.316\\
+s(heating\_degree\_days):building\_typehouse & 5.3 & 26.79 & 0\\
+s(heating\_degree\_days):heatpump\_typeair-source & 1.7 & 10.64 & 1.38e-05\\
+s(heating\_degree\_days):heatpump\_typeground-source & 1.3 & 5.43 & 0.00523\\
+s(sunshine\_hours) & 6.5 & 34.95 & 0\\
+\addlinespace
+s(humidity\_avg) & 5.3 & 1.69 & 0.118\\
+s(living\_area) & 9.0 & 417.39 & 0\\
+\bottomrule
+\end{longtabu}
 
-The parametric coefficients are additive shifts on the log scale.
-Converting with \texttt{(exp(coef)\ -\ 1)\ ×\ 100} gives the
-\textbf{percentage difference in daily kWh} relative to the reference
-category (flat, air-source heat pump), all else equal:
+The smooth terms reveal where non-linearity is present in the data.
 
 \begin{itemize}
 \tightlist
 \item
-  \textbf{Houses vs.~flats:} Houses consume \textbf{11.3\% more}
-  electricity per day on average. Given a median daily consumption of
-  around 21 kWh, this corresponds to roughly 2.4 additional kWh per day.
-  This is a modest but statistically reliable difference that likely
-  reflects greater floor area rather than less efficient behaviour.
+  \textbf{s(HDD):flat (edf = 0.8):} The smooth shows a mild positive
+  trend but with a very wide confidence band, reflecting high
+  uncertainty. The non-significance (p = 0.316) is due to this
+  uncertainty rather than the effect being absent. For flats, colder
+  days are associated with higher consumption but the uncertainty is too
+  large to pin down the exact shape of this relationship. This likely
+  reflects higher variability in flat consumption patterns rather than
+  the absence of a heating effect.
 \item
-  \textbf{Ground-source vs.~air-source heat pump:} Households with a
-  ground-source heat pump consume \textbf{12.5\% less} electricity per
-  day. Ground-source systems extract heat from the ground at a stable
-  temperature year-round, making them significantly more efficient than
-  air-source systems. Air-source systems struggle in very cold weather
-  and must work harder to maintain indoor temperatures.
+  \textbf{s(HDD):house (edf = 5.3):} Highly significant (p \textless{}
+  0.001) and strongly non-linear. For houses, the response to cold
+  weather is strongly non-linear and highly certain, consumption
+  accelerates disproportionately on the coldest days, meaning a simple
+  straight-line assumption would underestimate peak heating demand.
+\item
+  \textbf{s(HDD):air-source (edf = 1.7):} Air-source heat pumps show a
+  near-linear but slightly curved response to heating demand,
+  consumption rises steadily with cold weather with only a mild bend in
+  the relationship.
+\item
+  \textbf{s(HDD):ground-source (edf = 1.3):} Nearly linear and
+  significant (p = 0.005). Ground-source heat pumps respond to cold
+  weather in a stable and nearly linear fashion, making their
+  consumption the most predictable of all groups.
+\item
+  \textbf{s(sunshine\_hours) (edf = 6.5):} Highly significant (p
+  \textless{} 0.001) and strongly non-linear. More sunshine generally
+  reduces consumption through passive solar gain, but the relationship
+  is not a simple straight line. The effect levels off at moderate
+  sunshine hours and rises again at very high values, suggesting that on
+  the sunniest days some households switch their reversible heat pump to
+  cooling mode, increasing electricity consumption.
+\item
+  \textbf{s(humidity\_avg) (edf = 5.3):} Non-linear in shape but not
+  significant overall (p = 0.118). Humidity may interact with perceived
+  temperature in ways not fully captured here. It is retained to enable
+  a direct and controlled comparison between the LM and GAM on identical
+  predictors. Dropping it did not meaningfully change the other
+  coefficients.
+\item
+  \textbf{s(living\_area) (edf = 9.0):} Highly significant (p
+  \textless{} 0.001) and the most non-linear term. Consumption does not
+  scale proportionally with floor area, medium-sized homes behave
+  differently from small or very large ones. Consumption peaks around
+  500--600 m² and then declines sharply at very large living areas,
+  which may reflect more energy-efficient construction in larger or
+  newer buildings.
 \end{itemize}
 
-The smooth terms reveal where non-linearity is present in the continuous
-predictors:
+The parametric terms capture the baseline level shifts between groups
+and are summarised in the table below.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p\_tab }\OtherTok{\textless{}{-}} \FunctionTok{as.data.frame}\NormalTok{(s\_gam}\SpecialCharTok{$}\NormalTok{p.table)}
+\NormalTok{p\_tab }\OtherTok{\textless{}{-}} \FunctionTok{cbind}\NormalTok{(}\AttributeTok{Term =} \FunctionTok{rownames}\NormalTok{(p\_tab), p\_tab)}
+\NormalTok{knitr}\SpecialCharTok{::}\FunctionTok{kable}\NormalTok{(}
+  \FunctionTok{data.frame}\NormalTok{(}
+    \AttributeTok{Term =}\NormalTok{ p\_tab}\SpecialCharTok{$}\NormalTok{Term,}
+    \AttributeTok{Est =} \FunctionTok{round}\NormalTok{(p\_tab}\SpecialCharTok{$}\NormalTok{Estimate, }\DecValTok{4}\NormalTok{),}
+    \AttributeTok{SE =} \FunctionTok{round}\NormalTok{(p\_tab[[}\StringTok{"Std. Error"}\NormalTok{]], }\DecValTok{4}\NormalTok{),}
+    \AttributeTok{t.val =} \FunctionTok{round}\NormalTok{(p\_tab[[}\StringTok{"t value"}\NormalTok{]], }\DecValTok{2}\NormalTok{),}
+    \AttributeTok{p.value =} \FunctionTok{formatC}\NormalTok{(p\_tab[[}\StringTok{"Pr(\textgreater{}|t|)"}\NormalTok{]], }\AttributeTok{digits =} \DecValTok{3}\NormalTok{, }\AttributeTok{format =} \StringTok{"g"}\NormalTok{)}
+\NormalTok{  ),}
+  \AttributeTok{caption =} \StringTok{"GAM – Parametric Terms"}\NormalTok{,}
+  \AttributeTok{col.names =} \FunctionTok{c}\NormalTok{(}\StringTok{"Term"}\NormalTok{, }\StringTok{"Estimate"}\NormalTok{, }\StringTok{"Std. Error"}\NormalTok{, }\StringTok{"t{-}value"}\NormalTok{, }\StringTok{"p{-}value"}\NormalTok{),}
+  \AttributeTok{row.names =} \ConstantTok{FALSE}
+\NormalTok{) }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{kable\_styling}\NormalTok{(}\AttributeTok{bootstrap\_options =} \FunctionTok{c}\NormalTok{(}\StringTok{"striped"}\NormalTok{, }\StringTok{"hover"}\NormalTok{), }\AttributeTok{full\_width =} \ConstantTok{TRUE}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{longtabu} to \linewidth {>{\raggedright}X>{\raggedleft}X>{\raggedleft}X>{\raggedleft}X>{\raggedright}X}
+\caption{\label{tab:gam-parametric-table}GAM – Parametric Terms}\\
+\toprule
+Term & Estimate & Std. Error & t-value & p-value\\
+\midrule
+(Intercept) & 2.5659 & 0.0331 & 77.62 & 0\\
+building\_typehouse & 0.0192 & 0.0331 & 0.58 & 0.562\\
+heatpump\_typeground-source & -0.1437 & 0.0065 & -22.09 & 8.13e-108\\
+n\_residents & 0.1297 & 0.0030 & 43.62 & 0\\
+\bottomrule
+\end{longtabu}
+
+While the \texttt{by\ =} smooths allow the heating-demand curve to
+differ in shape. Converting the parametric estimates with
+\texttt{(exp(coef)\ -\ 1)\ ×\ 100} gives the percentage difference
+relative to the reference level (flat, air-source heat pump).
 
 \begin{itemize}
 \tightlist
 \item
-  \textbf{s(heating\_degree\_days), edf = 1.0:} The smooth collapsed to
-  a perfect straight line. Heating demand has a strictly linear effect
-  on log(kWh), meaning every additional degree-day adds the same
-  proportional increase in consumption. No threshold effects or
-  accelerations are present.
+  \textbf{Houses vs.~flats:} The parametric term for
+  \texttt{building\_typehouse} is small and not statistically
+  significant (p = 0.562). Once the model fits a separate heating-demand
+  curve per building type, the baseline intercept gap disappears. The
+  difference between building types is captured entirely by how they
+  respond to cold weather, not by a flat shift.
 \item
-  \textbf{s(temp\_avg), edf = 7.0:} Highly non-linear. Temperature has a
-  complex, season-dependent effect on consumption that cannot be
-  captured with a single slope. This likely reflects the interplay
-  between outdoor temperature, heating demand, and household behaviour
-  across seasons.
+  \textbf{Ground-source vs.~air-source heat pump:} Ground-source systems
+  consume 13.4\% less electricity per day, all else equal (p \textless{}
+  0.001). This large reduction reflects the inherently higher efficiency
+  of ground-source heat pumps across all temperature conditions.
 \item
-  \textbf{s(living\_area), edf = 9.0:} The most non-linear term in the
-  model. The consumption-area relationship is not monotone, meaning
-  medium-sized homes may behave very differently from small or very
-  large ones. This possibly reflects different heating system
-  configurations or occupancy patterns.
+  \textbf{Number of residents:} Each additional resident adds 13.8\% to
+  daily consumption (p \textless{} 0.001), confirming that occupancy is
+  a meaningful driver of electricity demand.
 \end{itemize}
 
 \subsubsection{Visual Evidence}\label{visual-evidence-3}
 
+The component plots below visualise the estimated smooth function for
+each predictor, showing how each variable contributes to the predicted
+log consumption independently of the others.
+
 \begin{Shaded}
 \begin{Highlighting}[]
-\FunctionTok{par}\NormalTok{(}\AttributeTok{mfrow =} \FunctionTok{c}\NormalTok{(}\DecValTok{1}\NormalTok{, }\DecValTok{3}\NormalTok{), }\AttributeTok{mar =} \FunctionTok{c}\NormalTok{(}\DecValTok{4}\NormalTok{, }\DecValTok{4}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{1}\NormalTok{))}
-\FunctionTok{plot}\NormalTok{(}
+\NormalTok{gratia}\SpecialCharTok{::}\FunctionTok{draw}\NormalTok{(}
 \NormalTok{  model\_gam,}
-  \AttributeTok{shade =} \ConstantTok{TRUE}\NormalTok{,}
-  \AttributeTok{seWithMean =} \ConstantTok{TRUE}\NormalTok{,}
-  \AttributeTok{ylab =} \StringTok{"Effect on log(kWh\_total)"}\NormalTok{,}
-  \AttributeTok{residuals =} \ConstantTok{FALSE}
-\NormalTok{)}
+  \AttributeTok{residuals =} \ConstantTok{FALSE}\NormalTok{,}
+  \AttributeTok{ci\_level =} \FloatTok{0.95}\NormalTok{,}
+  \AttributeTok{smooth\_col =}\NormalTok{ clr\_primary,}
+  \AttributeTok{ci\_col =}\NormalTok{ clr\_primary}
+\NormalTok{) }\SpecialCharTok{\&}
+\NormalTok{  report\_theme }\SpecialCharTok{\&}
+  \FunctionTok{theme}\NormalTok{(}\AttributeTok{text =} \FunctionTok{element\_text}\NormalTok{(}\AttributeTok{size =} \DecValTok{9}\NormalTok{),}
+        \AttributeTok{axis.text =} \FunctionTok{element\_text}\NormalTok{(}\AttributeTok{size =} \DecValTok{8}\NormalTok{),}
+        \AttributeTok{strip.text =} \FunctionTok{element\_text}\NormalTok{(}\AttributeTok{size =} \DecValTok{9}\NormalTok{))}
 \end{Highlighting}
 \end{Shaded}
 
-\pandocbounded{\includegraphics[keepaspectratio]{report_files/report_files/figure-latex/gam-smooth-plots-1.pdf}}
+\begin{center}\includegraphics{report_files/figure-latex/gam-smooth-plots-1} \end{center}
 
-\begin{Shaded}
-\begin{Highlighting}[]
-\FunctionTok{par}\NormalTok{(}\AttributeTok{mfrow =} \FunctionTok{c}\NormalTok{(}\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{))}
-\end{Highlighting}
-\end{Shaded}
-
-Each panel shows the estimated smooth function for one continuous
-predictor. The y-axis is the additive contribution to
+The seven panels show the estimated smooth function for each term in the
+model. The y-axis is the additive contribution to
 \texttt{log\_kWh\_total}, where positive values increase predicted
-consumption and negative values decrease it. The shaded band is the 95\%
-confidence interval. The \textbf{effective degrees of freedom (edf)}
-indicates how curved the smooth is: edf = 1 means a straight line and
-higher values mean more complex shapes.
+consumption and negative values decrease it. The shaded bands are 95\%
+confidence intervals. The effective degrees of freedom (edf) on each
+panel title indicates curvature. An edf of 1 is a straight line and
+higher values indicate more complex shapes. The s(HDD):house smooth (edf
+= 5.3) shows the most visible curvature, confirming that cold-weather
+response is the main source of non-linearity for houses.
+
+To make the by = smooths more interpretable, the plots below show the
+model's predicted daily consumption on the original kWh scale, with all
+other predictors held at their median values.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -1471,8 +1545,10 @@ higher values mean more complex shapes.
     \FunctionTok{max}\NormalTok{(gam\_train}\SpecialCharTok{$}\NormalTok{heating\_degree\_days),}
     \AttributeTok{length.out =} \DecValTok{200}
 \NormalTok{  ),}
-  \AttributeTok{temp\_avg =} \FunctionTok{median}\NormalTok{(gam\_train}\SpecialCharTok{$}\NormalTok{temp\_avg),}
+  \AttributeTok{sunshine\_hours =} \FunctionTok{median}\NormalTok{(gam\_train}\SpecialCharTok{$}\NormalTok{sunshine\_hours),}
+  \AttributeTok{humidity\_avg =} \FunctionTok{median}\NormalTok{(gam\_train}\SpecialCharTok{$}\NormalTok{humidity\_avg),}
   \AttributeTok{living\_area =} \FunctionTok{median}\NormalTok{(gam\_train}\SpecialCharTok{$}\NormalTok{living\_area),}
+  \AttributeTok{n\_residents =} \FunctionTok{round}\NormalTok{(}\FunctionTok{median}\NormalTok{(gam\_train}\SpecialCharTok{$}\NormalTok{n\_residents)),}
   \AttributeTok{building\_type =} \FunctionTok{levels}\NormalTok{(gam\_train}\SpecialCharTok{$}\NormalTok{building\_type),}
   \AttributeTok{heatpump\_type =} \FunctionTok{levels}\NormalTok{(gam\_train}\SpecialCharTok{$}\NormalTok{heatpump\_type)[}\DecValTok{1}\NormalTok{]}
 \NormalTok{)}
@@ -1496,48 +1572,56 @@ higher values mean more complex shapes.
 \NormalTok{  ) }\SpecialCharTok{+}
   \FunctionTok{geom\_line}\NormalTok{(}\AttributeTok{linewidth =} \DecValTok{1}\NormalTok{) }\SpecialCharTok{+}
   \FunctionTok{labs}\NormalTok{(}
-    \AttributeTok{title =} \StringTok{"GAM – Predicted Daily Consumption by Heating Demand"}\NormalTok{,}
-    \AttributeTok{subtitle =} \StringTok{"Temperature and living area held at median; air{-}source heat pump"}\NormalTok{,}
+    \AttributeTok{title =} \StringTok{"GAM – Predicted Daily Consumption by Heating Demand and Building Type"}\NormalTok{,}
+    \AttributeTok{subtitle =} \StringTok{"Other predictors held at median; air{-}source heat pump"}\NormalTok{,}
     \AttributeTok{x =} \StringTok{"Heating Degree Days"}\NormalTok{,}
     \AttributeTok{y =} \StringTok{"Predicted kWh/day"}\NormalTok{,}
     \AttributeTok{color =} \StringTok{"Building type"}\NormalTok{,}
     \AttributeTok{fill =} \StringTok{"Building type"}
 \NormalTok{  ) }\SpecialCharTok{+}
-  \FunctionTok{theme\_minimal}\NormalTok{()}
+  \FunctionTok{scale\_colour\_manual}\NormalTok{(}\AttributeTok{values =}\NormalTok{ clr\_builds) }\SpecialCharTok{+}
+  \FunctionTok{scale\_fill\_manual}\NormalTok{(}\AttributeTok{values =}\NormalTok{ clr\_builds) }\SpecialCharTok{+}
+\NormalTok{  report\_theme}
 \end{Highlighting}
 \end{Shaded}
 
-\pandocbounded{\includegraphics[keepaspectratio]{report_files/report_files/figure-latex/gam-pred-hdd-1.pdf}}
+\begin{center}\includegraphics{report_files/figure-latex/gam-pred-hdd-1} \end{center}
 
-This plot isolates the effect of heating demand on electricity
-consumption for houses compared to flats. The x-axis spans the full
-observed range of heating degree days, from warm summer days near zero
-to the coldest winter days. The key aspects to examine are whether
-consumption accelerates sharply at high HDD values, whether the gap
-between houses and flats widens in winter, and whether the confidence
-bands widen at the extremes due to fewer extreme cold days in the
-training data.
+This plot shows how the GAM's heating-demand curve differs between
+houses and flats. Both groups consume more electricity on colder days,
+but houses show a steeper and more curved response, particularly at high
+HDD values. This non-linearity, captured by the s(HDD):house smooth with
+edf = 5.3, would have been forced into a single linear slope by the LM's
+interaction term. The wider confidence band for flats at extreme cold
+values reflects lower sample density there.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{temp\_grid }\OtherTok{\textless{}{-}} \FunctionTok{expand.grid}\NormalTok{(}
-  \AttributeTok{temp\_avg =} \FunctionTok{seq}\NormalTok{(}
-    \FunctionTok{min}\NormalTok{(gam\_train}\SpecialCharTok{$}\NormalTok{temp\_avg),}
-    \FunctionTok{max}\NormalTok{(gam\_train}\SpecialCharTok{$}\NormalTok{temp\_avg),}
+\NormalTok{hp\_grid }\OtherTok{\textless{}{-}} \FunctionTok{expand.grid}\NormalTok{(}
+  \AttributeTok{heating\_degree\_days =} \FunctionTok{seq}\NormalTok{(}
+    \FunctionTok{min}\NormalTok{(gam\_train}\SpecialCharTok{$}\NormalTok{heating\_degree\_days),}
+    \FunctionTok{max}\NormalTok{(gam\_train}\SpecialCharTok{$}\NormalTok{heating\_degree\_days),}
     \AttributeTok{length.out =} \DecValTok{200}
 \NormalTok{  ),}
-  \AttributeTok{heating\_degree\_days =} \FunctionTok{median}\NormalTok{(gam\_train}\SpecialCharTok{$}\NormalTok{heating\_degree\_days),}
+  \AttributeTok{sunshine\_hours =} \FunctionTok{median}\NormalTok{(gam\_train}\SpecialCharTok{$}\NormalTok{sunshine\_hours),}
+  \AttributeTok{humidity\_avg =} \FunctionTok{median}\NormalTok{(gam\_train}\SpecialCharTok{$}\NormalTok{humidity\_avg),}
   \AttributeTok{living\_area =} \FunctionTok{median}\NormalTok{(gam\_train}\SpecialCharTok{$}\NormalTok{living\_area),}
-  \AttributeTok{building\_type =} \FunctionTok{levels}\NormalTok{(gam\_train}\SpecialCharTok{$}\NormalTok{building\_type),}
-  \AttributeTok{heatpump\_type =} \FunctionTok{levels}\NormalTok{(gam\_train}\SpecialCharTok{$}\NormalTok{heatpump\_type)[}\DecValTok{1}\NormalTok{]}
+  \AttributeTok{n\_residents =} \FunctionTok{round}\NormalTok{(}\FunctionTok{median}\NormalTok{(gam\_train}\SpecialCharTok{$}\NormalTok{n\_residents)),}
+  \AttributeTok{building\_type =} \FunctionTok{levels}\NormalTok{(gam\_train}\SpecialCharTok{$}\NormalTok{building\_type)[}\DecValTok{1}\NormalTok{],}
+  \AttributeTok{heatpump\_type =} \FunctionTok{levels}\NormalTok{(gam\_train}\SpecialCharTok{$}\NormalTok{heatpump\_type)}
 \NormalTok{)}
-\NormalTok{temp\_pred }\OtherTok{\textless{}{-}} \FunctionTok{predict}\NormalTok{(model\_gam, }\AttributeTok{newdata =}\NormalTok{ temp\_grid, }\AttributeTok{se.fit =} \ConstantTok{TRUE}\NormalTok{)}
-\NormalTok{temp\_grid}\SpecialCharTok{$}\NormalTok{fit }\OtherTok{\textless{}{-}}\NormalTok{ temp\_pred}\SpecialCharTok{$}\NormalTok{fit}
-\NormalTok{temp\_grid}\SpecialCharTok{$}\NormalTok{se }\OtherTok{\textless{}{-}}\NormalTok{ temp\_pred}\SpecialCharTok{$}\NormalTok{se.fit}
+\NormalTok{hp\_pred }\OtherTok{\textless{}{-}} \FunctionTok{predict}\NormalTok{(model\_gam, }\AttributeTok{newdata =}\NormalTok{ hp\_grid, }\AttributeTok{se.fit =} \ConstantTok{TRUE}\NormalTok{)}
+\NormalTok{hp\_grid}\SpecialCharTok{$}\NormalTok{fit }\OtherTok{\textless{}{-}}\NormalTok{ hp\_pred}\SpecialCharTok{$}\NormalTok{fit}
+\NormalTok{hp\_grid}\SpecialCharTok{$}\NormalTok{se }\OtherTok{\textless{}{-}}\NormalTok{ hp\_pred}\SpecialCharTok{$}\NormalTok{se.fit}
 
 \FunctionTok{ggplot}\NormalTok{(}
-\NormalTok{  temp\_grid,}
-  \FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ temp\_avg, }\AttributeTok{y =} \FunctionTok{exp}\NormalTok{(fit), }\AttributeTok{color =}\NormalTok{ building\_type, }\AttributeTok{fill =}\NormalTok{ building\_type)}
+\NormalTok{  hp\_grid,}
+  \FunctionTok{aes}\NormalTok{(}
+    \AttributeTok{x =}\NormalTok{ heating\_degree\_days,}
+    \AttributeTok{y =} \FunctionTok{exp}\NormalTok{(fit),}
+    \AttributeTok{color =}\NormalTok{ heatpump\_type,}
+    \AttributeTok{fill =}\NormalTok{ heatpump\_type}
+\NormalTok{  )}
 \NormalTok{) }\SpecialCharTok{+}
   \FunctionTok{geom\_ribbon}\NormalTok{(}
     \FunctionTok{aes}\NormalTok{(}\AttributeTok{ymin =} \FunctionTok{exp}\NormalTok{(fit }\SpecialCharTok{{-}} \FloatTok{1.96} \SpecialCharTok{*}\NormalTok{ se), }\AttributeTok{ymax =} \FunctionTok{exp}\NormalTok{(fit }\SpecialCharTok{+} \FloatTok{1.96} \SpecialCharTok{*}\NormalTok{ se)),}
@@ -1546,57 +1630,48 @@ training data.
 \NormalTok{  ) }\SpecialCharTok{+}
   \FunctionTok{geom\_line}\NormalTok{(}\AttributeTok{linewidth =} \DecValTok{1}\NormalTok{) }\SpecialCharTok{+}
   \FunctionTok{labs}\NormalTok{(}
-    \AttributeTok{title =} \StringTok{"GAM – Predicted Daily Consumption by Average Temperature"}\NormalTok{,}
-    \AttributeTok{subtitle =} \StringTok{"Other predictors held at median / reference level"}\NormalTok{,}
-    \AttributeTok{x =} \StringTok{"Average Temperature (°C)"}\NormalTok{,}
+    \AttributeTok{title =} \StringTok{"GAM – Predicted Daily Consumption by Heating Demand and Heat Pump Type"}\NormalTok{,}
+    \AttributeTok{subtitle =} \StringTok{"Other predictors held at median; flat building type"}\NormalTok{,}
+    \AttributeTok{x =} \StringTok{"Heating Degree Days"}\NormalTok{,}
     \AttributeTok{y =} \StringTok{"Predicted kWh/day"}\NormalTok{,}
-    \AttributeTok{color =} \StringTok{"Building type"}\NormalTok{,}
-    \AttributeTok{fill =} \StringTok{"Building type"}
+    \AttributeTok{color =} \StringTok{"Heat pump type"}\NormalTok{,}
+    \AttributeTok{fill =} \StringTok{"Heat pump type"}
 \NormalTok{  ) }\SpecialCharTok{+}
-  \FunctionTok{theme\_minimal}\NormalTok{()}
+  \FunctionTok{scale\_colour\_manual}\NormalTok{(}\AttributeTok{values =} \FunctionTok{c}\NormalTok{(}\StringTok{"air{-}source"} \OtherTok{=}\NormalTok{ clr\_primary, }\StringTok{"ground{-}source"} \OtherTok{=}\NormalTok{ clr\_secondary)) }\SpecialCharTok{+}
+  \FunctionTok{scale\_fill\_manual}\NormalTok{(}\AttributeTok{values =} \FunctionTok{c}\NormalTok{(}\StringTok{"air{-}source"} \OtherTok{=}\NormalTok{ clr\_primary, }\StringTok{"ground{-}source"} \OtherTok{=}\NormalTok{ clr\_secondary)) }\SpecialCharTok{+}
+\NormalTok{  report\_theme}
 \end{Highlighting}
 \end{Shaded}
 
-\pandocbounded{\includegraphics[keepaspectratio]{report_files/report_files/figure-latex/gam-pred-temp-1.pdf}}
+\begin{center}\includegraphics{report_files/figure-latex/gam-pred-heatpump-1} \end{center}
 
-This plot traces predicted consumption across the full temperature
-range. A monotone decreasing curve confirms that colder days drive
-higher consumption through heating demand. A U-shape at the warm end
-would indicate a summer cooling effect, where electric heat pumps run
-for cooling rather than heating. The width of the confidence band
-reveals where the model is most uncertain, which is typically at
-temperature extremes where fewer observations exist.
+This plot compares the predicted heating-demand curves for air-source
+and ground-source heat pumps. Ground-source systems consume consistently
+less electricity across the full range of heating demand. The
+near-linear shape of both curves (reflecting low edf for these smooths)
+suggests that heat pump type shifts the intercept of the heating
+response more than it changes its curvature. The stable gap confirms the
+large parametric coefficient for ground-source heat pumps identified
+above.
 
 \subsubsection{Model Diagnostics}\label{model-diagnostics-3}
 
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{fit\_df }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{(}
-  \AttributeTok{observed =}\NormalTok{ gam\_train}\SpecialCharTok{$}\NormalTok{log\_kWh\_total,}
-  \AttributeTok{fitted =} \FunctionTok{fitted}\NormalTok{(model\_gam)}
-\NormalTok{)}
-\FunctionTok{ggplot}\NormalTok{(fit\_df, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ fitted, }\AttributeTok{y =}\NormalTok{ observed)) }\SpecialCharTok{+}
-  \FunctionTok{geom\_point}\NormalTok{(}\AttributeTok{alpha =} \FloatTok{0.1}\NormalTok{, }\AttributeTok{size =} \FloatTok{0.6}\NormalTok{, }\AttributeTok{color =} \StringTok{"steelblue"}\NormalTok{) }\SpecialCharTok{+}
-  \FunctionTok{geom\_abline}\NormalTok{(}\AttributeTok{intercept =} \DecValTok{0}\NormalTok{, }\AttributeTok{slope =} \DecValTok{1}\NormalTok{, }\AttributeTok{color =} \StringTok{"tomato"}\NormalTok{, }\AttributeTok{linetype =} \StringTok{"dashed"}\NormalTok{) }\SpecialCharTok{+}
-  \FunctionTok{labs}\NormalTok{(}
-    \AttributeTok{title =} \StringTok{"GAM – Observed vs. Fitted"}\NormalTok{,}
-    \AttributeTok{x =} \StringTok{"Fitted log(kWh\_total)"}\NormalTok{,}
-    \AttributeTok{y =} \StringTok{"Observed log(kWh\_total)"}
-\NormalTok{  ) }\SpecialCharTok{+}
-  \FunctionTok{theme\_minimal}\NormalTok{()}
-\end{Highlighting}
-\end{Shaded}
+The plots below assess how well the model fits the training data and
+whether any systematic patterns remain in the residuals.
 
-\pandocbounded{\includegraphics[keepaspectratio]{report_files/report_files/figure-latex/gam-obs-vs-fitted-1.pdf}}
+\begin{center}\includegraphics[width=0.7\linewidth]{report_files/figure-latex/gam-obs-vs-fitted-1} \end{center}
 
 The dashed line is the ideal 1:1 line. A perfectly calibrated model
 would scatter all points along it symmetrically. Systematic deviations
 above or below indicate that the model consistently over- or
-under-estimates in certain consumption ranges. A fan shape with wider
-scatter at high fitted values would suggest that high-consumption days
-are inherently harder to predict, likely due to household-specific
-behaviour that the model cannot capture from weather and building
-characteristics alone.
+under-estimates in certain consumption ranges. The points follow the 1:1
+line reasonably well in the mid-range, confirming the model captures the
+main consumption patterns. A cluster of strongly negative observed
+values around fitted = 2.5 is visible, likely representing near-zero
+consumption days or data anomalies. At low fitted values the cloud sits
+slightly above the reference line, indicating mild underestimation
+there. Both patterns are consistent with a cross-sectional model that
+cannot account for individual household behaviour.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -1605,27 +1680,28 @@ characteristics alone.
   \AttributeTok{residuals =} \FunctionTok{residuals}\NormalTok{(model\_gam)}
 \NormalTok{)}
 \FunctionTok{ggplot}\NormalTok{(resid\_df, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ fitted, }\AttributeTok{y =}\NormalTok{ residuals)) }\SpecialCharTok{+}
-  \FunctionTok{geom\_point}\NormalTok{(}\AttributeTok{alpha =} \FloatTok{0.1}\NormalTok{, }\AttributeTok{size =} \FloatTok{0.6}\NormalTok{, }\AttributeTok{color =} \StringTok{"steelblue"}\NormalTok{) }\SpecialCharTok{+}
-  \FunctionTok{geom\_hline}\NormalTok{(}\AttributeTok{yintercept =} \DecValTok{0}\NormalTok{, }\AttributeTok{color =} \StringTok{"tomato"}\NormalTok{, }\AttributeTok{linetype =} \StringTok{"dashed"}\NormalTok{) }\SpecialCharTok{+}
-  \FunctionTok{geom\_smooth}\NormalTok{(}\AttributeTok{method =} \StringTok{"loess"}\NormalTok{, }\AttributeTok{se =} \ConstantTok{FALSE}\NormalTok{, }\AttributeTok{color =} \StringTok{"orange"}\NormalTok{, }\AttributeTok{linewidth =} \FloatTok{0.8}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{geom\_point}\NormalTok{(}\AttributeTok{alpha =} \FloatTok{0.1}\NormalTok{, }\AttributeTok{size =} \FloatTok{0.6}\NormalTok{, }\AttributeTok{color =}\NormalTok{ clr\_primary) }\SpecialCharTok{+}
+  \FunctionTok{geom\_hline}\NormalTok{(}\AttributeTok{yintercept =} \DecValTok{0}\NormalTok{, }\AttributeTok{color =}\NormalTok{ clr\_secondary, }\AttributeTok{linetype =} \StringTok{"dashed"}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{geom\_smooth}\NormalTok{(}\AttributeTok{method =} \StringTok{"loess"}\NormalTok{, }\AttributeTok{se =} \ConstantTok{FALSE}\NormalTok{, }\AttributeTok{color =}\NormalTok{ clr\_secondary, }\AttributeTok{linewidth =} \FloatTok{0.8}\NormalTok{) }\SpecialCharTok{+}
   \FunctionTok{labs}\NormalTok{(}
     \AttributeTok{title =} \StringTok{"GAM – Residuals vs. Fitted"}\NormalTok{,}
     \AttributeTok{x =} \StringTok{"Fitted log(kWh\_total)"}\NormalTok{,}
     \AttributeTok{y =} \StringTok{"Residuals"}
 \NormalTok{  ) }\SpecialCharTok{+}
-  \FunctionTok{theme\_minimal}\NormalTok{()}
+\NormalTok{  report\_theme}
 \end{Highlighting}
 \end{Shaded}
 
-\pandocbounded{\includegraphics[keepaspectratio]{report_files/report_files/figure-latex/gam-residuals-1.pdf}}
+\begin{center}\includegraphics{report_files/figure-latex/gam-residuals-1} \end{center}
 
-A well-fitting model shows residuals scattered randomly around zero. The
-orange smoother (loess) should be approximately flat. A curved smoother
-would indicate the model still misses a systematic pattern. A funnel
-shape (residual variance increasing with fitted values) would suggest
-heteroscedasticity: the model is less precise for high-consumption
-households, which is common when household- level effects are not
-explicitly modelled.
+The loess smoother is approximately flat and close to zero across most
+of the fitted range, indicating no major systematic bias. A slight
+negative dip is visible at low fitted values and a small downward drift
+appears at the high end. The vertical streaks of extreme negative
+residuals around fitted = 2 correspond to the same anomalous near-zero
+consumption days visible in the observed vs fitted plot. Residual
+variance is broadly stable across the fitted range with no strong funnel
+shape, suggesting heteroscedasticity is not a major concern.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -1651,30 +1727,35 @@ explicitly modelled.
 \end{Shaded}
 
 \begin{verbatim}
-## R² (test):          30.3%
-## MAE (kWh/day):     10.4 kWh
+## R² (test):          31.6%
+## MAE (kWh/day):     10.6 kWh
 ## Median consumption: 20.9 kWh/day
-## MAE as % of median: 49.8%
+## MAE as % of median: 50.5%
 \end{verbatim}
 
 The most interpretable performance metric here is the \textbf{mean
 absolute error in kWh}. On average, the model's daily consumption
-forecasts are off by \textbf{10.4 kWh}, against a median household
+forecasts are off by \textbf{10.6 kWh}, against a median household
 consumption of \textbf{20.9 kWh/day}. This means a typical prediction
-error of about \textbf{50\%} of a household's usual daily consumption.
-The model captures broad patterns such as cold days, large houses, and
-heat pump type, but cannot account for individual household behaviour
-like occupancy, working from home, or appliance usage on a given day.
+error of about \textbf{51\%} of a household's usual daily consumption.
+This is expected for a cross-sectional model of this type. Weather and
+building characteristics capture the structural drivers of demand, but
+day-to-day variation driven by individual behaviour, whether someone is
+home, what appliances they use, is simply not observable from the
+available predictors and represents a natural ceiling for this modelling
+approach.
 
-The \textbf{R² of 30.3\%} tells the same story from a different angle.
-The five predictors explain roughly a third of the day-to-day variation
+The \textbf{R² of 31.6\%} tells the same story from a different angle.
+The eight predictors explain roughly a third of the day-to-day variation
 in consumption, and the remaining two-thirds is driven by factors not
-available in this dataset. For a client, this means the model is useful
-for segmentation and benchmarking such as flagging atypically
-high-consuming households, but should not be used as a precise daily
-forecast without household-level data.
+available in this dataset. Compared to the extended Linear Model (R² =
+27.4\%, MAE = 10.96 kWh/day), the GAM achieves a modest improvement. R²
+rises by 3.6 percentage points and MAE falls by approximately 0.4
+kWh/day. This improvement is real but small, suggesting that the LM's
+linear approximation is adequate for most of the predictors in this
+dataset.
 
-A note on why RMSE was not used: RMSE on the log scale is mathematically
+A note on why RMSE was not used. RMSE on the log scale is mathematically
 correct but has no intuitive unit that a client can relate to. MAE in
 kWh is directly actionable, and R² communicates model quality in plain
 percentage terms.
@@ -1684,42 +1765,41 @@ percentage terms.
 \begin{itemize}
 \tightlist
 \item
-  \textbf{Temperature} has a highly non-linear effect on consumption
-  (edf = 7.0): the relationship varies substantially across the seasonal
-  range and cannot be captured by a single slope.
+  \textbf{Heating demand (HDD)} is non-linear for houses (edf = 5.3, p
+  \textless{} 0.001), meaning the LM's linear interaction term
+  understates the acceleration in consumption during the coldest days.
 \item
-  \textbf{Heating degree days} act linearly (edf = 1.0), confirming that
-  the Linear Model's treatment of this variable was already adequate.
+  \textbf{HDD for flats} shows no significant smooth effect (edf = 0.8,
+  p = 0.316). Flat consumption responds to cold weather in a way that is
+  well described by a straight line once group-specific curves are
+  allowed.
 \item
-  \textbf{Living area} shows the highest non-linearity (edf = 9.0),
-  suggesting that medium-sized homes behave differently from small or
-  large ones, likely due to heating system configuration and occupancy
-  patterns.
+  \textbf{Ground-source heat pumps} consume 13.4\% less electricity than
+  air-source systems (p \textless{} 0.001).
 \item
-  Houses consume 11.3\% more electricity per day than flats, all else
-  equal.
+  \textbf{Each additional resident} adds 13.8\% to daily consumption (p
+  \textless{} 0.001).
 \item
-  Ground-source heat pumps consume 12.5\% less electricity than
-  air-source systems, reflecting their superior year-round efficiency.
+  \textbf{Living area} is the most non-linear predictor (edf = 9.0, p
+  \textless{} 0.001). Consumption does not scale proportionally with
+  floor area.
 \item
-  The model achieves an R² of 30.3\% and a mean prediction error of 10.4
-  kWh/day on the held-out test set.
+  The GAM achieves an R² of 31.6\% and a MAE of 10.6 kWh/day, improving
+  on the extended LM by about 0.4 kWh/day.
 \end{itemize}
 
 \subsubsection{Conclusion}\label{conclusion-3}
 
-The GAM reveals that temperature and living area have genuinely
-non-linear effects on electricity consumption, which a plain linear
-model would misrepresent. Heating degree days, however, turn out to be
-linear, suggesting the LM's treatment of that variable was already
-adequate. Houses consume 11.3\% more than flats, and ground-source heat
-pumps consume 12.5\% less than air- source systems. With an R² of 30.3\%
-and a mean prediction error of 10.4 kWh/day, the model performs
-moderately well for a purely weather- and building-based specification
-and will serve as the interpretable benchmark in the model comparison
-section.
-
-\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+The GAM confirms that non-linearity is present in the data, but mostly
+in how houses respond to cold weather during the peak heating season.
+For flats and both heat pump types, the heating-demand curve is close to
+linear, meaning the extended LM captures those effects adequately. The
+most actionable findings are consistent with the LM. Ground-source heat
+pumps and lower occupancy reduce consumption significantly. The GAM's
+modest improvement in predictive accuracy (MAE of 10.6 kWh/day versus
+10.96 kWh/day for the extended LM) does not justify choosing it over the
+LM when interpretability is the priority. The detailed comparison using
+5-fold cross-validation is presented in the Model Comparison section.
 
 \subsection{Neural Network (NN)}\label{nn}
 
@@ -1749,8 +1829,11 @@ classification metrics derived from test data.
 
 The dataset consists of 99,838 observations and includes variables
 related to weather conditions, building characteristics, and household
-composition. The response variable, \emph{high\_consumption}, is binary
-and approximately balanced between the two classes.
+composition. The response variable, \emph{high\_consumption}, is binary,
+defined using each household's own 75th percentile of
+\texttt{log\_kWh\_total} as the threshold --- consistent with the GLM
+Binomial and SVM. By construction, exactly 25\% of each household's days
+are classified as high-consumption.
 
 To ensure valid model evaluation, the data is split into training (80\%)
 and test (20\%) sets using a stratified sampling approach. This
@@ -1788,10 +1871,10 @@ leakage.
 ##     size = 25, decay = 0.05, maxit = 1000, trace = FALSE)
 \end{verbatim}
 
-The neural network is specified with an architecture of (8--3--1),
-consisting of eight input nodes, one hidden layer with three neurons,
-and a single output neuron for binary classification. This relatively
-simple structure is chosen to balance model flexibility with the risk of
+The neural network is specified with an architecture of (9--25--1),
+consisting of nine input nodes, one hidden layer with 25 neurons, and a
+single output neuron for binary classification. This relatively simple
+structure is chosen to balance model flexibility with the risk of
 overfitting, allowing the network to capture non-linear relationships
 without introducing unnecessary complexity.
 
@@ -1799,7 +1882,7 @@ A non-linear activation function is applied in the hidden layer,
 enabling the model to learn complex patterns in the data. The output
 layer produces predicted probabilities for the high-consumption class.
 
-To improve generalisation, weight decay (set to 0.001) is included as a
+To improve generalisation, weight decay (set to 0.05) is included as a
 regularisation mechanism. This penalises large weights and helps reduce
 model variance. The network is trained using the nnet package with a
 sufficient number of iterations to ensure convergence.
@@ -1810,35 +1893,31 @@ architecture that performs reliably on unseen data.
 
 \subsubsection{Model Results}\label{model-results-4}
 
-\begin{longtable}[]{@{}lrrrr@{}}
-\caption{Neural Network Performance Metrics}\tabularnewline
-\toprule\noalign{}
-Model & Accuracy & Sensitivity & Specificity & AUC \\
-\midrule\noalign{}
-\endfirsthead
-\toprule\noalign{}
-Model & Accuracy & Sensitivity & Specificity & AUC \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-Neural Network & 0.88 & 0.691 & 0.943 & 0.939 \\
-\end{longtable}
+\begin{longtabu} to \linewidth {>{\raggedright}X>{\raggedleft}X>{\raggedleft}X>{\raggedleft}X>{\raggedleft}X}
+\caption{\label{tab:nn-results}Neural Network Performance Metrics}\\
+\toprule
+Model & Accuracy & Sensitivity & Specificity & AUC\\
+\midrule
+Neural Network & 0.855 & 0.621 & 0.934 & 0.91\\
+\bottomrule
+\end{longtabu}
 
-The neural network achieves an accuracy of approximately 0.88,
-indicating solid predictive performance and a clear improvement over a
-naive classifier \((\approx
-0.50)\) given the balanced dataset. This suggests that the model
-captures meaningful structure in the data. The AUC of 0.939 confirms
-strong discriminative ability across all classification thresholds.
+The neural network achieves an accuracy of approximately 0.86. Because
+the binary target is defined using the 75th-percentile threshold,
+roughly 75\% of observations belong to the low-consumption class; a
+naive classifier that always predicts ``low'' would therefore achieve a
+baseline accuracy of \(\approx 0.75\). The model's accuracy must be
+assessed against this higher bar rather than a 50/50 split. The AUC of
+0.91 provides a threshold-independent measure and confirms
+discriminative ability beyond the class-imbalance baseline.
 
-Sensitivity (0.691) exceeds specificity (0.943), indicating that the
-model is more effective at identifying high-consumption events than
-low-consumption cases. This suggests that patterns associated with high
-consumption are more strongly captured by the available predictors.
-While this may be advantageous in contexts where detecting
-high-consumption events is particularly important, it also implies a
-slightly higher rate of false positives.
+Specificity (0.934) exceeds sensitivity (0.621), indicating that the
+model is more effective at identifying low-consumption days than
+high-consumption days. This is expected given the 75/25 class imbalance:
+with three times as many normal days as high-consumption days, the model
+has more signal for the majority class. The lower sensitivity reflects a
+higher rate of missed high-consumption events, which is the more costly
+error in capacity-planning contexts.
 
 Overall, the confusion matrix shows that the majority of observations
 are correctly classified, with most predictions concentrated along the
@@ -1860,13 +1939,15 @@ noticeable overlap in the mid-range indicates that some observations
 cannot be clearly distinguished, which explains the presence of
 classification errors.
 
+\begin{center}\includegraphics{report_files/figure-latex/nn-pred-prob-1} \end{center}
+
 The \emph{confusion matrix} provides a direct summary of classification
 performance. Most observations lie on the diagonal, confirming a high
 number of correct predictions for both classes. Nevertheless, errors
 occur in both directions, highlighting that class separation is not
 complete.
 
-\pandocbounded{\includegraphics[keepaspectratio]{report_files/report_files/figure-latex/nn_plots_side_by_side-1.pdf}}
+\begin{center}\includegraphics{report_files/figure-latex/nn-confmat-1} \end{center}
 
 The \emph{ROC curve} further evaluates model performance across all
 possible classification thresholds. The curve lies clearly above the
@@ -1876,17 +1957,17 @@ suggests that high true positive rates can be achieved with relatively
 low false positive rates, while the flattening at higher values reflects
 diminishing gains.
 
-\pandocbounded{\includegraphics[keepaspectratio]{report_files/report_files/figure-latex/nn_roc-1.pdf}}
+\begin{center}\includegraphics{report_files/figure-latex/nn_roc-1} \end{center}
 
 \subsubsection{Model Diagnostics}\label{model-diagnostics-4}
 
 Neural network diagnostics focus on predictive performance rather than
-distributional assumptions. The chosen architecture (8--3--1) provides a
-balance between flexibility and overfitting, allowing the model to
+distributional assumptions. The chosen architecture (9--25--1) provides
+a balance between flexibility and overfitting, allowing the model to
 capture non-linear relationships while maintaining stable
 generalisation.
 
-The test accuracy of approximately 88\% indicates reasonable
+The test accuracy of approximately 85.5\% indicates reasonable
 generalisation to unseen data. The absence of a substantial gap between
 training and test performance suggests that overfitting is limited,
 although some dependence on the specific train--test split may remain.
@@ -1903,7 +1984,7 @@ model complexity. Increasing the number of hidden neurons led to slight
 improvements in training performance but did not translate into
 meaningful gains in test accuracy, indicating potential overfitting.
 Simpler architectures achieved comparable results with greater
-stability, supporting the choice of the 8--3--1 specification.
+stability, supporting the choice of the 9--25--1 specification.
 
 \subsubsection{Coefficient
 Interpretation}\label{coefficient-interpretation}
@@ -1920,12 +2001,13 @@ instead.
 \begin{itemize}
 \item
   The neural network achieves solid predictive performance, with an
-  accuracy of approximately 88\%, clearly outperforming a naive
-  baseline.
+  accuracy of approximately 85.5\%, which should be interpreted against
+  the \(\approx 75\)\% naive baseline arising from the 75/25 class
+  split.
 \item
-  The model is more effective at identifying high-consumption events
-  than low- consumption cases, as reflected in higher sensitivity
-  compared to specificity.
+  The model is more effective at identifying low-consumption days than
+  high- consumption days, as reflected in higher specificity compared to
+  sensitivity. This is expected given the 75/25 class imbalance.
 \item
   The confusion matrix and ROC curve confirm good overall classification
   ability, although not perfect.
@@ -1942,14 +2024,14 @@ instead.
 
 The neural network achieves solid predictive performance and
 successfully captures non-linear relationships in the data. With an
-accuracy of approximately 88\%, it provides a meaningful improvement
-over baseline classification and demonstrates good overall
-discriminative ability.
+accuracy of approximately 85.5\%, it demonstrates discriminative ability
+above the naive \(\approx 75\)\% baseline that arises from the 75/25
+class split, though the margin above that baseline is modest and
+performance is primarily constrained by the available predictors rather
+than model complexity.
 
 However, the presence of overlap in predicted probabilities indicates
-that the model cannot fully distinguish between the two classes. This
-suggests that performance is primarily constrained by the available
-predictors rather than by model complexity.
+that the model cannot fully distinguish between the two classes.
 
 From a practical perspective, the model can serve as a useful
 decision-support tool for identifying high-consumption events, although
@@ -1959,7 +2041,7 @@ classification uncertainty.
 Further improvements are more likely to come from enhanced feature
 engineering or the inclusion of additional relevant variables rather
 than increasing model complexity. Cross-validation results for the
-Neural Network are reported in the Model Comparison section. ---
+Neural Network are reported in the Model Comparison section.
 
 \subsection{Support Vector Machine (SVM)}\label{svm}
 
@@ -1967,279 +2049,205 @@ Neural Network are reported in the Model Comparison section. ---
 
 \subsubsection{Objective}\label{objective-5}
 
-The aim of this analysis is to classify each day as a
-\emph{high-consumption day} (top 25\% of daily kWh usage) or a
-\emph{normal day} --- a binary classification problem. This framing is
-practically useful: identifying high-load days in advance allows grid
-operators and energy providers to plan capacity and issue consumption
-alerts.
+This section classifies each household-day as \emph{high consumption}
+(top 25\% of that household's days) or \emph{normal}, a binary problem
+with practical relevance: knowing which days are likely to be high-load
+in advance lets grid operators and energy providers plan capacity.
 
-A Support Vector Machine (SVM) is employed because it can capture
-complex, non- linear decision boundaries via kernel functions, without
-requiring distributional assumptions on the predictors. Model
-performance is evaluated on a held-out test set using accuracy,
-sensitivity, specificity, and F1 score.
+An SVM is used because it can find non-linear decision boundaries via
+kernel functions without requiring distributional assumptions about the
+predictors. Performance is evaluated on a held-out test set using
+accuracy, sensitivity, specificity, and F1 score.
 
 \subsubsection{Data Preparation}\label{data-preparation-1}
 
-The response variable, \texttt{high\_consumption}, is derived from
-\texttt{log\_kWh\_total} using the 75th percentile as a threshold. Days
-above this threshold are labelled \emph{high}; all others are
-\emph{normal}. The threshold corresponds to 3.541 on the log scale
-(approximately 34.5 kWh per day). This data-driven cutoff identifies the
-25\% of days with the highest energy demand, which are
-disproportionately responsible for grid stress events.
+\texttt{high\_consumption} labels a day as \emph{high} if it falls in
+the top 25\% of that household's own \texttt{log\_kWh\_total}
+distribution. For each of the 127 households, the 75th percentile is
+computed separately, so every household contributes exactly 25\%
+high-consumption days by construction.
 
-After removing missing values, the dataset contains 93,686 observations:
+After removing missing values, the dataset has 93,686 observations:
 23,440 high-consumption days (25.0\%) and 70,246 normal days (75.0\%).
-The original \texttt{log\_kWh\_total} is excluded from the predictors to
-prevent data leakage --- the SVM must identify high-load days from
-weather conditions and household characteristics alone.
+\texttt{log\_kWh\_total} is excluded to prevent data leakage; the SVM
+must identify high-load days from weather and household characteristics
+alone.
 
-The data are split into training (74,949 rows) and test (18,737 rows)
-sets using stratified 80/20 sampling, preserving the 25/75 class ratio
-in both subsets. All numeric predictors are standardised before
-training, as SVMs are sensitive to feature scale.
+The data are split 80/20 into training (74,949 rows) and test (18,737
+rows) using stratified sampling to keep the class ratio consistent. All
+numeric predictors are standardised before training, as SVMs are
+sensitive to feature scale.
 
-\begin{longtable}[]{@{}lr@{}}
-\caption{Class balance in the training set}\tabularnewline
-\toprule\noalign{}
-Class & Proportion \\
-\midrule\noalign{}
-\endfirsthead
-\toprule\noalign{}
-Class & Proportion \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-high & 0.25 \\
-normal & 0.75 \\
-\end{longtable}
+\begin{longtabu} to \linewidth {>{\raggedright}X>{\raggedleft}X}
+\caption{\label{tab:svm-class-balance}Class balance in the training set}\\
+\toprule
+Class & Proportion\\
+\midrule
+high & 0.251\\
+normal & 0.749\\
+\bottomrule
+\end{longtabu}
 
 \subsubsection{Model Setup}\label{model-setup-5}
 
-Two SVM models are estimated using a radial basis function (RBF) kernel.
-The RBF kernel maps data into a high-dimensional space, enabling
-non-linear decision boundaries --- well-suited to energy consumption
-patterns that interact across weather and household variables.
+Both models use a radial basis function (RBF) kernel, which maps data
+into a higher-dimensional space to find non-linear decision boundaries.
+This suits energy data where weather and household effects interact in
+ways a linear boundary cannot capture.
 
-\textbf{Baseline SVM:} Cost = 1, gamma = default (1 / number of
-features). This serves as a reference point for the tuned model.
+\textbf{Baseline SVM:} C = 1, sigma estimated from training data. This
+provides a reference for the tuned model.
 
-\textbf{Tuned SVM:} 5-fold cross-validation is used to search over a
-grid of \texttt{C} ∈ \{1, 10, 100\} and \texttt{sigma} ∈ \{0.01, 0.1,
-1/7\}. \texttt{C} controls the penalty for misclassification (higher =
-tighter fit); \texttt{sigma} is the inverse bandwidth of the RBF kernel
-(higher = more local boundaries). The grid search and cross-validation
-are performed internally by \texttt{e1071::tune()}, which evaluates
-every parameter combination and returns the model with the lowest
-cross-validation error. The best parameter combination maximises
-cross-validation accuracy on the training set.
+\textbf{Tuned SVM:} 5-fold cross-validation over a grid of \texttt{C} ∈
+\{1, 10, 100\} and \texttt{sigma} ∈ \{0.01, 0.1, 1/7\}. \texttt{C}
+controls the misclassification penalty (higher = tighter fit);
+\texttt{sigma} is the inverse bandwidth of the RBF kernel (higher = more
+local boundaries). The combination with the highest CV accuracy is
+selected.
 
-The tuned model uses the following best parameters: C = 100, sigma =
-0.1429 (equal to 1/7, the default gamma in \texttt{e1071}). These were
-selected from a 3×3 grid and achieved the highest cross-validation
-accuracy of 0.8304 (Kappa = 0.4859).
+The best parameters were C = 100, sigma = 0.1429 (= 1/7), achieving CV
+accuracy of 0.8304 (Kappa = 0.4859) across the 3×3 grid.
 
 \subsubsection{Model Results}\label{model-results-5}
 
-\begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.4474}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1184}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1579}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1579}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1184}}@{}}
-\caption{SVM model comparison on test set}\tabularnewline
-\toprule\noalign{}
-\begin{minipage}[b]{\linewidth}\raggedright
-Model
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-Accuracy
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-Sensitivity
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-Specificity
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-F1 Score
-\end{minipage} \\
-\midrule\noalign{}
-\endfirsthead
-\toprule\noalign{}
-\begin{minipage}[b]{\linewidth}\raggedright
-Model
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-Accuracy
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-Sensitivity
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-Specificity
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-F1 Score
-\end{minipage} \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-Baseline SVM (C=1, default sigma) & 0.8221 & 0.4618 & 0.9423 & 0.5651 \\
-Tuned SVM (C=100, sigma=0.1429) & 0.8318 & 0.4834 & 0.9481 & 0.5899 \\
-\end{longtable}
+\begin{longtabu} to \linewidth {>{\raggedright}X>{\raggedleft}X>{\raggedleft}X>{\raggedleft}X>{\raggedleft}X}
+\caption{\label{tab:svm-eval-table}SVM model comparison on test set}\\
+\toprule
+Model & Accuracy & Sensitivity & Specificity & F1 Score\\
+\midrule
+Baseline SVM (C=1, default sigma) & 0.8512 & 0.5806 & 0.9419 & 0.6620\\
+Tuned SVM (C=100, sigma=0.1429) & 0.8529 & 0.5902 & 0.9409 & 0.6681\\
+\bottomrule
+\end{longtabu}
 
-\begin{longtable}[]{@{}lrr@{}}
-\caption{Tuned SVM --- 5-fold cross-validation performance (global 75th
-percentile threshold)}\tabularnewline
-\toprule\noalign{}
-Model & CV AUC & CV Accuracy \\
-\midrule\noalign{}
-\endfirsthead
-\toprule\noalign{}
-Model & CV AUC & CV Accuracy \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-Tuned SVM (C=100, σ=0.1429) & 0.842 & 0.831 \\
-\end{longtable}
+\begin{longtabu} to \linewidth {>{\raggedright}X>{\raggedleft}X>{\raggedleft}X}
+\caption{\label{tab:svm-cv-table}Tuned SVM — 5-fold cross-validation performance (per-household 75th percentile threshold)}\\
+\toprule
+Model & CV AUC & CV Accuracy\\
+\midrule
+Tuned SVM (C=100, σ=0.1429) & 0.842 & 0.831\\
+\bottomrule
+\end{longtabu}
 
-The tuned SVM achieves a five-fold CV AUC of \textbf{0.842} and CV
-accuracy of \textbf{83.1\%}. The single 80/20 split below provides
-additional diagnostic detail (sensitivity, specificity, F1) not
-available from the CV summary.
+The tuned SVM achieves a five-fold CV AUC of \textbf{0.842} and accuracy
+of \textbf{83.1\%}. The 80/20 split below adds sensitivity, specificity,
+and F1.
 
-The tuned SVM (C = 100, sigma = 0.1429) achieves an accuracy of
-\textbf{83.2\%} on the test set, compared to 82.2\% for the baseline ---
-a modest improvement. However, accuracy alone is misleading here because
-a naive classifier that always predicts \emph{normal} would achieve 75\%
-(the majority class proportion). The true gain over this baseline is
-therefore only \textasciitilde8 percentage points.
+The tuned SVM (C = 100, sigma = 0.1429) reaches \textbf{85.3\%}
+accuracy, compared to 85.1\% for the baseline. The improvement is
+modest: a naive all-\emph{normal} classifier would already score 74.9\%,
+leaving a true gain of only 10 percentage points.
 
-The more important metrics for this task are:
+The more informative metrics are:
 
-\textbf{Sensitivity: 0.4834} --- the model correctly identifies only
-48.3\% of actual high-consumption days. More than half of all high-load
-days are missed. This is a significant limitation for an early-warning
-application where false negatives carry higher operational costs.
+\textbf{Sensitivity (0.5902):} the model correctly identifies 59\% of
+actual high-consumption days. Over half are missed, a meaningful
+limitation in early-warning contexts where false negatives are costly.
 
-\textbf{Specificity: 0.9481} --- normal days are classified correctly
-94.8\% of the time. The model is conservative: it flags fewer
-high-consumption days than actually occur (2995 predicted high vs.~4688
+\textbf{Specificity (0.9409):} normal days are classified correctly
+94.1\% of the time. The model is conservative, flagging fewer
+high-consumption days than actually occur (3605 predicted high vs.~4702
 actual high in the test set).
 
-\textbf{F1 Score: 0.5899} --- the harmonic mean of precision and recall
+\textbf{F1 Score (0.6681):} the harmonic mean of precision and recall
 for the high class reflects the imbalance between high specificity and
 low sensitivity.
 
-\textbf{Kappa: 0.4905} --- a moderate level of agreement beyond chance,
-improving on the baseline (0.4602) but still below the 0.6 threshold
-typically considered \emph{substantial} agreement.
-
-The tuned model is selected as the final model based on the highest
-cross- validation accuracy on the training set.
+\textbf{Kappa (0.5757):} moderate agreement beyond chance, improving on
+the baseline (0.569) but below the 0.6 threshold for \emph{substantial}
+agreement.
 
 \subsubsection{Visual Evidence}\label{visual-evidence-5}
 
 The confusion matrix heatmap shows the distribution of predictions
-versus actual labels. Correct predictions lie on the diagonal;
-off-diagonal cells represent misclassifications. A concentration of
-observations on the diagonal confirms strong overall performance.
+versus actual labels. Correct predictions fall on the diagonal;
+off-diagonal cells are misclassifications.
 
-\pandocbounded{\includegraphics[keepaspectratio]{report_files/report_files/figure-latex/svm-conf-matrix-plot-1.pdf}}
+\begin{center}\includegraphics{report_files/figure-latex/svm-conf-matrix-plot-1} \end{center}
 
-The bar chart below compares sensitivity and specificity across the
-baseline and tuned models, illustrating how cross-validation tuning
-shifts the trade-off between detecting high-consumption days and
-avoiding false alarms.
+The bar chart compares sensitivity and specificity for the baseline and
+tuned models, showing how tuning shifts the balance between detecting
+high-consumption days and avoiding false alarms.
 
-\pandocbounded{\includegraphics[keepaspectratio]{report_files/report_files/figure-latex/svm-metric-comparison-1.pdf}}
+\begin{center}\includegraphics[width=0.48\linewidth]{report_files/figure-latex/svm-metric-comparison-1} \end{center}
 
 \subsubsection{Model Diagnostics}\label{model-diagnostics-5}
 
-SVM diagnostics focus on generalisation performance and the validity of
-modelling choices rather than distributional assumptions.
+Unlike regression models, SVM diagnostics focus on generalisation
+performance and modelling choices rather than distributional
+assumptions.
 
 \textbf{CV tuning results:} Across all 9 combinations, CV accuracy
 ranged from 0.8071 (C=10, sigma=0.01) to 0.8304 (C=100, sigma=0.1429).
-The top four combinations all involve sigma ≥ 0.1, suggesting the model
-benefits from a moderately local kernel. The gain from increasing C from
-10 to 100 at sigma=0.1429 is small (0.8268 → 0.8304), indicating
-diminishing returns from further penalising misclassification.
+The top four combinations all involve sigma ≥ 0.1, suggesting a
+moderately local kernel works best. The gain from increasing C from 10
+to 100 at sigma=0.1429 is small (0.8268 → 0.8304), with diminishing
+returns beyond that.
 
-\textbf{Class separability:} Sensitivity of 48.3\% reveals that the
+\textbf{Class separability:} Sensitivity of 59\% shows that the
 available predictors (weather conditions and household characteristics)
 do not reliably separate the two classes. Many high-consumption days
-fall in the same feature space as normal days, creating an irreducible
-overlap that no kernel or parameter choice can overcome.
+fall in the same feature space as normal days, an overlap that no kernel
+choice can resolve.
 
-\textbf{Tuning stability:} The best parameter combination (C=100,
-sigma=0.1429) sits at the top-right corner of the grid, raising the
-question of whether a larger C or sigma would further improve results.
-However, given the flattening improvement from C=10 to C=100 and the
-domain knowledge that the classes genuinely overlap, additional tuning
-is unlikely to produce meaningful sensitivity gains.
+\textbf{Tuning stability:} The best combination (C=100, sigma=0.1429)
+sits at the top-right corner of the grid. Given the small step from C=10
+to C=100 and genuine class overlap in the data, further tuning is
+unlikely to produce meaningful sensitivity gains.
 
 \textbf{Comparison with baseline:} The tuned model improves accuracy
-(82.2\% → 83.2\%) and sensitivity (46.2\% → 48.3\%) over the default
-parameterisation. The improvement is real but modest, consistent with
-the view that the bottleneck is feature informativeness rather than
-model configuration.
+(85.1\% → 85.3\%) and sensitivity (58.1\% → 59\%) over the default
+parameters. The improvement is real but modest, pointing to the
+predictor set as the limiting factor rather than model configuration.
 
 \subsubsection{Key Findings}\label{key-findings-4}
 
 \textbf{The SVM achieves reasonable accuracy but low sensitivity:} At
-83.2\% accuracy, the model clearly outperforms always predicting the
-majority class (75\%). However, sensitivity of 48.3\% means it misses
-more than half of all actual high- consumption days --- the most
-operationally important class.
+85.3\% accuracy, the model outperforms always predicting the majority
+class (74.9\%). Sensitivity of 59\% is the bigger concern: more than
+half of actual high-consumption days are missed.
 
 \textbf{High specificity reflects a conservative classifier:}
-Specificity of 94.8\% shows the model rarely raises false alarms on
+Specificity of 94.1\% means the model rarely raises false alarms on
 normal days, but this comes at the cost of missing many genuine
 high-load events.
 
-\textbf{Cross-validation tuning yields real but limited improvement:}
-Moving from default parameters to C=100, sigma=0.1429 improves
-sensitivity from 46.2\% to 48.3\% and accuracy from 82.2\% to 83.2\%.
-The gain is consistent but small, confirming that further tuning alone
-cannot resolve the core problem.
+\textbf{Tuning yields real but limited improvement:} Moving from default
+parameters to C=100, sigma=0.1429 improves sensitivity from 58.1\% to
+59\% and accuracy from 85.1\% to 85.3\%. The gains are consistent but
+small; further tuning will not resolve the core problem.
 
 \textbf{The predictor set is the bottleneck:} Weather conditions and
-static household characteristics (building type, living area, residents,
-heat pump type) capture only part of what drives high-consumption days.
-The strong day-to-day within- household variation that drives a day over
-the 34.5 kWh threshold is not fully explained by the available features.
+static household characteristics capture only part of what drives
+high-consumption days. Day-to-day within-household variation is not well
+explained by the available features.
 
-\textbf{Feature leakage is correctly avoided:} By excluding
-\texttt{log\_kWh\_total}, all results reflect genuine out-of-sample
-discriminative ability from operationally observable inputs.
+\textbf{Data leakage is avoided:} By excluding \texttt{log\_kWh\_total},
+all results reflect genuine out-of-sample discriminative ability from
+operationally observable inputs.
 
 \subsubsection{Conclusion}\label{conclusion-5}
 
-The SVM demonstrates that weather conditions and household
-characteristics carry real signal for identifying high-consumption days,
-achieving \textasciitilde8 percentage points above the naive
-majority-class baseline. The model is well-specified and the tuning is
-sound.
+Weather conditions and household characteristics carry real signal for
+classifying high-consumption days: the SVM scores roughly 8 percentage
+points above the naive majority-class baseline.
 
-However, the model is of \textbf{limited practical usefulness as a
-standalone early- warning system}. A sensitivity of 48.3\% means that in
-a deployment context, more than half of high-load days would go
-undetected. For capacity planning or demand-response triggering, this
-miss rate is likely too high to be operationally reliable.
+At 59\% sensitivity, however, the model misses more than half of all
+actual high-load days. For capacity planning or demand-response
+triggering, that miss rate is too high for the model to be useful on its
+own.
 
-The root cause is not the model choice --- it is the available feature
-set. High and normal consumption days overlap substantially in the
-weather-and-household feature space, and no kernel function or
-regularisation choice can separate what is genuinely overlapping in the
-data. Meaningful improvement would require richer features: lagged
-consumption, day-of-week and seasonal indicators, occupancy patterns, or
-appliance-level data.
+The limiting factor is not the model but the available features. High
+and normal consumption days overlap substantially in the
+weather-and-household feature space, and no kernel or regularisation
+choice can separate what is genuinely mixed in the data. Richer features
+would help: lagged consumption, occupancy patterns, or appliance-level
+data.
 
-If the threshold for flagging is lowered (accepting more false alarms to
-capture more true positives), the model could play a supporting role in
-probabilistic forecasting pipelines. But at the default threshold, it
-should not be used as the sole basis for high-consumption day decisions.
-
-\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+Lowering the flagging threshold would recover more true positives at the
+cost of more false alarms, which may be acceptable in a probabilistic
+forecasting pipeline. At the default threshold, the model should not be
+the sole basis for high-consumption day decisions.
 
 \section{Model Comparison}\label{comparison}
 
@@ -2263,64 +2271,75 @@ two regression models fitted to \texttt{log\_kWh\_total}. MAE is
 computed on the original kWh scale for interpretability. R² is computed
 on the log scale.
 
-\begin{longtable}[]{@{}lrr@{}}
-\caption{Five-fold CV performance: regression models on log\_kWh\_total.
-MAE is on the kWh scale; R² is on the log scale.}\tabularnewline
-\toprule\noalign{}
-Model & CV MAE (kWh/day) & CV R2 \\
-\midrule\noalign{}
-\endfirsthead
-\toprule\noalign{}
-Model & CV MAE (kWh/day) & CV R2 \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-Linear Model (extended) & 10.96 & 0.274 \\
-GAM & 10.55 & 0.296 \\
-\end{longtable}
+\begin{longtabu} to \linewidth {>{\raggedright}X>{\raggedleft}X>{\raggedleft}X}
+\caption{\label{tab:reg-comparison-table}Five-fold CV performance: regression models on log_kWh_total. MAE is on the kWh scale; R² is on the log scale.}\\
+\toprule
+Model & CV MAE (kWh/day) & CV R2\\
+\midrule
+Linear Model (extended) & 10.96 & 0.274\\
+GAM (same predictors) & 10.56 & 0.310\\
+\bottomrule
+\end{longtabu}
 
-\pandocbounded{\includegraphics[keepaspectratio]{report_files/report_files/figure-latex/reg-comparison-plot-1.pdf}}
+\begin{center}\includegraphics{report_files/figure-latex/reg-comparison-plot-1} \end{center}
 
-The two models use overlapping but not identical predictor sets. The
-extended LM includes sunshine hours, humidity, and number of residents,
-while the GAM replaces these with a flexible smooth on average
-temperature. Direct comparison is therefore indicative rather than
-perfectly controlled. Despite this, the results reveal whether the GAM's
-flexible smooth terms translate into a meaningful reduction in
-prediction error relative to the linear specification. A GAM MAE
-materially lower than the LM would justify the added complexity for
-forecasting purposes; a small difference would suggest that the
-non-linearities found in the smooth plots have limited practical impact
-and that the simpler LM is the better choice for a client who values
-interpretability.
+Both models use \textbf{exactly the same predictor set}: heating degree
+days (interacted with building type and heat pump type), sunshine hours,
+humidity, living area, and number of residents. The only difference is
+functional form: the LM uses linear terms and explicit interaction
+dummies, while the GAM replaces these with \texttt{by\ =} smooths. This
+makes the comparison controlled and directly attributable to model
+flexibility rather than predictor choice.
+
+The GAM achieves a CV MAE of 10.56 kWh/day and an R² of 0.31, compared
+to 10.96 kWh/day and R² of 0.274 for the extended LM. The GAM reduces
+prediction error by 0.4 kWh/day, a roughly 3.6\% improvement, and
+explains 3.6 additional percentage points of variance. The improvement
+is real but modest. As the GAM smooth plots showed, the main
+non-linearity is in how houses respond to extreme cold (edf = 5.3 for
+s(HDD):house), but this effect does not translate into a large
+out-of-sample accuracy gain. This suggests that household-level
+heterogeneity, not functional form, is the primary source of unexplained
+variance.
+
+For a client who prioritises interpretability, the extended LM is a
+reasonable choice: its coefficients are directly actionable and its
+predictions are nearly as accurate. For a client who prioritises
+predictive performance, the GAM is preferred, but the marginal gain of
+0.40 kWh/day should be weighed against the added complexity of smooth
+terms and the loss of a single interpretable coefficient per predictor.
 
 \subsection{Classification Models: GLM Binomial vs SVM vs Neural
 Network}\label{classification-models-glm-binomial-vs-svm-vs-neural-network}
 
-The table below compares all three classification models. The GLM
-Binomial and SVM results are averaged across five cross-validation folds
-using the global 75th percentile threshold (top 25\% of daily usage).
+The table below compares all three classification models. All three use
+each household's own 75th percentile as the high-consumption threshold,
+making results directly comparable. CV results are available for all
+three models.
 
-\begin{longtable}[]{@{}lrr@{}}
-\caption{Classification model performance: 5-fold CV, global 75th
-percentile threshold.}\tabularnewline
-\toprule\noalign{}
-Model & CV AUC & CV Accuracy \\
-\midrule\noalign{}
-\endfirsthead
-\toprule\noalign{}
-Model & CV AUC & CV Accuracy \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-GLM Binomial & 0.830 & 0.802 \\
-SVM (C=100, σ=0.1429) & 0.842 & 0.831 \\
-Neural Network & 0.931 & 0.874 \\
-\end{longtable}
+\begin{longtabu} to \linewidth {>{\raggedright}X>{\raggedleft}X>{\raggedleft}X}
+\caption{\label{tab:class-comparison-table}Classification model performance. All models: 5-fold CV, per-household 75th percentile threshold.}\\
+\toprule
+Model & CV AUC & CV Accuracy\\
+\midrule
+GLM Binomial & 0.830 & 0.802\\
+SVM (C=100, σ=0.1429) & 0.842 & 0.831\\
+Neural Network & 0.908 & 0.855\\
+\bottomrule
+\end{longtabu}
 
-\pandocbounded{\includegraphics[keepaspectratio]{report_files/report_files/figure-latex/class-comparison-plot-1.pdf}}
+\begin{center}\includegraphics{report_files/figure-latex/class-comparison-plot-1} \end{center}
+
+All three models share the same per-household 75th percentile threshold,
+making them directly comparable. The GLM Binomial achieves a higher AUC
+(0.83 vs 0.842) while accuracy is essentially tied (80.2\% vs 83.1\%).
+The AUC gap reflects the GLM's stronger overall discrimination across
+all classification thresholds. Both models correctly identify roughly
+four out of five household-days. The GLM Binomial is the preferred
+choice: it matches the SVM on accuracy, outperforms it on AUC, and
+provides explicit odds ratios for each predictor. For a client who needs
+to explain predictions (for example, when flagging a household for an
+energy audit), this interpretability advantage is directly actionable.
 
 \subsection{GLM Poisson (Standalone)}\label{glm-poisson-standalone}
 
@@ -2331,8 +2350,15 @@ separately via five-fold CV RMSE on the count scale.
 \begin{Shaded}
 \begin{Highlighting}[]
 \FunctionTok{set.seed}\NormalTok{(}\DecValTok{42}\NormalTok{)}
-\NormalTok{n        }\OtherTok{\textless{}{-}} \FunctionTok{nrow}\NormalTok{(dat\_count)}
-\NormalTok{folds    }\OtherTok{\textless{}{-}} \FunctionTok{sample}\NormalTok{(}\FunctionTok{rep}\NormalTok{(}\DecValTok{1}\SpecialCharTok{:}\DecValTok{5}\NormalTok{, }\AttributeTok{length.out =}\NormalTok{ n))}
+
+\CommentTok{\# Extract formula cleanly — detach from model environment to avoid memory bleed}
+\NormalTok{cv\_form }\OtherTok{\textless{}{-}} \FunctionTok{as.formula}\NormalTok{(}
+  \FunctionTok{deparse}\NormalTok{(}\FunctionTok{formula}\NormalTok{(mod\_pois)),}
+  \AttributeTok{env =} \FunctionTok{baseenv}\NormalTok{()}
+\NormalTok{)}
+
+\NormalTok{n          }\OtherTok{\textless{}{-}} \FunctionTok{nrow}\NormalTok{(dat\_count)}
+\NormalTok{folds      }\OtherTok{\textless{}{-}} \FunctionTok{sample}\NormalTok{(}\FunctionTok{rep}\NormalTok{(}\DecValTok{1}\SpecialCharTok{:}\DecValTok{5}\NormalTok{, }\AttributeTok{length.out =}\NormalTok{ n))}
 \NormalTok{rmse\_folds }\OtherTok{\textless{}{-}} \FunctionTok{numeric}\NormalTok{(}\DecValTok{5}\NormalTok{)}
 
 \ControlFlowTok{for}\NormalTok{ (k }\ControlFlowTok{in} \DecValTok{1}\SpecialCharTok{:}\DecValTok{5}\NormalTok{) \{}
@@ -2340,13 +2366,19 @@ separately via five-fold CV RMSE on the count scale.
 \NormalTok{  test\_k  }\OtherTok{\textless{}{-}}\NormalTok{ dat\_count[folds }\SpecialCharTok{==}\NormalTok{ k, ]}
 
 \NormalTok{  fit\_k }\OtherTok{\textless{}{-}} \FunctionTok{glm}\NormalTok{(}
-    \FunctionTok{formula}\NormalTok{(mod\_pois),          }\CommentTok{\# reuses the exact same formula}
-    \AttributeTok{family  =} \FunctionTok{poisson}\NormalTok{(}\AttributeTok{link =} \StringTok{"log"}\NormalTok{),}
-    \AttributeTok{data    =}\NormalTok{ train\_k}
+\NormalTok{    cv\_form,}
+    \AttributeTok{family =} \FunctionTok{poisson}\NormalTok{(}\AttributeTok{link =} \StringTok{"log"}\NormalTok{),}
+    \AttributeTok{offset =} \FunctionTok{log}\NormalTok{(n\_days),}
+    \AttributeTok{data   =}\NormalTok{ train\_k,}
+    \AttributeTok{model  =} \ConstantTok{FALSE}\NormalTok{,}
+    \AttributeTok{x      =} \ConstantTok{FALSE}\NormalTok{,}
+    \AttributeTok{y      =} \ConstantTok{FALSE}
 \NormalTok{  )}
 
 \NormalTok{  pred\_k        }\OtherTok{\textless{}{-}} \FunctionTok{predict}\NormalTok{(fit\_k, }\AttributeTok{newdata =}\NormalTok{ test\_k, }\AttributeTok{type =} \StringTok{"response"}\NormalTok{)}
 \NormalTok{  rmse\_folds[k] }\OtherTok{\textless{}{-}} \FunctionTok{sqrt}\NormalTok{(}\FunctionTok{mean}\NormalTok{((test\_k}\SpecialCharTok{$}\NormalTok{n\_high\_days }\SpecialCharTok{{-}}\NormalTok{ pred\_k)}\SpecialCharTok{\^{}}\DecValTok{2}\NormalTok{))}
+  \FunctionTok{rm}\NormalTok{(fit\_k, train\_k, test\_k)}
+  \FunctionTok{gc}\NormalTok{()}
 \NormalTok{\}}
 
 \NormalTok{pois\_cv\_rmse }\OtherTok{\textless{}{-}} \FunctionTok{round}\NormalTok{(}\FunctionTok{mean}\NormalTok{(rmse\_folds), }\DecValTok{3}\NormalTok{)}
@@ -2354,29 +2386,7 @@ separately via five-fold CV RMSE on the count scale.
 \end{Highlighting}
 \end{Shaded}
 
-\begin{longtable}[]{@{}lr@{}}
-\caption{Five-fold CV RMSE: GLM Poisson on n\_high\_days (count
-scale).}\tabularnewline
-\toprule\noalign{}
-Fold & RMSE \\
-\midrule\noalign{}
-\endfirsthead
-\toprule\noalign{}
-Fold & RMSE \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-Fold 1 & 9.788 \\
-Fold 2 & 9.337 \\
-Fold 3 & 9.662 \\
-Fold 4 & 9.789 \\
-Fold 5 & 9.073 \\
-\textbf{Mean} & 9.530 \\
-\textbf{SD} & 0.315 \\
-\end{longtable}
-
-The five-fold CV RMSE is 9.53 days (SD = 0.315). Given that
+The five-fold CV RMSE is 9.48 days (SD = 0.31). Given that
 \texttt{n\_high\_days} ranges from 0 to \textasciitilde30, this reflects
 moderate prediction error on the count scale.
 
@@ -2393,11 +2403,41 @@ interpretable while classification performance is competitive. The right
 choice depends on whether the use case demands explainability or
 accuracy.
 
-\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
-
 \section{Conclusions}\label{conclusions}
 
-\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+Across 127 Swiss households monitored daily from 2022 to 2024, cold
+weather is the strongest and most consistent driver of electricity
+consumption. The relationship is non-linear for houses: consumption
+accelerates sharply on the coldest winter days, while no statistically
+detectable non-linear cold-weather response was found for flats. The
+single most actionable finding for an energy supplier or grid operator
+is heat pump type. Households with ground-source heat pumps use
+approximately 13\% less electricity per day than those with air-source
+systems, holding all else equal, and this difference is stable across
+seasons and building types. Occupancy also matters: every additional
+resident adds roughly 14\% to daily demand, which suggests that family
+size should be a key variable in any demand forecasting or household
+segmentation tool.
+
+On the modelling side, the Generalised Additive Model achieved the best
+predictive accuracy for daily consumption (mean error of 10.6 kWh/day,
+R² of 31\%), improving on the extended Linear Model (11.0 kWh/day, R² of
+27\%) by capturing the non-linear cold-weather response of houses. The
+improvement is real but moderate: both models leave roughly two-thirds
+of day-to-day variation unexplained, which reflects individual household
+behaviour that weather and building characteristics alone cannot
+predict. For classification of high- consumption days, the GLM Binomial
+performed best (AUC = 0.83, accuracy = 80.2\%) with the SVM close behind
+(AUC = 0.842, accuracy = 83.1\%). For a client prioritising
+transparency, the GLM Binomial is the recommended model: it identifies
+high-demand household-days with good accuracy and explains exactly why
+each prediction was made. The Neural Network also achieved competitive
+results (AUC = 0.908, accuracy = 85.5\%), evaluated under the same
+per-household 75th percentile threshold. The clearest practical takeaway
+is that upgrading from air-source to ground-source heat pumps is the
+intervention most likely to reduce peak demand, and that larger
+households with air-source systems should be the first target for
+efficiency programmes.
 
 \section{Use of Generative AI}\label{ai}
 

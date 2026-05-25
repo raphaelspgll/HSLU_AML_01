@@ -86,10 +86,10 @@ Items marked **[ALL]** require input from all three members before the section c
 - [ ] **Check all plots have a written explanation.** Scan the compiled HTML
   and flag any figure not followed by an interpretation paragraph. Pay
   particular attention to SVM and NN diagnostic plots.
-- [ ] **Regenerate `cv_class_results.rds`.** Threshold is confirmed consistent
-  across all models. Run `R/08_model_comparison_cv_classification.R` to
-  regenerate a clean version and confirm the classification CV table renders
-  correctly with all three models.
+- [x] **Regenerate `cv_class_results.rds`.** Confirmed (2026-05-25): file was
+  regenerated on 2026-05-24 using the per-household 75th percentile threshold.
+  All three models present — GLM Binomial AUC 0.830 / acc 80.2%, SVM AUC 0.842
+  / acc 83.1%, Neural Network AUC 0.908 / acc 85.5%.
 
 ---
 
