@@ -551,15 +551,9 @@ single-predictor effect in the model after the building type interaction.
 
 **Humidity is not a useful predictor:** `humidity_avg` is not significant (p = 0.165) once the other weather variables are controlled for.
 
-**Overall explanatory power is limited:** The extended model explains ~`r round(summary(heapo_lm)$adj.r.squared * 100, 1)`% of the variance in log daily consumption (adj. R² = `r round(summary(heapo_lm)$adj.r.squared, 4)`). On the original kWh scale, mean absolute error is `r round(lm_ext_cv_mae, 1)` kWh/day (5-fold CV).
+**Overall explanatory power is limited:** The extended model explains ~`r round(summary(heapo_lm)$adj.r.squared * 100, 1)`% of the variance in log daily consumption (adj. R² = `r round(summary(heapo_lm)$adj.r.squared, 4)`). On the original kWh scale, mean absolute error is `r round(lm_ext_cv_mae, 1)` kWh/day (5-fold CV). At the household-day level, predictions are too imprecise for operational use — household-level heterogeneity is the likely cause.
 
-### Conclusion
-
-The linear model identifies the main structural and weather-related drivers of daily household energy consumption. All predictors except humidity are significant, and the interaction terms show that cold weather affects houses and ground-source pump households differently.
-
-However, the model has **limited predictive value**. An adjusted R² of `r round(summary(heapo_lm)$adj.r.squared, 2)` leaves ~`r round((1 - summary(heapo_lm)$adj.r.squared) * 100, 0)`% of the variance unexplained. At the household-day level, predictions are too imprecise for operational use. Household-level heterogeneity is likely the cause: baseline consumption varies substantially across households in ways a cross-sectional model cannot capture.
-
-For inference, the model does its job: it gives directly interpretable coefficient estimates for every predictor. For forecasting, models with household-level random effects would be needed.
+**Inference vs. forecasting:** For inference, the model gives directly interpretable coefficient estimates for every predictor. For forecasting, models with household-level random effects would be needed.
 
 ## GLM – Poisson {#glm-poisson}
 
@@ -885,7 +879,7 @@ knitr::kable(
 ```
 The RMSE of `r round(rmse_pois, 3)` days reflects substantial residual spread, partly explained by the high overdispersion ($\hat{\phi}$ = `r round(phi_q, 2)`). Note that the quasi-Poisson model produces identical fitted values and therefore the same RMSE, as it only affects standard errors and inference, not point predictions.
 
-### Conclusion
+### Key Findings
 
 The Poisson GLM provides a clear and interpretable account of the factors
 driving the frequency of high-consumption days. Building type, temperature, and
@@ -1265,28 +1259,15 @@ performs well beyond what the modest accuracy gain over the naive baseline sugge
   from January, indicating that some households generate high-consumption days
   in summer as well, likely from cooling or increased hot water use.
 - **Sensitivity of `r round(recall * 100, 1)`%** means the model correctly
-  flags roughly two thirds of actual high-consumption days but also misses one 
-  in three demand spikes 
-  entirely. A client using this model for operational alerting should be aware 
+  flags roughly two thirds of actual high-consumption days but also misses one
+  in three demand spikes
+  entirely. A client using this model for operational alerting should be aware
   of this limitation.
 
-### Conclusion
-
-The GLM Binomial achieves an AUC of `r round(glm_auc_val, 3)` and a sensitivity of
-`r round(recall * 100, 1)`% using a per-household 75th percentile threshold.
-The sensitivity of 63.5% is a known limitation, one in three high-consumption 
-days goes undetected, which should be weighed against the strong AUC of 0.896 
-when deciding whether this model is sufficient for operational use. The
-most important finding is that structural household characteristics (building
-type, heat pump type, size, and number of residents) become non-significant once
-the model
-conditions on each household's own baseline. Day-to-day variation in consumption
-is driven primarily by weekend occupancy and cold weather, not by what kind of
-building or heat pump a household has.
-
-For the client, this means that demand spikes at the household level are
-predictable from calendar and weather information alone, without needing to know
-anything about the household's physical characteristics. The model is
+For the client, demand spikes at the household level are predictable from
+calendar and weather information alone, without needing to know anything about
+the household's physical characteristics — structural variables lose significance
+once the model conditions on each household's own baseline. The model is
 transparent, interpretable, and provides a well-founded baseline for comparison
 with more flexible classification methods.
 
@@ -1724,6 +1705,7 @@ actionable, and R² communicates model quality in plain percentage terms.
 - **HDD for apartments** shows no significant smooth effect (edf = 0.8,
   p = 0.316). Flat consumption responds to cold weather in a way that is
   well described by a straight line once group-specific curves are allowed.
+  The extended LM captures those effects adequately.
 - **Ground-source heat pumps** consume
   `r round((1 - exp(coef(model_gam)["heatpump_typeground-source"])) * 100, 1)`%
   less electricity than air-source systems (p < 0.001).
@@ -1734,20 +1716,9 @@ actionable, and R² communicates model quality in plain percentage terms.
   Consumption does not scale proportionally with floor area.
 - The GAM achieves an R² of `r round(r2_gam * 100, 1)`% and a MAE of
   `r round(gam_mae_kwh, 1)` kWh/day, improving on the extended LM by about 0.4
-  kWh/day.
-
-### Conclusion
-
-The GAM confirms that non-linearity is present in the data, but mostly in how
-houses respond to cold weather during the peak heating season. For apartments
-and both heat pump types, the heating-demand curve is close to linear, meaning
-the extended LM captures those effects adequately. The most actionable findings
-are consistent with the LM. Ground-source heat pumps and lower occupancy reduce
-consumption significantly. The GAM's modest improvement in predictive accuracy
-(MAE of `r round(gam_mae_kwh, 1)` kWh/day versus 10.96 kWh/day for the
-extended LM) does not justify choosing it over the LM when interpretability is
-the priority. The detailed comparison using 5-fold cross-validation is presented
-in the Model Comparison section.
+  kWh/day. This modest gain does not justify choosing the GAM over the LM when
+  interpretability is the priority. The detailed comparison using 5-fold
+  cross-validation is presented in the Model Comparison section.
 
 ## Neural Network (NN) {#nn}
 *Lead: Raphaël Spagolla*
@@ -2014,9 +1985,10 @@ serve as the practical evaluation instead.
 
 ### Key Findings
 
-* The neural network achieves solid predictive performance, with an accuracy of
-  approximately `r round(acc * 100, 1)`%, which should be interpreted against the
-  $\approx 75$% naive baseline arising from the 75/25 class split.
+* The neural network achieves solid predictive performance and successfully
+  captures non-linear relationships in the data. Accuracy is approximately
+  `r round(acc * 100, 1)`%, above the $\approx 75$% naive baseline arising from
+  the 75/25 class split, though the margin is modest.
 
 * The model is more effective at identifying low-consumption days than high-
   consumption days, as reflected in higher specificity compared to sensitivity.
@@ -2032,26 +2004,12 @@ serve as the practical evaluation instead.
   suggesting that performance is primarily constrained by the available features
   rather than the model itself.
 
-### Conclusion
-
-The neural network achieves solid predictive performance and successfully
-captures non-linear relationships in the data. With an accuracy of approximately
-`r round(acc * 100, 1)`%, it demonstrates discriminative ability above the naive
-$\approx 75$% baseline that arises from the 75/25 class split, though the margin
-above that baseline is modest and performance is primarily constrained by the
-available predictors rather than model complexity.
-
-However, the presence of overlap in predicted probabilities indicates that the
-model cannot fully distinguish between the two classes.
-
 From a practical perspective, the model can serve as a useful decision-support
 tool for identifying high-consumption events, although predictions should be
 interpreted with some caution due to remaining classification uncertainty.
-
 Further improvements are more likely to come from enhanced feature engineering
-or the inclusion of additional relevant variables rather than increasing model
-complexity. Cross-validation results for the Neural Network are reported in the
-Model Comparison section.
+or the inclusion of additional relevant variables. Cross-validation results for
+the Neural Network are reported in the Model Comparison section.
 
 ## Support Vector Machine (SVM) {#svm}
 
@@ -2324,25 +2282,17 @@ Unlike regression models, SVM diagnostics focus on generalisation performance an
 
 ### Key Findings
 
-**The SVM achieves reasonable accuracy but low sensitivity:** At `r round(cm_best$overall["Accuracy"] * 100, 1)`% accuracy, the model outperforms always predicting the majority class (`r round(table(test_y)["normal"] / length(test_y) * 100, 1)`%). Sensitivity of `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% is the bigger concern: more than half of actual high-consumption days are missed.
+**The SVM achieves reasonable accuracy but low sensitivity:** At `r round(cm_best$overall["Accuracy"] * 100, 1)`% accuracy, the model scores roughly 8 percentage points above the naive majority-class baseline (`r round(table(test_y)["normal"] / length(test_y) * 100, 1)`%). Sensitivity of `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% is the bigger concern: more than half of actual high-consumption days are missed, making the model too unreliable on its own for capacity planning or demand-response triggering.
 
 **High specificity reflects a conservative classifier:** Specificity of `r round(cm_best$byClass["Specificity"] * 100, 1)`% means the model rarely raises false alarms on normal days, but this comes at the cost of missing many genuine high-load events.
 
 **Tuning yields real but limited improvement:** Moving from default parameters to C=`r best_C`, sigma=`r best_sigma` improves sensitivity from `r round(cm_baseline$byClass["Sensitivity"] * 100, 1)`% to `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% and accuracy from `r round(cm_baseline$overall["Accuracy"] * 100, 1)`% to `r round(cm_best$overall["Accuracy"] * 100, 1)`%. The gains are consistent but small; further tuning will not resolve the core problem.
 
-**The predictor set is the bottleneck:** Weather conditions and static household characteristics capture only part of what drives high-consumption days. Day-to-day within-household variation is not well explained by the available features.
+**The predictor set is the bottleneck:** Weather conditions and static household characteristics capture only part of what drives high-consumption days. High and normal consumption days overlap substantially in the feature space, and no kernel or regularisation choice can separate what is genuinely mixed in the data. Richer features would help: lagged consumption, occupancy patterns, or appliance-level data.
 
 **Data leakage is avoided:** By excluding `log_kWh_total`, all results reflect genuine out-of-sample discriminative ability from operationally observable inputs.
 
-### Conclusion
-
-Weather conditions and household characteristics carry real signal for classifying high-consumption days: the SVM scores roughly 8 percentage points above the naive majority-class baseline.
-
-At `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% sensitivity, however, the model misses more than half of all actual high-load days. For capacity planning or demand-response triggering, that miss rate is too high for the model to be useful on its own.
-
-The limiting factor is not the model but the available features. High and normal consumption days overlap substantially in the weather-and-household feature space, and no kernel or regularisation choice can separate what is genuinely mixed in the data. Richer features would help: lagged consumption, occupancy patterns, or appliance-level data.
-
-Lowering the flagging threshold would recover more true positives at the cost of more false alarms, which may be acceptable in a probabilistic forecasting pipeline. At the default threshold, the model should not be the sole basis for high-consumption day decisions.
+**Threshold adjustment is a practical alternative:** Lowering the flagging threshold would recover more true positives at the cost of more false alarms, which may be acceptable in a probabilistic forecasting pipeline. At the default threshold, the model should not be the sole basis for high-consumption day decisions.
 
 # Model Comparison {#comparison}
 
