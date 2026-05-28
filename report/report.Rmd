@@ -291,8 +291,9 @@ $$
 - $\text{heating\_degree\_days} \times \text{heatpump\_type}$: different heat
   pump technologies have different efficiencies in cold conditions, so the
   effect of cold on consumption should vary by pump type.
-- $\text{heating\_degree\_days} \times \text{building\_type}$: well-insulated
-  houses are less sensitive to outdoor temperature than poorly-insulated ones.
+- $\text{heating\_degree\_days} \times \text{building\_type}$: houses and
+  apartments differ structurally in size, exposed surface area, and construction,
+  so their cold-weather sensitivity is expected to differ.
 
 All coefficients are on the log scale: a coefficient of 0.05 means a 5%
 multiplicative change in kWh for a one-unit increase in the predictor.
@@ -436,15 +437,6 @@ p4 <- ggplot(aug, aes(x = .hat, y = .std.resid)) +
 gridExtra::grid.arrange(p1, p2, p3, p4, ncol = 2)
 ```
 
-- **Residuals vs Fitted:** Checks linearity. A horizontal band with no
-  systematic pattern is ideal.
-- **Q-Q Plot:** Checks normality of residuals. Points near the diagonal indicate
-  normality; heavy tails would signal departure.
-- **Scale-Location:** Checks homoscedasticity (constant variance). A flat,
-  evenly spread line is ideal.
-- **Residuals vs Leverage:** Identifies high-leverage observations that
-  disproportionately influence the fit.
-
 ```{r lm-vif, echo=FALSE}
 vif_vals <- vif(heapo_lm)
 data.frame(
@@ -535,25 +527,19 @@ tibble(
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 ```
 
-The simple model achieves an adjusted R² of `r round(summary(heapo_mlm_simple)$adj.r.squared, 4)`. Adding the two interaction terms improves this to `r round(summary(heapo_lm)$adj.r.squared, 4)`, a real but modest gain. Five-fold CV MAE is roughly `r round(lm_ext_cv_mae, 1)` kWh/day for the extended model. The interaction terms are meaningful, but overall explanatory power remains limited on this dataset.
+The simple model achieves an adjusted R² of `r round(summary(heapo_mlm_simple)$adj.r.squared, 4)`. Adding the two interaction terms improves this to `r round(summary(heapo_lm)$adj.r.squared, 4)`, a real but modest gain. The interaction terms are meaningful, but overall explanatory power remains limited on this dataset.
 
 ### Key Findings
 
-**Heating degree days is the dominant weather driver:** Cold weather is the primary positive predictor of energy consumption. The interaction term (β = 0.039, p < 0.001) shows that houses are more sensitive to cold than apartments, consistent with lower thermal efficiency.
+**Heating degree days is the dominant weather driver:** Cold weather is the primary positive predictor of energy consumption. Houses start from a higher baseline (β = 0.220) and are more sensitive to cold than apartments (interaction β = 0.039, p < 0.001), consistent with lower thermal efficiency.
 
-**Household size has the strongest marginal effect:** With β = 0.134, each
-additional resident increases daily consumption by ~14.3%, making it the largest
-single-predictor effect in the model after the building type interaction.
-
-**Houses consume substantially more, especially in winter:** Both the baseline offset (β = 0.220, house vs. apartments) and the temperature interaction (β = 0.039) point the same way: houses start higher and get more sensitive to cold as temperatures drop.
+**Household size has the strongest marginal effect:** With β = 0.134, each additional resident increases daily consumption by ~14.3%, making it the largest single-predictor effect in the model after the building type interaction.
 
 **Ground-source heat pumps are more efficient and more stable:** They consume ~13.3% less at baseline and respond less to temperature swings (interaction β = −0.003), consistent with the efficiency advantage of ground-source systems at low outdoor temperatures.
 
 **Humidity is not a useful predictor:** `humidity_avg` is not significant (p = 0.165) once the other weather variables are controlled for.
 
-**Overall explanatory power is limited:** The extended model explains ~`r round(summary(heapo_lm)$adj.r.squared * 100, 1)`% of the variance in log daily consumption (adj. R² = `r round(summary(heapo_lm)$adj.r.squared, 4)`). On the original kWh scale, mean absolute error is `r round(lm_ext_cv_mae, 1)` kWh/day (5-fold CV). At the household-day level, predictions are too imprecise for operational use — household-level heterogeneity is the likely cause.
-
-**Inference vs. forecasting:** For inference, the model gives directly interpretable coefficient estimates for every predictor. For forecasting, models with household-level random effects would be needed.
+**Overall explanatory power is limited:** The extended model explains ~`r round(summary(heapo_lm)$adj.r.squared * 100, 1)`% of the variance in log daily consumption (adj. R² = `r round(summary(heapo_lm)$adj.r.squared, 4)`). On the original kWh scale, mean absolute error is `r round(lm_ext_cv_mae, 1)` kWh/day (5-fold CV). Household-level heterogeneity is the likely cause; models with household-level random effects would be needed for operational forecasting.
 
 ## GLM – Poisson {#glm-poisson}
 
@@ -2274,23 +2260,17 @@ Unlike regression models, SVM diagnostics focus on generalisation performance an
 
 **CV tuning results:** Across all 9 combinations, CV accuracy ranged from 0.8071 (C=10, sigma=0.01) to 0.8304 (C=100, sigma=0.1429). The top four combinations all involve sigma ≥ 0.1, suggesting a moderately local kernel works best. The gain from increasing C from 10 to 100 at sigma=0.1429 is small (0.8268 → 0.8304), with diminishing returns beyond that.
 
-**Class separability:** Sensitivity of `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% shows that the available predictors (weather conditions and household characteristics) do not reliably separate the two classes. Many high-consumption days fall in the same feature space as normal days, an overlap that no kernel choice can resolve.
+**Class separability:** The available predictors do not reliably separate the two classes. High and normal consumption days share substantial overlap in the feature space, which no kernel choice can resolve.
 
-**Tuning stability:** The best combination (C=`r best_C`, sigma=`r best_sigma`) sits at the top-right corner of the grid. Given the small step from C=10 to C=100 and genuine class overlap in the data, further tuning is unlikely to produce meaningful sensitivity gains.
-
-**Comparison with baseline:** The tuned model improves accuracy (`r round(cm_baseline$overall["Accuracy"] * 100, 1)`% → `r round(cm_best$overall["Accuracy"] * 100, 1)`%) and sensitivity (`r round(cm_baseline$byClass["Sensitivity"] * 100, 1)`% → `r round(cm_best$byClass["Sensitivity"] * 100, 1)`%) over the default parameters. The improvement is real but modest, pointing to the predictor set as the limiting factor rather than model configuration.
+**Tuning stability:** The best combination (C=`r best_C`, sigma=`r best_sigma`) sits at the top-right corner of the grid. The gain from C=10 to C=100 at sigma=0.1429 is small (0.8268 → 0.8304), pointing to the predictor set as the limiting factor rather than model configuration.
 
 ### Key Findings
 
-**The SVM achieves reasonable accuracy but low sensitivity:** At `r round(cm_best$overall["Accuracy"] * 100, 1)`% accuracy, the model scores roughly 8 percentage points above the naive majority-class baseline (`r round(table(test_y)["normal"] / length(test_y) * 100, 1)`%). Sensitivity of `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% is the bigger concern: more than half of actual high-consumption days are missed, making the model too unreliable on its own for capacity planning or demand-response triggering.
-
-**High specificity reflects a conservative classifier:** Specificity of `r round(cm_best$byClass["Specificity"] * 100, 1)`% means the model rarely raises false alarms on normal days, but this comes at the cost of missing many genuine high-load events.
+**The SVM achieves reasonable accuracy but low sensitivity:** At `r round(cm_best$overall["Accuracy"] * 100, 1)`% accuracy, the model scores roughly 8 percentage points above the naive majority-class baseline (`r round(table(test_y)["normal"] / length(test_y) * 100, 1)`%). Sensitivity of `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% is the bigger concern: more than half of actual high-consumption days are missed, while specificity of `r round(cm_best$byClass["Specificity"] * 100, 1)`% shows the model rarely raises false alarms on normal days. This makes it too conservative on its own for capacity planning or demand-response triggering.
 
 **Tuning yields real but limited improvement:** Moving from default parameters to C=`r best_C`, sigma=`r best_sigma` improves sensitivity from `r round(cm_baseline$byClass["Sensitivity"] * 100, 1)`% to `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% and accuracy from `r round(cm_baseline$overall["Accuracy"] * 100, 1)`% to `r round(cm_best$overall["Accuracy"] * 100, 1)`%. The gains are consistent but small; further tuning will not resolve the core problem.
 
 **The predictor set is the bottleneck:** Weather conditions and static household characteristics capture only part of what drives high-consumption days. High and normal consumption days overlap substantially in the feature space, and no kernel or regularisation choice can separate what is genuinely mixed in the data. Richer features would help: lagged consumption, occupancy patterns, or appliance-level data.
-
-**Data leakage is avoided:** By excluding `log_kWh_total`, all results reflect genuine out-of-sample discriminative ability from operationally observable inputs.
 
 **Threshold adjustment is a practical alternative:** Lowering the flagging threshold would recover more true positives at the cost of more false alarms, which may be acceptable in a probabilistic forecasting pipeline. At the default threshold, the model should not be the sole basis for high-consumption day decisions.
 
