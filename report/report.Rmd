@@ -566,10 +566,13 @@ model estimates rates, allowing interpretation of results in terms of relative
 changes (rate ratios).
 
 ### Model Setup
-
-```{r poisson-modell, echo=FALSE}
+<details>
+<summary>Show / hide result</summary>
+```{r poisson-modell, echo=TRUE}
 print(formula(mod_pois))
 ```
+</details>
+
 
 The response variable is the number of high-consumption days per household-month
 ($n_{high\ days}$). A day is classified as a high-consumption day if its daily
@@ -666,7 +669,7 @@ counts concentrate near zero. The smooth LOESS curve decreases steeply in the
 0–10°C range and flattens at higher temperatures, suggesting diminishing
 marginal effects of warmth once heating demand is already low.
 
-```{r glm-poisson-plots, echo=FALSE, fig.height=4, fig.show='hold', out.width='50%'}
+```{r glm-poisson-plots, echo=TRUE, fig.height=4, fig.show='hold', out.width='50%'}
 ggplot(dat_count, aes(x = building_type, y = n_high_days, fill = building_type)) +
   geom_boxplot(alpha = 0.7, outlier.size = 0.2) +
   scale_fill_manual(values = clr_builds, guide = "none") +
@@ -697,7 +700,7 @@ heating*, *number of residents*, and *living area* show moderate to small
 increases. *Heating degree days* sits right at 1 and is the only non-significant
 predictor (shown in grey).
 
-```{r glm-poisson-rr-plot, echo=FALSE, fig.height=5, fig.width=7, fig.align='center'}
+```{r glm-poisson-rr-plot, echo=TRUE, fig.height=5, fig.width=7, fig.align='center'}
 coef_summary <- coef(summary(mod_pois))
 
 coef_df <- data.frame(
@@ -749,7 +752,7 @@ ggplot(
 
 ### Model Diagnostics
 
-```{r diagnostics, echo=FALSE}
+```{r diagnostics, echo=TRUE}
 s_m_p <- summary(mod_pois)
 disp_pois <- s_m_p$deviance / s_m_p$df.residual
 
@@ -783,7 +786,7 @@ share*, *house vs apartments*) show the largest absolute increase, while those w
 very small SEs (e.g., *living area*, *number of residents*) are inflated by a
 smaller absolute amount but the same factor $\sqrt{\hat{\phi}}$.
 
-```{r quasi-se-plot, echo=FALSE, fig.height=4, fig.align='center'}
+```{r quasi-se-plot, echo=TRUE, fig.height=4, fig.align='center'}
 pois_tidy <- tidy(mod_pois) %>% select(term, estimate, std.error, p.value)
 quasi_tidy <- tidy(mod_quasi_pois) %>% select(term, std.error, p.value)
 
@@ -846,7 +849,9 @@ and report the Root Mean Squared Error (RMSE). The observed-vs-fitted plot is
 rendered as a hexbin to handle overplotting given the large number of
 observations.
 
-```{r goodness-of-fit, echo=FALSE, fig.height=4}
+<details>
+<summary>Show / hide result</summary>
+```{r goodness-of-fit, echo=TRUE, fig.height=4}
 dat_count$fitted_pois <- fitted(mod_pois)
 dat_count$fitted_quasi <- fitted(mod_quasi_pois)
 
@@ -863,6 +868,8 @@ knitr::kable(
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 
 ```
+</details>
+
 The RMSE of `r round(rmse_pois, 3)` days reflects substantial residual spread, partly explained by the high overdispersion ($\hat{\phi}$ = `r round(phi_q, 2)`). Note that the quasi-Poisson model produces identical fitted values and therefore the same RMSE, as it only affects standard errors and inference, not point predictions.
 
 ### Key Findings
@@ -1753,10 +1760,14 @@ consistency and prevent data leakage.
 
 ### Model setup
 
+<details>
+<summary>Show / hide result</summary>
 ```{r nn-modell, echo=TRUE}
 cat(deparse(formula(mod_nn)), "\n\n")
 mod_nn$call
 ```
+</details>
+
 
 The neural network is specified with an architecture of (9–25–1), consisting of
 nine input nodes, one hidden layer with 25 neurons, and a single output
@@ -1778,8 +1789,9 @@ performance and model stability, favouring a parsimonious architecture that
 performs reliably on unseen data.
 
 ### Model Results
-
-```{r nn-results, echo=FALSE}
+<details>
+<summary>Show / hide result</summary>
+```{r nn-results, echo=TRUE}
 truth <- test_nn$high_consumption
 pred_class <- factor(
   ifelse(pred_prob_1 >= 0.5, "1", "0"),
@@ -1815,6 +1827,8 @@ knitr::kable(
 ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 ```
+</details>
+
 
 The neural network achieves an accuracy of approximately `r round(acc, 2)`. Because the binary
 target is defined using the 75th-percentile threshold, roughly 75% of observations
@@ -1849,7 +1863,7 @@ concentrated at lower values. However, noticeable overlap in the mid-range
 indicates that some observations cannot be clearly distinguished, which explains
 the presence of classification errors.
 
-```{r nn-pred-prob, echo=FALSE, fig.height=4, fig.width=6, fig.align='center'}
+```{r nn-pred-prob, echo=TRUE, fig.height=4, fig.width=6, fig.align='center'}
 nn_prob_df <- data.frame(
   index       = seq_along(pred_prob_1),
   probability = as.numeric(pred_prob_1),
@@ -1878,7 +1892,7 @@ Most observations lie on the diagonal, confirming a high number of correct
 predictions for both classes. Nevertheless, errors occur in both directions,
 highlighting that class separation is not complete.
 
-```{r nn-confmat, echo=FALSE, fig.height=4, fig.width=4.5, fig.align='center'}
+```{r nn-confmat, echo=TRUE, fig.height=4, fig.width=4.5, fig.align='center'}
 nn_df <- data.frame(
   Predicted = factor(c("0", "0", "1", "1"), levels = c("1", "0")),
   Actual    = factor(c("0", "1", "0", "1"), levels = c("0", "1")),
@@ -1917,7 +1931,7 @@ classification. The steep initial increase suggests that high true positive
 rates can be achieved with relatively low false positive rates, while the
 flattening at higher values reflects diminishing gains.
 
-```{r nn_roc, echo=FALSE, fig.height=4, fig.width=6, fig.align='center'}
+```{r nn_roc, echo=TRUE, fig.height=4, fig.width=6, fig.align='center'}
 roc_df_nn <- data.frame(
   fpr = perf_roc@x.values[[1]],
   tpr = perf_roc@y.values[[1]]
