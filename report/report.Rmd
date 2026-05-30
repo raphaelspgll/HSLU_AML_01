@@ -21,10 +21,27 @@ knitr::opts_chunk$set(
   echo = TRUE,
   message = FALSE,
   warning = FALSE,
-  fig.width = 8,
-  fig.height = 5,
+  fig.width = 7,
+  fig.height = 4,
   cache = TRUE
 )
+```
+
+```{css, echo=FALSE}
+body {
+  font-size: 13px;
+  line-height: 1.45;
+}
+p {
+  margin-bottom: 0.55em;
+}
+h1, h2, h3, h4 {
+  margin-top: 1.1em;
+  margin-bottom: 0.35em;
+}
+.main-container {
+  padding-top: 10px;
+}
 ```
 
 ```{r packages, message=FALSE}
@@ -405,7 +422,7 @@ ggplot(fit_df, aes(x = fitted, y = observed)) +
 
 ### Model Diagnostics
 
-```{r lm-diagnostics, echo=FALSE, fig.height=6, fig.width=7, fig.align='center'}
+```{r lm-diagnostics, echo=FALSE, fig.height=5, fig.width=7, fig.align='center'}
 aug <- broom::augment(heapo_lm)
 
 p1 <- ggplot(aug, aes(x = .fitted, y = .resid)) +
@@ -1453,7 +1470,7 @@ The component plots below visualise the estimated smooth function for each
 predictor, showing how each variable contributes to the predicted log consumption 
 independently of the others.
 
-```{r gam-smooth-plots, fig.height=8, fig.width=10, fig.align='center'}
+```{r gam-smooth-plots, fig.height=6, fig.width=9, fig.align='center'}
 gratia::draw(
   model_gam,
   residuals = FALSE,
