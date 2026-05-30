@@ -124,6 +124,12 @@ set of building, technology, and weather covariates.
 
 ## Variable Description
 
+The raw HEAPO dataset spans 2018 to 2024 across 438 monitored households in the
+canton of Zurich. The modelling subset was restricted to the period 2022-01-01
+through 2024-02-29 and limited to households with at least 95% daily coverage to
+exclude partially observed installations. It was then randomly sampled to a
+maximum of 100,000 observations to comply with the course data size limit.
+
 | Variable | Type | Description |
 |:---|:---|:---|
 | `log_kWh_total` | Continuous | Natural log of daily total electricity consumption (kWh). Response for LM and GAM. |
@@ -137,11 +143,6 @@ set of building, technology, and weather covariates.
 | `has_floor_heating` | Binary | 1 if floor heating system present, 0 otherwise. |
 | `high_consumption` | Binary | 1 if daily kWh exceeds the household's own 75th percentile (top 25% of that household's days). Response for GLM Binomial. |
 
-The raw HEAPO dataset spans 2018 to 2024 across 438 monitored households in the
-canton of Zurich. The modelling subset was restricted to the period 2022-01-01
-through 2024-02-29 and limited to households with at least 95% daily coverage to
-exclude partially observed installations. It was then randomly sampled to a
-maximum of 100,000 observations to comply with the course data size limit.
 
 # Exploratory Data Analysis
 
@@ -154,6 +155,13 @@ percentile, flagging the top 25% of consumption days for each individual
 household.
 
 ## Seasonal Pattern
+
+Consumption in winter months (December to February) is roughly three to five
+times higher than in summer (June to August), driven almost entirely by heat
+pump operation for space heating. The wide interquartile range in winter
+reflects differences in building size, insulation quality, and heat pump
+technology across households. This strong seasonal pattern motivates heating
+degree days as the primary weather predictor in all models.
 
 ```{r eda-seasonal, fig.height=4, fig.align='center'}
 heapo %>%
@@ -168,13 +176,6 @@ heapo %>%
   ) +
   report_theme
 ```
-
-Consumption in winter months (December to February) is roughly three to five
-times higher than in summer (June to August), driven almost entirely by heat
-pump operation for space heating. The wide interquartile range in winter
-reflects differences in building size, insulation quality, and heat pump
-technology across households. This strong seasonal pattern motivates heating
-degree days as the primary weather predictor in all models.
 
 ## Heating Degree Days vs. Consumption
 
@@ -204,14 +205,19 @@ heapo %>%
   report_theme
 ```
 
-The relationship is positive and seams to be linear across the observed
-HDD range, with consumption measured form 0 to 125 kWh per day at 0 heating degree days
+The relationship is positive and seems to be linear across the observed
+HDD range, with consumption measured from 0 to 125 kWh per day at 0 heating degree days
 , which hints to the base load of the building types. The loess smoother confirms that no sharp threshold or strong
 curvature is present, which justifies treating HDD as a continuous predictor in
 the Linear Model. A slight levelling off at very high HDD values is visible, and
 the GAM will capture this through its flexible smooth terms.
 
 ## Consumption by Building Type
+
+Houses consume substantially more electricity per day than apartments, with medians
+differing by roughly a factor of two. This gap persists after controlling for
+weather, as the modelling section will confirm. Building type therefore carries
+real structural signal and is included as a predictor in all models.
 
 ```{r eda-building, fig.height=3.5, fig.align='center'}
 heapo %>%
@@ -227,10 +233,6 @@ heapo %>%
   report_theme
 ```
 
-Houses consume substantially more electricity per day than apartments, with medians
-differing by roughly a factor of two. This gap persists after controlling for
-weather, as the modelling section will confirm. Building type therefore carries
-real structural signal and is included as a predictor in all models.
 
 Taken together, the three plots tell a consistent story. Electricity demand is
 primarily a seasonal phenomenon. The portfolio shifts from a low-consumption
@@ -954,8 +956,8 @@ hoc correction.
 ### Objective
 
 Can we predict whether a given day will be unusually high-consumption for a
-specific household? This section fits a **Generalised Linear Model with a
-binomial family** to answer exactly that question. The response variable
+specific household? This section fits a Generalised Linear Model with a
+binomial family to answer exactly that question. The response variable
 `high_consumption` is a binary indicator that equals 1 if the household's daily
 `log_kWh_total` exceeds that household's own 75th percentile and 0 otherwise.
 Using a per-household threshold means the model is not distinguishing houses
@@ -1056,12 +1058,13 @@ f1 <- 2 * precision * recall / (precision + recall)
 specificity <- tn / (tn + fp)
 ```
 
-Coefficients from a binomial GLM are expressed as **odds ratios** (OR =
+Coefficients from a binomial GLM are expressed as odds ratios (OR =
 exp(coefficient)). A value above 1 increases the odds that a day falls in the
 top 25% of a household's own consumption, and a value below 1 decreases it,
 relative to the reference category.
-
-```{r glm-binomial-coef-table, echo=FALSE}
+<details>
+<summary>Show / hide table</summary>
+```{r glm-binomial-coef-table, echo=TRUE}
 glm_cs <- coef(summary(model_glm))
 glm_tbl <- data.frame(
   Term = rownames(glm_cs),
@@ -1098,8 +1101,8 @@ knitr::kable(
 ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 ```
-
-A striking result of using the per-household threshold is that structural
+</details>
+The result of using the per-household threshold is that structural
 predictors (building type, heat pump type, living area, and number of residents)
 are all statistically non-significant. This is expected because the threshold
 is set individually for each household, and these characteristics are already
@@ -1342,10 +1345,10 @@ The Linear Model assumes that each predictor affects the response in a straight
 line. For energy consumption, this is often too rigid. The relationship between
 heating demand and electricity use may differ between houses and apartments, and
 between heat pump types, in ways that cannot be captured by fixed linear slopes.
-A **Generalised Additive Model (GAM)** relaxes this assumption by replacing
+A Generalised Additive Model (GAM) relaxes this assumption by replacing
 fixed slopes with flexible smooth functions, while remaining fully interpretable
-through its component plots. Here we model `log_kWh_total` using **exactly the
-same predictors as the extended Linear Model**, namely heating degree days
+through its component plots. Here we model `log_kWh_total` using exactly the
+same predictors as the extended Linear Model, namely heating degree days
 (interacted with building type and heat pump type), sunshine hours, humidity,
 living area, and the number of residents. The GAM replaces the LM's explicit interaction
 terms with `by =` smooths, which allow the shape of the heating-demand curve to
@@ -1419,6 +1422,8 @@ it to a fixed linear slope.
 The table below summarises the estimated degrees of freedom, F-statistic and 
 significance for each smooth term in the model.
 
+<details>
+<summary>Show / hide table</summary>
 ```{r gam-smooth-table}
 s_gam <- summary(model_gam)
 s_tab <- as.data.frame(s_gam$s.table)
@@ -1436,16 +1441,15 @@ knitr::kable(
 ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 ```
-
+</details>
 The smooth terms reveal where non-linearity is present in the data.
 
-- **s(HDD):apartment (edf = 0.8):** The smooth shows a mild positive trend but with a 
-  very wide confidence band, reflecting high uncertainty. The non-significance 
-  (p = 0.316) is due to this uncertainty rather than the effect being absent.
-  For apartments, colder days are associated with higher consumption but the 
-  uncertainty is too large to pin down the exact shape of this relationship. 
-  This likely reflects higher variability in flat consumption patterns rather 
-  than the absence of a heating effect.
+- **s(HDD):apartment (edf = 0.8):** The relationship is approximately linear and 
+non-significant (p = 0.316). The wide confidence band likely reflects the limited 
+number of apartment observations in the dataset rather than genuine ambiguity about 
+the functional form. The data do not provide sufficient evidence to isolate a 
+distinct heating response for apartments beyond the main HDD effect.
+
 - **s(HDD):house (edf = 5.3):** Highly significant (p < 0.001) and strongly
   non-linear. For houses, the response to cold weather is strongly non-linear 
   and highly certain, consumption accelerates disproportionately on the coldest days, 
@@ -1462,18 +1466,13 @@ The smooth terms reveal where non-linearity is present in the data.
   passive solar gain, but the relationship is not a simple straight line. 
   The effect levels off at moderate sunshine hours and rises again at very 
   high values, suggesting that on the sunniest days some households switch their
-  reversible heat pump to cooling mode, increasing electricity consumption.
+  probably reversible heat pump to cooling mode, increasing electricity consumption.
 - **s(humidity_avg) (edf = 5.3):** Non-linear in shape but not significant
   overall (p = 0.118). Humidity may interact with perceived temperature in ways
   not fully captured here. It is retained to enable a direct and controlled 
   comparison between the LM and GAM on identical predictors. Dropping it did
   not meaningfully change the other coefficients.
-- **s(living_area) (edf = 9.0):** Highly significant (p < 0.001) and the most
-  non-linear term. Consumption does not scale proportionally with floor area,
-  medium-sized homes behave differently from small or very large ones.
-  Consumption peaks around 500–600 m² and then declines sharply at very large 
-  living areas, which may reflect more energy-efficient construction in larger 
-  or newer buildings.
+- **s(living_area) (edf = 9.0):** Highly significant (p < 0.001) and the most      non-linear term in the model. Consumption does not scale proportionally with     floor area. The smooth suggests a complex pattern in the small-to-medium range   (100–400 m²) that may partly reflect overfitting given the high edf. The         dominant feature is a clear peak around 500–600 m² followed by a sharp decline   at very large living areas. One possible explanation is more energy-efficient    construction in larger or newer buildings, though this cannot be confirmed from   the data alone.
 
 The parametric terms capture the baseline level shifts between groups and are 
 summarised in the table below.
@@ -1498,13 +1497,13 @@ knitr::kable(
 
 While the `by =` smooths allow the heating-demand curve to differ in shape. Converting
 the parametric estimates with `(exp(coef) - 1) × 100` gives the percentage
-difference relative to the reference level (flat, air-source heat pump).
+difference relative to the reference level (apartment, air-source heat pump).
 
 - **Houses vs. apartments:** The parametric term for `building_typehouse` is
   small and not statistically significant (p = 0.562). Once the model fits a
   separate heating-demand curve per building type, the baseline intercept gap
   disappears. The difference between building types is captured entirely by how
-  they respond to cold weather, not by a flat shift.
+  they respond to cold weather.
 - **Ground-source vs. air-source heat pump:** Ground-source systems consume
   `r round((1 - exp(coef(model_gam)["heatpump_typeground-source"])) * 100, 1)`%
   less electricity per day, all else equal (p < 0.001). This large reduction
@@ -1667,7 +1666,7 @@ pumps identified above.
 The plots below assess how well the model fits the training data and whether 
 any systematic patterns remain in the residuals.
 
-```{r gam-obs-vs-fitted, echo=FALSE, fig.height=3.5, fig.width=5.5, out.width="70%", fig.align="center"}
+```{r gam-obs-vs-fitted, echo=TRUE, fig.height=3.5, fig.width=5.5, out.width="70%", fig.align="center"}
 fit_df <- data.frame(
   observed = gam_train$log_kWh_total,
   fitted = fitted(model_gam)
@@ -1728,8 +1727,9 @@ The vertical streaks of extreme negative residuals around fitted = 2 correspond
 to the same anomalous near-zero consumption days visible in the observed vs 
 fitted plot. Residual variance is broadly stable across the fitted range with 
 no strong funnel shape, suggesting heteroscedasticity is not a major concern.
-
-```{r gam-performance}
+<details>
+<summary>Show / hide result</summary>
+```{r gam-performance, echo=FALSE}
 pred_gam <- predict(model_gam, newdata = gam_test)
 actual_log <- gam_test$log_kWh_total
 actual_kwh <- exp(actual_log)
@@ -1749,19 +1749,20 @@ cat(sprintf(
   mae_pct
 ))
 ```
+</details>
 
-The most interpretable performance metric here is the **mean absolute error in
-kWh**. On average, the model's daily consumption forecasts are off by
-**`r round(gam_mae_kwh, 1)` kWh**, against a median household consumption of
-**`r round(median_kwh, 1)` kWh/day**. This means a typical prediction error of
-about **`r round(mae_pct, 0)`%** of a household's usual daily consumption.
+The most interpretable performance metric here is the mean absolute error in
+kWh. On average, the model's daily consumption forecasts are off by
+`r round(gam_mae_kwh, 1)` kWh, against a median household consumption of
+`r round(median_kwh, 1)` kWh/day. This means a typical prediction error of
+about `r round(mae_pct, 0)`% of a household's usual daily consumption.
 This is expected for a cross-sectional model of this type. 
 Weather and building characteristics capture the structural drivers of demand, 
 but day-to-day variation driven by individual behaviour, whether someone is 
 home, what appliances they use, is simply not observable from the available 
 predictors and represents a natural ceiling for this modelling approach.
 
-The **R² of `r round(r2_gam * 100, 1)`%** tells the same story from a different
+The R² of `r round(r2_gam * 100, 1)`% tells the same story from a different
 angle. The eight predictors explain roughly a third of the day-to-day variation
 in consumption, and the remaining two-thirds is driven by factors not available
 in this dataset. Compared to the extended Linear Model (R² = 27.4%, MAE =
@@ -1780,7 +1781,7 @@ actionable, and R² communicates model quality in plain percentage terms.
   meaning the LM's linear interaction term understates the acceleration in
   consumption during the coldest days.
 - **HDD for apartments** shows no significant smooth effect (edf = 0.8,
-  p = 0.316). Flat consumption responds to cold weather in a way that is
+  p = 0.316). Apartment consumption responds to cold weather in a way that is
   well described by a straight line once group-specific curves are allowed.
   The extended LM captures those effects adequately.
 - **Ground-source heat pumps** consume
@@ -2619,8 +2620,7 @@ Across all six models, interpretability and predictive performance trade
 off consistently. The LM, GAMs, and GLM Poisson offer transparent,
 coefficient-based explanations but leave more variance unexplained. The
 SVM and Neural Network improve accuracy but are effectively black boxes.
-The GLM Binomial sits in between — log-odds coefficients remain
-interpretable while classification performance is competitive. The right
+The GLM Binomial offers a middle ground, with interpretable log-odds coefficients and competitive classification performance. The right
 choice depends on whether the use case demands explainability or accuracy.
 
 # Conclusions {#conclusions}
@@ -2660,15 +2660,25 @@ achieving an AUC of
 `r round(class_summary[grepl("GLM", class_summary$Model), "CV AUC"], 3)`
 and accuracy of
 `r round(class_summary[grepl("GLM", class_summary$Model), "CV Accuracy"] * 100, 1)`%
-while remaining fully interpretable.
+while remaining fully interpretable and maintainable since less parameters are needed.
 
 The practical implication for energy suppliers and grid operators is to target
 demand management programmes at larger households with air-source systems during
 cold weather peaks, where high occupancy and less efficient heating combine to
 produce the sharpest load spikes. Weekend time-of-use tariffs or demand response
-incentives offer an additional lever for flattening the load peaks that drive
-balancing energy costs.
+incentives offer an additional lever for flattening these peaks and reducing
+balancing energy costs. Since the model can flag high-demand days in advance,
+proactive communication to at-risk households before cold snaps represents a
+low-cost first step. At the grid level, aggregating flexibility across many heat
+pump households into a virtual power plant would allow suppliers to collectively
+shift or pause demand during price spikes. The findings here provide a basis
+for identifying which households offer the most relevant flexibility. For
+households currently considering a heat pump installation, ground-source systems
+show consistently lower consumption and should be recommended where feasible.
+Promoting energy storage and load-shifting solutions could further reduce reliance
+on the spot market, though further research is needed to quantify the long-term
+financial benefit across all these approaches.
 
 # Use of Generative AI {#ai}
 
-Generative AI tools — primarily Claude (Anthropic) and GitHub Copilot — were used throughout this project to support code generation, debugging, and text drafting. AI assistance proved effective for producing boilerplate R code for data preprocessing, visualisation, and model-fitting wrappers, as well as for generating first drafts of methodological prose describing model outputs and statistical concepts. Human oversight was essential for tasks requiring analytical judgement, including the selection of modelling thresholds, cross-validation architecture, and the interpretation of model coefficients, where AI-generated suggestions occasionally contained subtle errors or overstated certainty. All AI-generated code was reviewed and tested prior to integration, and all interpretive text was verified against actual model output before inclusion in this report.
+Generative AI tools, primarily Claude (Anthropic) and GitHub Copilot, were used throughout this project to support code generation, debugging, and text drafting. AI assistance proved effective for producing boilerplate R code for data preprocessing, visualisation, and model-fitting wrappers, as well as for generating first drafts of methodological prose describing model outputs and statistical concepts. Human oversight was essential for tasks requiring analytical judgement, including the selection of modelling thresholds, cross-validation architecture, and the interpretation of model coefficients, where AI-generated suggestions occasionally contained subtle errors or overstated certainty. All AI-generated code was reviewed and tested prior to integration, and all interpretive text was verified against actual model output before inclusion in this report.
