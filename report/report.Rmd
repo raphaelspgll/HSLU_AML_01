@@ -312,8 +312,8 @@ $$
 
 **Extended MLR:** adds two interaction terms:
 
-- `heating_degree_days` × `heatpump_type`
-- `heating_degree_days` × `building_type`
+- `heating_degree_days` × `heatpump_type` (cold-weather sensitivity by pump technology)
+- `heating_degree_days` × `building_type` (cold-weather sensitivity by building type)
 
 All coefficients are on the log scale: a coefficient of 0.05 means a 5%
 multiplicative change in kWh for a one-unit increase in the predictor.
