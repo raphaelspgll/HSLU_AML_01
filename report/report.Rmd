@@ -68,7 +68,7 @@ library(gridExtra)
 clr_primary <- "#4E79A7"
 clr_secondary <- "#E15759"
 clr_neutral <- "#AAAAAA"
-clr_builds <- c("apartment" = "#4E79A7", "house" = "#E15759")
+clr_builds <- c("appartment" = "#4E79A7", "house" = "#E15759")
 report_theme <- theme_minimal(base_size = 12)
 ```
 
@@ -136,7 +136,7 @@ maximum of 100,000 observations to comply with the course data size limit.
 | `heating_degree_days` | Continuous | Daily heating demand below the 12°C Swiss SIA base temperature (°C·day). |
 | `temp_avg` | Continuous | Daily average outdoor temperature (°C). |
 | `living_area` | Continuous | Heated floor area of the household (m²). |
-| `building_type` | Categorical (>2 levels) | Building type, either "apartment" or "house". |
+| `building_type` | Categorical (>2 levels) | Building type, either "appartment" or "house". |
 | `heatpump_type` | Categorical (2 levels) | Heat pump technology: air-source or ground-source. |
 | `n_residents` | Count | Number of permanent household members. |
 | `is_weekend` | Binary | 1 if Saturday or Sunday, 0 otherwise. |
@@ -1843,7 +1843,7 @@ neural networks, as it improves numerical stability and facilitates efficient
 training. The same transformations are then applied to the test set to ensure
 consistency and prevent data leakage.
 
-### Model Setup
+### Model setup
 
 <details>
 <summary>Show / hide result</summary>
