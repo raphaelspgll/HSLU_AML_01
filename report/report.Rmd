@@ -1985,7 +1985,7 @@ nn_df <- data.frame(
   Label = c("TN", "FN", "FP", "TP")
 )
 
-ggplot(nn_df, aes(x = Actual, y = Predicted, fill = Count)) +
+ggplot(nn_df, aes(x = Actual, y = Predicted, fill = Label)) +
   geom_tile(color = "white", linewidth = 1.2) +
   geom_text(
     aes(label = paste0(Label, "\n", Count)),
@@ -1993,7 +1993,7 @@ ggplot(nn_df, aes(x = Actual, y = Predicted, fill = Count)) +
     fontface = "bold",
     color = "white"
   ) +
-  scale_fill_gradient(low = clr_primary, high = clr_secondary) +
+  scale_fill_manual(values = c("TN" = clr_primary, "TP" = clr_primary, "FP" = clr_secondary, "FN" = clr_secondary)) +
   scale_x_discrete(labels = c("0" = "Low (0)", "1" = "High (1)")) +
   scale_y_discrete(labels = c("0" = "Low (0)", "1" = "High (1)")) +
   labs(
@@ -2335,7 +2335,7 @@ svm_df <- data.frame(
   Label = c("TN", "FN", "FP", "TP")
 )
 
-ggplot(svm_df, aes(x = Actual, y = Predicted, fill = Count)) +
+ggplot(svm_df, aes(x = Actual, y = Predicted, fill = Label)) +
   geom_tile(color = "white", linewidth = 1.2) +
   geom_text(
     aes(label = paste0(Label, "\n", Count)),
@@ -2343,7 +2343,7 @@ ggplot(svm_df, aes(x = Actual, y = Predicted, fill = Count)) +
     fontface = "bold",
     color = "white"
   ) +
-  scale_fill_gradient(low = clr_primary, high = clr_secondary) +
+  scale_fill_manual(values = c("TN" = clr_primary, "TP" = clr_primary, "FP" = clr_secondary, "FN" = clr_secondary)) +
   scale_x_discrete(labels = c("normal" = "Low (0)", "high" = "High (1)")) +
   scale_y_discrete(labels = c("normal" = "Low (0)", "high" = "High (1)")) +
   labs(
