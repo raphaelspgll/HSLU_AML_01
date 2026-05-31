@@ -312,12 +312,12 @@ $$
 
 **Extended MLR:** adds two interaction terms motivated by domain knowledge:
 
-- $\text{heating\_degree\_days} \times \text{heatpump\_type}$: different heat
-  pump technologies have different efficiencies in cold conditions, so the
-  effect of cold on consumption should vary by pump type.
-- $\text{heating\_degree\_days} \times \text{building\_type}$: houses and
-  apartments differ structurally in size, exposed surface area, and construction,
-  so their cold-weather sensitivity is expected to differ.
+- `heating_degree_days` × `heatpump_type`: different heat pump technologies
+  have different efficiencies in cold conditions, so the effect of cold on
+  consumption should vary by pump type.
+- `heating_degree_days` × `building_type`: houses and apartments differ
+  structurally in size, exposed surface area, and construction, so their
+  cold-weather sensitivity is expected to differ.
 
 All coefficients are on the log scale: a coefficient of 0.05 means a 5%
 multiplicative change in kWh for a one-unit increase in the predictor.
