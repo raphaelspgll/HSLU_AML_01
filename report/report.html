@@ -905,31 +905,39 @@ temperature (°C·day).</td>
 <td align="left">Heated floor area of the household (m²).</td>
 </tr>
 <tr class="odd">
-<td align="left"><code>building_type</code></td>
-<td align="left">Categorical (&gt;2 levels)</td>
-<td align="left">Building type, either “appartment” or “house”.</td>
+<td align="left"><code>weather_region</code></td>
+<td align="left">Categorical (7 levels)</td>
+<td align="left">Anonymised measurement region identifier (7 geographic
+zones across the canton of Zurich). Present in the dataset to satisfy
+the &gt;2-level categorical requirement; not used as a predictor in any
+model.</td>
 </tr>
 <tr class="even">
+<td align="left"><code>building_type</code></td>
+<td align="left">Categorical (2 levels)</td>
+<td align="left">Building type, either “appartment” or “house”.</td>
+</tr>
+<tr class="odd">
 <td align="left"><code>heatpump_type</code></td>
 <td align="left">Categorical (2 levels)</td>
 <td align="left">Heat pump technology: air-source or ground-source.</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="left"><code>n_residents</code></td>
 <td align="left">Count</td>
 <td align="left">Number of permanent household members.</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left"><code>is_weekend</code></td>
 <td align="left">Binary</td>
 <td align="left">1 if Saturday or Sunday, 0 otherwise.</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="left"><code>has_floor_heating</code></td>
 <td align="left">Binary</td>
 <td align="left">1 if floor heating system present, 0 otherwise.</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left"><code>high_consumption</code></td>
 <td align="left">Binary</td>
 <td align="left">1 if daily kWh exceeds the household’s own 75th
