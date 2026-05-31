@@ -438,7 +438,7 @@ aug <- broom::augment(heapo_lm)
 p1 <- ggplot(aug, aes(x = .fitted, y = .resid)) +
   geom_point(alpha = 0.1, size = 0.5, color = clr_primary) +
   geom_smooth(
-    method = "loess",
+    method = "gam",
     se = FALSE,
     color = clr_secondary,
     linewidth = 0.8
@@ -460,7 +460,7 @@ p2 <- ggplot(aug, aes(sample = .std.resid)) +
 p3 <- ggplot(aug, aes(x = .fitted, y = sqrt(abs(.std.resid)))) +
   geom_point(alpha = 0.1, size = 0.5, color = clr_primary) +
   geom_smooth(
-    method = "loess",
+    method = "gam",
     se = FALSE,
     color = clr_secondary,
     linewidth = 0.8
@@ -475,7 +475,7 @@ p3 <- ggplot(aug, aes(x = .fitted, y = sqrt(abs(.std.resid)))) +
 p4 <- ggplot(aug, aes(x = .hat, y = .std.resid)) +
   geom_point(alpha = 0.2, size = 0.5, color = clr_primary) +
   geom_smooth(
-    method = "loess",
+    method = "gam",
     se = FALSE,
     color = clr_secondary,
     linewidth = 0.8
