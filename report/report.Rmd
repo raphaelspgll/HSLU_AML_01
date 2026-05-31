@@ -29,7 +29,7 @@ knitr::opts_chunk$set(
 
 ```{css, echo=FALSE}
 body {
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.45;
 }
 p {
@@ -296,9 +296,9 @@ if (file.exists(mlm_simple_path)) {
 
 ### Objective
 
-This section models daily household energy consumption as `log_kWh_total`, the natural logarithm of total daily kilowatt-hour usage. The log transformation is standard for energy data: daily kWh is strictly positive and right-skewed in raw form, and approximately normal on the log scale.
+Can a simple regression explain how much electricity a household uses on a given day? This section fits a multiple linear regression to `log_kWh_total`, the natural logarithm of daily kilowatt-hour usage. The log transformation is standard for energy data: raw daily kWh is strictly positive and right-skewed, and the log scale is approximately normal. Coefficients on the log scale are directly readable as approximate percentage changes in consumption, which matters for communicating load drivers to grid operators and energy suppliers.
 
-Predictors cover weather conditions (heating degree days, sunshine hours, humidity), building characteristics (building type, living area, heat pump type), and household composition (number of residents). Two interaction terms are added to test whether cold-weather sensitivity differs by building type and heat pump technology.
+Predictors cover weather conditions (heating degree days, sunshine hours, humidity), building characteristics (building type, living area, heat pump type), and household composition (number of residents). A simple additive model is estimated first as an interpretable baseline. Two interaction terms are then added: one testing whether cold-weather sensitivity differs between houses and apartments, and one testing whether it differs between heat pump technologies. Domain knowledge motivates both. Houses lose heat faster through larger surface areas, and ground-source heat pumps maintain higher efficiency in cold weather than air-source systems do.
 
 ### Model Setup
 
@@ -310,19 +310,13 @@ $$
 \log(\text{kWh}_i) = \beta_0 + \beta_1\,\text{HDD}_i + \beta_2\,\text{Sunshine}_i + \cdots + \beta_7\,\text{HeatpumpType}_i + \varepsilon_i
 $$
 
-**Extended MLR:** adds two interaction terms motivated by domain knowledge:
+**Extended MLR:** adds two interaction terms:
 
-- `heating_degree_days` × `heatpump_type`: different heat pump technologies
-  have different efficiencies in cold conditions, so the effect of cold on
-  consumption should vary by pump type.
-- `heating_degree_days` × `building_type`: houses and apartments differ
-  structurally in size, exposed surface area, and construction, so their
-  cold-weather sensitivity is expected to differ.
+- `heating_degree_days` × `heatpump_type`
+- `heating_degree_days` × `building_type`
 
 All coefficients are on the log scale: a coefficient of 0.05 means a 5%
 multiplicative change in kWh for a one-unit increase in the predictor.
-
-The panel structure (multiple observations per household) means the i.i.d. assumption of standard OLS is not fully met; standard errors may be slightly understated due to within-household correlation.
 
 ### Model Results
 
@@ -371,7 +365,7 @@ temperatures.
 
 ### Visual Evidence
 
-The coefficient plot below summarises the direction and significance of all predictors in the extended model.
+The coefficient plot below shows each predictor's estimated coefficient with 95% confidence intervals. A coefficient to the right of zero increases daily consumption; one to the left reduces it. Grey points whose intervals cross zero are not statistically significant.
 
 ```{r lm-coef-plot, echo=TRUE, fig.height=5, fig.width=8, out.width="100%", fig.align="center"}
 cis <- confint(heapo_lm)
@@ -406,7 +400,9 @@ ggplot(
   )
 ```
 
-The scatterplot of observed versus fitted values on the log scale illustrates the model's predictive fit. Points near the diagonal indicate accurate predictions.
+The HDD-by-house interaction sits furthest to the right, confirming that houses respond most strongly to cold weather. Ground-source heat pump households are clearly below zero on both the main effect and the interaction, consistent with their efficiency advantage at low temperatures. `humidity_avg` is the only predictor straddling zero.
+
+The scatterplot of observed versus fitted values on the log scale shows the model's overall predictive calibration. A perfectly calibrated model would scatter all points along the 1:1 diagonal; systematic deviations above or below the line indicate regions where the model consistently over- or under-predicts.
 
 ```{r lm-obs-vs-fit, echo=TRUE, fig.height=3.5, fig.width=5.5, out.width="70%", fig.align="center"}
 fit_df <- tibble(
@@ -490,6 +486,10 @@ p4 <- ggplot(aug, aes(x = .hat, y = .std.resid)) +
 
 gridExtra::grid.arrange(p1, p2, p3, p4, ncol = 2)
 ```
+
+The four panels assess the core OLS assumptions. *Residuals vs. Fitted* checks for leftover non-linearity after fitting; a flat smoother near zero indicates no major pattern has been missed. *Normal Q-Q* checks whether residuals are approximately normal, which matters for the validity of p-values. *Scale-Location* checks for heteroscedasticity; a rising smoother would mean larger fitted values have more variable errors. *Residuals vs. Leverage* checks whether any single observation is pulling the estimates far from where the rest of the data would place them.
+
+One assumption the plots cannot fully address is independence. The dataset contains many observations per household, so residuals from the same household are correlated. Standard errors are consequently understated to some degree, and significance levels should be read with that caveat.
 
 <details>
 <summary>Show / hide table</summary>
@@ -587,7 +587,7 @@ tibble(
 ```
 </details>
 
-The simple model achieves an adjusted R² of `r round(summary(heapo_mlm_simple)$adj.r.squared, 4)`. Adding the two interaction terms improves this to `r round(summary(heapo_lm)$adj.r.squared, 4)`, a real but modest gain. The interaction terms are meaningful, but overall explanatory power remains limited on this dataset.
+The simple model achieves an adjusted R² of `r round(summary(heapo_mlm_simple)$adj.r.squared, 4)`. Adding the two interaction terms improves this to `r round(summary(heapo_lm)$adj.r.squared, 4)`, and 5-fold cross-validation confirms the pattern holds out-of-sample: MAE drops from `r round(lm_simple_cv_mae, 2)` to `r round(lm_ext_cv_mae, 2)` kWh/day. The gain from allowing cold-weather sensitivity to vary by group is real but small in absolute terms. Overall explanatory power is modest because weather and building characteristics capture only the structural drivers of consumption. Day-to-day variation driven by whether someone is home or what appliances are running is not in the dataset, and represents a natural ceiling for any model of this kind.
 
 ### Key Findings
 
@@ -730,7 +730,10 @@ counts concentrate near zero. The smooth LOESS curve decreases steeply in the
 marginal effects of warmth once heating demand is already low.
 
 ```{r glm-poisson-plots, echo=TRUE, fig.height=4, fig.show='hold', out.width='50%'}
-ggplot(dat_count, aes(x = building_type, y = n_high_days, fill = building_type)) +
+ggplot(
+  dat_count,
+  aes(x = building_type, y = n_high_days, fill = building_type)
+) +
   geom_boxplot(alpha = 0.7, outlier.size = 0.2) +
   scale_fill_manual(values = clr_builds, guide = "none") +
   labs(
@@ -1993,7 +1996,14 @@ ggplot(nn_df, aes(x = Actual, y = Predicted, fill = Label)) +
     fontface = "bold",
     color = "white"
   ) +
-  scale_fill_manual(values = c("TN" = clr_primary, "TP" = clr_primary, "FP" = clr_secondary, "FN" = clr_secondary)) +
+  scale_fill_manual(
+    values = c(
+      "TN" = clr_primary,
+      "TP" = clr_primary,
+      "FP" = clr_secondary,
+      "FN" = clr_secondary
+    )
+  ) +
   scale_x_discrete(labels = c("0" = "Low (0)", "1" = "High (1)")) +
   scale_y_discrete(labels = c("0" = "Low (0)", "1" = "High (1)")) +
   labs(
@@ -2210,9 +2220,9 @@ if (file.exists("../models/cv_class_results.rds")) {
 
 ### Objective
 
-This section classifies each household-day as *high consumption* (top 25% of that household's days) or *normal*, a binary problem with practical relevance: knowing which days are likely to be high-load in advance lets grid operators and energy providers plan capacity.
+Can a high-load day be identified before it happens, using only weather conditions and what we already know about the household? This section trains a Support Vector Machine to classify each household-day as *high consumption* (top 25% of that household's own days) or *normal*. The problem has direct operational relevance: a reliable early-warning classifier would let grid operators and energy providers plan capacity without waiting for demand spikes to appear on the meter.
 
-An SVM is used because it can find non-linear decision boundaries via kernel functions without requiring distributional assumptions about the predictors. Performance is evaluated on a held-out test set using accuracy, sensitivity, specificity, and F1 score.
+An SVM is used because consumption peaks may not separate cleanly from normal days along a linear boundary. With a radial basis function (RBF) kernel, the model can find curved decision surfaces in high-dimensional feature space without making distributional assumptions about the predictors. A baseline model with default hyperparameters is compared against a tuned version where the regularisation strength C and kernel bandwidth sigma are selected by 5-fold cross-validation. The same per-household 75th percentile threshold used in the GLM Binomial is applied throughout, so the two classifiers can be compared directly on the same task.
 
 ### Data Preparation
 
@@ -2237,8 +2247,6 @@ prop.table(table(train_data$high_consumption)) %>%
 </details>
 
 ### Model Setup
-
-Both models use a radial basis function (RBF) kernel, which maps data into a higher-dimensional space to find non-linear decision boundaries. This suits energy data where weather and household effects interact in ways a linear boundary cannot capture.
 
 **Baseline SVM:** C = 1, sigma estimated from training data. This provides a reference for the tuned model.
 
@@ -2312,7 +2320,7 @@ The more informative metrics are:
 
 ### Visual Evidence
 
-The confusion matrix heatmap shows the distribution of predictions versus actual labels. Correct predictions fall on the diagonal; off-diagonal cells are misclassifications.
+The confusion matrix heatmap shows the full breakdown of test-set predictions against actual labels. Blue cells on the diagonal are correct predictions; red cells off the diagonal are errors. Reading column-wise gives the recall for each class; reading row-wise gives precision.
 
 ```{r svm-conf-matrix-plot, echo=TRUE, fig.height=4, fig.width=4.5, fig.align='center'}
 cm_mat <- cm_best$table
@@ -2343,7 +2351,14 @@ ggplot(svm_df, aes(x = Actual, y = Predicted, fill = Label)) +
     fontface = "bold",
     color = "white"
   ) +
-  scale_fill_manual(values = c("TN" = clr_primary, "TP" = clr_primary, "FP" = clr_secondary, "FN" = clr_secondary)) +
+  scale_fill_manual(
+    values = c(
+      "TN" = clr_primary,
+      "TP" = clr_primary,
+      "FP" = clr_secondary,
+      "FN" = clr_secondary
+    )
+  ) +
   scale_x_discrete(labels = c("normal" = "Low (0)", "high" = "High (1)")) +
   scale_y_discrete(labels = c("normal" = "Low (0)", "high" = "High (1)")) +
   labs(
@@ -2363,7 +2378,9 @@ ggplot(svm_df, aes(x = Actual, y = Predicted, fill = Label)) +
   theme(legend.position = "none", panel.grid = element_blank())
 ```
 
-The bar chart compares sensitivity and specificity for the baseline and tuned models, showing how tuning shifts the balance between detecting high-consumption days and avoiding false alarms.
+The matrix makes the model's asymmetry concrete. The large TN count shows the SVM seldom raises false alarms on genuinely normal days, explaining the high specificity. The large FN count shows that more than half of actual high-consumption days are silently missed. This conservative bias is a direct consequence of the 75/25 class split: on ambiguous days, the model defaults to the majority class.
+
+The bar chart puts the sensitivity-specificity trade-off for both models side by side. Tuning from default parameters to C = `r best_C`, sigma = `r best_sigma` pushes sensitivity up from `r round(cm_baseline$byClass["Sensitivity"] * 100, 1)`% to `r round(cm_best$byClass["Sensitivity"] * 100, 1)`%, recovering more true high-consumption days at the cost of a small drop in specificity. The gain is consistent but modest, pointing to the predictor set rather than hyperparameter choice as the main constraint.
 
 ```{r svm-metric-comparison, echo=TRUE, fig.height=3.5, fig.width=5, out.width="48%", fig.show="hold", fig.align='center'}
 metrics_df <- bind_rows(
@@ -2396,11 +2413,9 @@ ggplot(metrics_df, aes(x = Metric, y = Value, fill = Model)) +
 
 Unlike regression models, SVM diagnostics focus on generalisation performance and modelling choices rather than distributional assumptions.
 
-**CV tuning results:** Across all 9 combinations, CV accuracy ranged from 0.8071 (C=10, sigma=0.01) to 0.8304 (C=100, sigma=0.1429). The top four combinations all involve sigma ≥ 0.1, suggesting a moderately local kernel works best. The gain from increasing C from 10 to 100 at sigma=0.1429 is small (0.8268 → 0.8304), with diminishing returns beyond that.
+**CV tuning results:** Across all 9 combinations, CV accuracy ranged from 0.8071 (C=10, sigma=0.01) to 0.8304 (C=100, sigma=0.1429). The top four combinations all involve sigma ≥ 0.1, suggesting a moderately local kernel works best. The gain from C=10 to C=100 at sigma=0.1429 is small (0.8268 → 0.8304), pointing to the predictor set as the limiting factor rather than model configuration.
 
 **Class separability:** The available predictors do not reliably separate the two classes. High and normal consumption days share substantial overlap in the feature space, which no kernel choice can resolve.
-
-**Tuning stability:** The best combination (C=`r best_C`, sigma=`r best_sigma`) sits at the top-right corner of the grid. The gain from C=10 to C=100 at sigma=0.1429 is small (0.8268 → 0.8304), pointing to the predictor set as the limiting factor rather than model configuration.
 
 ### Key Findings
 
