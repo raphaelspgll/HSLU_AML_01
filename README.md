@@ -2,6 +2,8 @@
 
 **Applied Machine Learning and Predictive Modelling 1 · FS 2026 · Hochschule Luzern**
 
+https://github.com/raphaelspgll/HSLU_AML_01
+
 ---
 
 ## Description
