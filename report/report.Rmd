@@ -296,7 +296,7 @@ if (file.exists(mlm_simple_path)) {
 
 ### Objective
 
-This section models daily household energy consumption as $\text{log\_kWh\_total}$, the natural logarithm of total daily kilowatt-hour usage. The log transformation is standard for energy data: daily kWh is strictly positive and right-skewed in raw form, and approximately normal on the log scale.
+This section models daily household energy consumption as `log_kWh_total`, the natural logarithm of total daily kilowatt-hour usage. The log transformation is standard for energy data: daily kWh is strictly positive and right-skewed in raw form, and approximately normal on the log scale.
 
 Predictors cover weather conditions (heating degree days, sunshine hours, humidity), building characteristics (building type, living area, heat pump type), and household composition (number of residents). Two interaction terms are added to test whether cold-weather sensitivity differs by building type and heat pump technology.
 
@@ -647,7 +647,7 @@ observations remain comparable even when exposure differs between months.
 To model these rates, a Poisson GLM with a log-link is fitted:
 
 $$
-\log(\mathbb{E}[Y_i]) = \beta_0 + \beta_1 X_{1i} + \cdots + \beta_p X_{pi} + \log(n\_days_i)
+\log(\mathbb{E}[Y_i]) = \beta_0 + \beta_1 X_{1i} + \cdots + \beta_p X_{pi} + \log(n_{\text{days},i})
 $$
 
 The log-link guarantees positive fitted values and supports a multiplicative
