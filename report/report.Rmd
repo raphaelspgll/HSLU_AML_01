@@ -2552,6 +2552,7 @@ if (!is.null(class_summary)) {
       scale_fill_manual(values = c(clr_primary, clr_neutral, clr_secondary)) +
       facet_wrap(~Metric, scales = "free_y") +
       report_theme +
+      theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
       labs(
         title = "Classification model comparison",
         subtitle = "All models: per-household 75th percentile threshold",
