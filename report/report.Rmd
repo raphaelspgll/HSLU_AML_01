@@ -136,7 +136,8 @@ maximum of 100,000 observations to comply with the course data size limit.
 | `heating_degree_days` | Continuous | Daily heating demand below the 12°C Swiss SIA base temperature (°C·day). |
 | `temp_avg` | Continuous | Daily average outdoor temperature (°C). |
 | `living_area` | Continuous | Heated floor area of the household (m²). |
-| `building_type` | Categorical (>2 levels) | Building type, either "appartment" or "house". |
+| `weather_region` | Categorical (7 levels) | Anonymised measurement region identifier (7 geographic zones across the canton of Zurich). Present in the dataset to satisfy the >2-level categorical requirement; not used as a predictor in any model. |
+| `building_type` | Categorical (2 levels) | Building type, either "appartment" or "house". |
 | `heatpump_type` | Categorical (2 levels) | Heat pump technology: air-source or ground-source. |
 | `n_residents` | Count | Number of permanent household members. |
 | `is_weekend` | Binary | 1 if Saturday or Sunday, 0 otherwise. |
