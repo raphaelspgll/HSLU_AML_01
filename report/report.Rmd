@@ -298,7 +298,7 @@ if (file.exists(mlm_simple_path)) {
 
 Can a simple regression explain how much electricity a household uses on a given day? This section fits a multiple linear regression to `log_kWh_total`, the natural logarithm of daily kilowatt-hour usage. The log transformation is standard for energy data: raw daily kWh is strictly positive and right-skewed, and the log scale is approximately normal. Coefficients on the log scale are directly readable as approximate percentage changes in consumption, which matters for communicating load drivers to grid operators and energy suppliers.
 
-Predictors cover weather conditions (heating degree days, sunshine hours, humidity), building characteristics (building type, living area, heat pump type), and household composition (number of residents). A simple additive model is estimated first as an interpretable baseline. Two interaction terms are then added: one testing whether cold-weather sensitivity differs between houses and apartments, and one testing whether it differs between heat pump technologies. Domain knowledge motivates both. Houses lose heat faster through larger surface areas, and ground-source heat pumps maintain higher efficiency in cold weather than air-source systems do.
+Predictors cover weather conditions (heating degree days, sunshine hours, humidity), building characteristics (building type, living area, heat pump type), and household composition (number of residents). A simple additive model is estimated first as an interpretable baseline. Two interaction terms are then added: one testing whether cold-weather sensitivity differs between houses and apartments, and one testing whether it differs between heat pump technologies. Both are motivated by domain knowledge: houses lose heat faster through larger surface areas, and ground-source heat pumps maintain higher efficiency in cold weather than air-source systems.
 
 ### Model Setup
 
@@ -508,7 +508,7 @@ data.frame(
 
 Most predictors have VIF below 3, indicating no problematic multicollinearity.
 The exception is `heating_degree_days` (VIF = 61.55) and its interaction with
-`building_typehouse` (VIF = 61.44). These elevated values are expected for interaction terms and do not invalidate the model or inflate coefficient uncertainty.
+`building_typehouse` (VIF = 61.44). These elevated values are expected when a predictor appears in both a main effect and an interaction, and do not invalidate the model. The coefficients remain highly significant despite the inflated standard errors.
 
 ```{r lm-cv, echo=TRUE, cache=TRUE, message=FALSE, warning=FALSE}
 df_lm_cv <- heapo %>%
@@ -2304,7 +2304,7 @@ if (!is.na(svm_cv_auc)) {
 ```
 </details>
 
-The tuned SVM achieves a five-fold CV AUC of **`r round(svm_cv_auc, 3)`** and accuracy of **`r round(svm_cv_acc * 100, 1)`%**. The 80/20 split below adds sensitivity, specificity, and F1.
+The tuned SVM achieves a five-fold CV AUC of **`r round(svm_cv_auc, 3)`** and accuracy of **`r round(svm_cv_acc * 100, 1)`%**. The test-set evaluation below reports sensitivity, specificity, and F1.
 
 The tuned SVM (C = `r best_C`, sigma = `r best_sigma`) reaches **`r round(cm_best$overall["Accuracy"] * 100, 1)`%** accuracy, compared to `r round(cm_baseline$overall["Accuracy"] * 100, 1)`% for the baseline. The improvement is modest: a naive all-*normal* classifier would already score `r round(table(test_y)["normal"] / length(test_y) * 100, 1)`%, leaving a true gain of only `r round((cm_best$overall["Accuracy"] - table(test_y)["normal"] / length(test_y)) * 100, 0)` percentage points.
 
