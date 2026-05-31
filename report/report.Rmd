@@ -1843,7 +1843,7 @@ neural networks, as it improves numerical stability and facilitates efficient
 training. The same transformations are then applied to the test set to ensure
 consistency and prevent data leakage.
 
-### Model setup
+### Model Setup
 
 <details>
 <summary>Show / hide result</summary>
