@@ -51,12 +51,12 @@ HSLU_AML_01/
 │   ├── 02_data_filtration_EDA.Rmd   # Filter to modelling subset + full EDA (HTML)
 │   ├── 02_EDA_short.Rmd             # Condensed 2-page EDA summary (HTML)
 │   │
-│   ├── 3.1_linear_model.Rmd         # Linear Model on log(kWh_total)
+│   ├── 3.1_linear_model.R           # Linear Model on log(kWh_total)
 │   ├── 3.2_poisson_pipeline.R       # GLM Poisson — count of high-consumption days/month
 │   ├── 3.3_glm_binomial.R           # GLM Binomial — binary high-consumption classification
 │   ├── 3.4_gam_model.R              # Generalised Additive Model
 │   ├── 3.5_neural_network.R         # Neural Network (nnet, 5-fold CV)
-│   ├── 3.6_svm.Rmd                  # Support Vector Machine (RBF kernel, tuned)
+│   ├── 3.6_svm.R                    # Support Vector Machine (RBF kernel, tuned)
 │   │
 │   ├── 04_model_comparison_cv.R     # 5-fold CV comparison: LM vs GAM (regression)
 │   └── 04_model_comparison_cv_classification.R  # 5-fold CV: GLM Binomial vs SVM
@@ -203,12 +203,12 @@ Run scripts or knit notebooks in any order (all read from `heapo_modelling.rds`)
 
 | Script | Task | Method |
 |---|---|---|
-| `R/3.1_linear_model.Rmd` | Knit | Linear Model |
+| `R/3.1_linear_model.R` | `source()` | Linear Model |
 | `R/3.2_poisson_pipeline.R` | `source()` | GLM Poisson |
 | `R/3.3_glm_binomial.R` | `source()` | GLM Binomial |
 | `R/3.4_gam_model.R` | `source()` | GAM |
 | `R/3.5_neural_network.R` | `source()` | Neural Network |
-| `R/3.6_svm.Rmd` | Knit | SVM |
+| `R/3.6_svm.R` | `source()` | SVM |
 
 > **Neural Network:** Set `to_be_run <- TRUE` on line 88 of `3.5_neural_network.R` to retrain from scratch (slow). The default loads pre-saved CV results.
 
@@ -233,7 +233,7 @@ All models use the filtered modelling dataset: households observed between 2022-
 
 | Model | Script | Description |
 |---|---|---|
-| **Linear Model (LM)** | `3.1_linear_model.Rmd` | OLS on log-transformed daily consumption. Includes interaction terms `heating_degree_days × building_type` and `heating_degree_days × heatpump_type`. Interpretable baseline. |
+| **Linear Model (LM)** | `3.1_linear_model.R` | OLS on log-transformed daily consumption. Includes interaction terms `heating_degree_days × building_type` and `heating_degree_days × heatpump_type`. Interpretable baseline. |
 | **GAM** | `3.4_gam_model.R` | Generalised Additive Model with smooth spline terms `s(heating_degree_days)`, `s(temp_avg)`, `s(living_area)`. Captures non-linear weather effects without requiring interaction specification. |
 
 ### Classification task — predict `high_consumption` (top 25% per household)
@@ -243,7 +243,7 @@ All models use the filtered modelling dataset: households observed between 2022-
 | **GLM Binomial** | `3.3_glm_binomial.R` | Logistic regression. 80/20 train-test split. Reports accuracy, AUC, precision, recall, F1. |
 | **GLM Poisson** | `3.2_poisson_pipeline.R` | Poisson GLM on aggregated household-month counts of high-consumption days, with log(n_days) offset. Includes overdispersion check and quasi-Poisson comparison. |
 | **Neural Network** | `3.5_neural_network.R` | Single hidden layer (25 units, `nnet`), weight decay 0.05, feature scaling via model matrix. 5-fold stratified CV. |
-| **SVM** | `3.6_svm.Rmd` | RBF kernel (`e1071`/`kernlab`). Baseline at cost=1, then tuned by 5-fold CV over a grid of cost ∈ {1, 10, 100} and sigma ∈ {0.01, 0.1, 0.143}. Best tuned parameters: C=100, σ=0.1429. |
+| **SVM** | `3.6_svm.R` | RBF kernel (`kernlab`). Baseline at C=1 with sigma estimated from training data. Tuned by 5-fold CV over C ∈ {1, 10, 100} and sigma ∈ {0.01, 0.1, 1/7}. Best parameters: C=100, σ=1/7≈0.1429. Per-household 75th percentile threshold, same as GLM Binomial. |
 
 **Key predictors across all models:**
 

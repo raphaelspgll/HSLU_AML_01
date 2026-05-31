@@ -347,8 +347,8 @@ All predictors are significant at the 0.001 level except `humidity_avg` (p = 0.1
 consumption by ~1.5%, reflecting lower heating demand on brighter days.
 
 **Number of residents** (β = 0.134, p < 0.001): Each additional resident
-increases consumption by ~14.3% ($e^{0.134} - 1$), the second strongest effect
-after the temperature-building interaction.
+increases consumption by ~14.3% ($e^{0.134} - 1$), the largest per-unit effect
+among continuous predictors in the model.
 
 **Building type — house** (β = 0.220, p < 0.001): Houses consume ~24.6% more than apartments at baseline, before accounting for their greater sensitivity to cold (see interaction below).
 
@@ -400,7 +400,7 @@ ggplot(
   )
 ```
 
-The HDD-by-house interaction sits furthest to the right, confirming that houses respond most strongly to cold weather. Ground-source heat pump households are clearly below zero on both the main effect and the interaction, consistent with their efficiency advantage at low temperatures. `humidity_avg` is the only predictor straddling zero.
+`building_typehouse` sits furthest to the right (β = 0.220), confirming the large baseline gap between houses and apartments. `n_residents` follows (β = 0.134), reflecting strong occupancy effects. The HDD-by-house interaction (β = 0.039) sits third, showing that houses also respond more steeply to cold. Ground-source heat pump households are below zero on both the main effect and the interaction, consistent with their efficiency advantage. `humidity_avg` is the only predictor whose interval crosses zero.
 
 The scatterplot of observed versus fitted values on the log scale shows the model's overall predictive calibration. A perfectly calibrated model would scatter all points along the 1:1 diagonal; systematic deviations above or below the line indicate regions where the model consistently over- or under-predicts.
 
@@ -593,7 +593,7 @@ The simple model achieves an adjusted R² of `r round(summary(heapo_mlm_simple)$
 
 **Heating degree days is the dominant weather driver:** Cold weather is the primary positive predictor of energy consumption. Houses start from a higher baseline (β = 0.220) and are more sensitive to cold than apartments (interaction β = 0.039, p < 0.001), consistent with lower thermal efficiency.
 
-**Household size has the strongest marginal effect:** With β = 0.134, each additional resident increases daily consumption by ~14.3%, making it the largest single-predictor effect in the model after the building type interaction.
+**Household size has the strongest continuous predictor effect:** With β = 0.134, each additional resident increases daily consumption by ~14.3%, the largest per-unit effect among continuous predictors in the model.
 
 **Ground-source heat pumps are more efficient and more stable:** They consume ~13.3% less at baseline and respond less to temperature swings (interaction β = −0.003), consistent with the efficiency advantage of ground-source systems at low outdoor temperatures.
 
@@ -2226,11 +2226,11 @@ An SVM is used because consumption peaks may not separate cleanly from normal da
 
 ### Data Preparation
 
-`high_consumption` labels a day as *high* if it falls in the top 25% of that household's own `log_kWh_total` distribution. For each of the `r length(unique(heapo$Household_ID))` households, the 75th percentile is computed separately, so every household contributes exactly 25% high-consumption days by construction.
+`high_consumption` labels a day as *high* if it falls in the top 25% of that household's own `log_kWh_total` distribution. For each of the `r length(unique(heapo$Household_ID))` households, the 75th percentile is computed separately, so every household contributes approximately 25% high-consumption days by construction.
 
-After removing missing values, the dataset has 93,686 observations: 23,440 high-consumption days (25.0%) and 70,246 normal days (75.0%). `log_kWh_total` is excluded to prevent data leakage; the SVM must identify high-load days from weather and household characteristics alone.
+After removing missing values, the dataset has 93,686 observations: 23,514 high-consumption days (25.1%) and 70,172 normal days (74.9%). `log_kWh_total` is excluded to prevent data leakage; the SVM must identify high-load days from weather and household characteristics alone.
 
-The data are split 80/20 into training (74,949 rows) and test (18,737 rows) using stratified sampling to keep the class ratio consistent. All numeric predictors are standardised before training, as SVMs are sensitive to feature scale.
+The data are split 80/20 into training (74,950 rows) and test (18,736 rows) using stratified sampling to keep the class ratio consistent. All numeric predictors are standardised before training, as SVMs are sensitive to feature scale.
 
 <details>
 <summary>Show / hide table</summary>
@@ -2252,7 +2252,7 @@ prop.table(table(train_data$high_consumption)) %>%
 
 **Tuned SVM:** 5-fold cross-validation over a grid of `C` ∈ {1, 10, 100} and `sigma` ∈ {0.01, 0.1, 1/7}. `C` controls the misclassification penalty (higher = tighter fit); `sigma` is the inverse bandwidth of the RBF kernel (higher = more local boundaries). The combination with the highest CV accuracy is selected.
 
-The best parameters were C = 100, sigma = 0.1429 (= 1/7), achieving CV accuracy of 0.8304 (Kappa = 0.4859) across the 3×3 grid.
+The best parameters were C = 100, sigma = 0.1429 (= 1/7), achieving CV accuracy of 0.8530 (Kappa = 0.5747) across the 3×3 grid.
 
 ### Model Results
 
@@ -2310,7 +2310,7 @@ The tuned SVM (C = `r best_C`, sigma = `r best_sigma`) reaches **`r round(cm_bes
 
 The more informative metrics are:
 
-**Sensitivity (`r round(cm_best$byClass["Sensitivity"], 4)`):** the model correctly identifies `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% of actual high-consumption days. Over half are missed, a meaningful limitation in early-warning contexts where false negatives are costly.
+**Sensitivity (`r round(cm_best$byClass["Sensitivity"], 4)`):** the model correctly identifies `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% of actual high-consumption days. Over 40% are still missed, a meaningful limitation in early-warning contexts where false negatives are costly.
 
 **Specificity (`r round(cm_best$byClass["Specificity"], 4)`):** normal days are classified correctly `r round(cm_best$byClass["Specificity"] * 100, 1)`% of the time. The model is conservative, flagging fewer high-consumption days than actually occur (`r sum(cm_best$table["high", ])` predicted high vs. `r sum(cm_best$table[, "high"])` actual high in the test set).
 
@@ -2378,7 +2378,7 @@ ggplot(svm_df, aes(x = Actual, y = Predicted, fill = Label)) +
   theme(legend.position = "none", panel.grid = element_blank())
 ```
 
-The matrix makes the model's asymmetry concrete. The large TN count shows the SVM seldom raises false alarms on genuinely normal days, explaining the high specificity. The large FN count shows that more than half of actual high-consumption days are silently missed. This conservative bias is a direct consequence of the 75/25 class split: on ambiguous days, the model defaults to the majority class.
+The matrix makes the model's asymmetry concrete. The large TN count shows the SVM seldom raises false alarms on genuinely normal days, explaining the high specificity. The FN count (1,927) shows that over 40% of actual high-consumption days are silently missed. This conservative bias is a direct consequence of the 75/25 class split: on ambiguous days, the model defaults to the majority class.
 
 The bar chart puts the sensitivity-specificity trade-off for both models side by side. Tuning from default parameters to C = `r best_C`, sigma = `r best_sigma` pushes sensitivity up from `r round(cm_baseline$byClass["Sensitivity"] * 100, 1)`% to `r round(cm_best$byClass["Sensitivity"] * 100, 1)`%, recovering more true high-consumption days at the cost of a small drop in specificity. The gain is consistent but modest, pointing to the predictor set rather than hyperparameter choice as the main constraint.
 
@@ -2413,13 +2413,13 @@ ggplot(metrics_df, aes(x = Metric, y = Value, fill = Model)) +
 
 Unlike regression models, SVM diagnostics focus on generalisation performance and modelling choices rather than distributional assumptions.
 
-**CV tuning results:** Across all 9 combinations, CV accuracy ranged from 0.8071 (C=10, sigma=0.01) to 0.8304 (C=100, sigma=0.1429). The top four combinations all involve sigma ≥ 0.1, suggesting a moderately local kernel works best. The gain from C=10 to C=100 at sigma=0.1429 is small (0.8268 → 0.8304), pointing to the predictor set as the limiting factor rather than model configuration.
+**CV tuning results:** Across all 9 combinations, CV accuracy ranged from 0.8488 (C=1, sigma=0.01) to 0.8530 (C=100, sigma=0.1429). The top four combinations all involve sigma ≥ 0.1, suggesting a moderately local kernel works best. The gain from C=10 to C=100 at sigma=0.1429 is small (0.8525 → 0.8530), pointing to the predictor set as the limiting factor rather than model configuration.
 
 **Class separability:** The available predictors do not reliably separate the two classes. High and normal consumption days share substantial overlap in the feature space, which no kernel choice can resolve.
 
 ### Key Findings
 
-**The SVM achieves reasonable accuracy but low sensitivity:** At `r round(cm_best$overall["Accuracy"] * 100, 1)`% accuracy, the model scores roughly 8 percentage points above the naive majority-class baseline (`r round(table(test_y)["normal"] / length(test_y) * 100, 1)`%). Sensitivity of `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% is the bigger concern: more than half of actual high-consumption days are missed, while specificity of `r round(cm_best$byClass["Specificity"] * 100, 1)`% shows the model rarely raises false alarms on normal days. This makes it too conservative on its own for capacity planning or demand-response triggering.
+**The SVM achieves reasonable accuracy but low sensitivity:** At `r round(cm_best$overall["Accuracy"] * 100, 1)`% accuracy, the model scores roughly 10 percentage points above the naive majority-class baseline (`r round(table(test_y)["normal"] / length(test_y) * 100, 1)`%). Sensitivity of `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% is the bigger concern: over 40% of actual high-consumption days are missed, while specificity of `r round(cm_best$byClass["Specificity"] * 100, 1)`% shows the model rarely raises false alarms on normal days. This makes it too conservative on its own for capacity planning or demand-response triggering.
 
 **Tuning yields real but limited improvement:** Moving from default parameters to C=`r best_C`, sigma=`r best_sigma` improves sensitivity from `r round(cm_baseline$byClass["Sensitivity"] * 100, 1)`% to `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% and accuracy from `r round(cm_baseline$overall["Accuracy"] * 100, 1)`% to `r round(cm_best$overall["Accuracy"] * 100, 1)`%. The gains are consistent but small; further tuning will not resolve the core problem.
 
