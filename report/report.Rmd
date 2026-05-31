@@ -5,7 +5,7 @@ date: "`r Sys.Date()`"
 output:
   html_document:
     toc: true
-    toc_float: true
+    toc_float: false
     toc_depth: 3
     number_sections: true
     theme: flatly
@@ -21,10 +21,27 @@ knitr::opts_chunk$set(
   echo = TRUE,
   message = FALSE,
   warning = FALSE,
-  fig.width = 8,
-  fig.height = 5,
+  fig.width = 7,
+  fig.height = 4,
   cache = TRUE
 )
+```
+
+```{css, echo=FALSE}
+body {
+  font-size: 12px;
+  line-height: 1.45;
+}
+p {
+  margin-bottom: 0.55em;
+}
+h1, h2, h3, h4 {
+  margin-top: 1.1em;
+  margin-bottom: 0.35em;
+}
+.main-container {
+  padding-top: 10px;
+}
 ```
 
 ```{r packages, message=FALSE}
@@ -48,11 +65,11 @@ library(gridExtra)
 ```
 
 ```{r plot-defaults, include=FALSE}
-clr_primary   <- "#4E79A7"
+clr_primary <- "#4E79A7"
 clr_secondary <- "#E15759"
-clr_neutral   <- "#AAAAAA"
+clr_neutral <- "#AAAAAA"
 clr_builds <- c("appartment" = "#4E79A7", "house" = "#E15759")
-report_theme  <- theme_minimal(base_size = 12)
+report_theme <- theme_minimal(base_size = 12)
 ```
 
 ```{r load-data, include=FALSE}
@@ -107,24 +124,26 @@ set of building, technology, and weather covariates.
 
 ## Variable Description
 
+The raw HEAPO dataset spans 2018 to 2024 across 438 monitored households in the
+canton of Zurich. The modelling subset was restricted to the period 2022-01-01
+through 2024-02-29 and limited to households with at least 95% daily coverage to
+exclude partially observed installations. It was then randomly sampled to a
+maximum of 100,000 observations to comply with the course data size limit.
+
 | Variable | Type | Description |
 |:---|:---|:---|
 | `log_kWh_total` | Continuous | Natural log of daily total electricity consumption (kWh). Response for LM and GAM. |
 | `heating_degree_days` | Continuous | Daily heating demand below the 12°C Swiss SIA base temperature (°C·day). |
 | `temp_avg` | Continuous | Daily average outdoor temperature (°C). |
 | `living_area` | Continuous | Heated floor area of the household (m²). |
-| `building_type` | Categorical (>2 levels) | Building type, either "appartment" or "house". |
+| `weather_region` | Categorical (7 levels) | Anonymised measurement region identifier (7 geographic zones across the canton of Zurich). Present in the dataset to satisfy the >2-level categorical requirement; not used as a predictor in any model. |
+| `building_type` | Categorical (2 levels) | Building type, either "appartment" or "house". |
 | `heatpump_type` | Categorical (2 levels) | Heat pump technology: air-source or ground-source. |
 | `n_residents` | Count | Number of permanent household members. |
 | `is_weekend` | Binary | 1 if Saturday or Sunday, 0 otherwise. |
 | `has_floor_heating` | Binary | 1 if floor heating system present, 0 otherwise. |
 | `high_consumption` | Binary | 1 if daily kWh exceeds the household's own 75th percentile (top 25% of that household's days). Response for GLM Binomial. |
 
-The raw HEAPO dataset spans 2018 to 2024 across 438 monitored households in the
-canton of Zurich. The modelling subset was restricted to the period 2022-01-01
-through 2024-02-29 and limited to households with at least 95% daily coverage to
-exclude partially observed installations. It was then randomly sampled to a
-maximum of 100,000 observations to comply with the course data size limit.
 
 # Exploratory Data Analysis
 
@@ -137,6 +156,13 @@ percentile, flagging the top 25% of consumption days for each individual
 household.
 
 ## Seasonal Pattern
+
+Consumption in winter months (December to February) is roughly three to five
+times higher than in summer (June to August), driven almost entirely by heat
+pump operation for space heating. The wide interquartile range in winter
+reflects differences in building size, insulation quality, and heat pump
+technology across households. This strong seasonal pattern motivates heating
+degree days as the primary weather predictor in all models.
 
 ```{r eda-seasonal, fig.height=4, fig.align='center'}
 heapo %>%
@@ -152,13 +178,6 @@ heapo %>%
   report_theme
 ```
 
-Consumption in winter months (December to February) is roughly three to five
-times higher than in summer (June to August), driven almost entirely by heat
-pump operation for space heating. The wide interquartile range in winter
-reflects differences in building size, insulation quality, and heat pump
-technology across households. This strong seasonal pattern motivates heating
-degree days as the primary weather predictor in all models.
-
 ## Heating Degree Days vs. Consumption
 
 **Heating Degree Days (HDD)** quantify daily heating demand as the temperature
@@ -171,7 +190,12 @@ heapo %>%
   slice_sample(n = 15000) %>%
   ggplot(aes(x = heating_degree_days, y = kWh_total)) +
   geom_point(alpha = 0.08, size = 0.5, color = clr_primary) +
-  geom_smooth(method = "loess", color = clr_secondary, se = FALSE, linewidth = 1) +
+  geom_smooth(
+    method = "loess",
+    color = clr_secondary,
+    se = FALSE,
+    linewidth = 1
+  ) +
   scale_y_continuous(labels = comma) +
   labs(
     title = "Heating Degree Days vs. Daily Consumption",
@@ -182,14 +206,19 @@ heapo %>%
   report_theme
 ```
 
-The relationship is positive and seams to be linear across the observed
-HDD range, with consumption measured form 0 to 125 kWh per day at 0 heating degree days
+The relationship is positive and seems to be linear across the observed
+HDD range, with consumption measured from 0 to 125 kWh per day at 0 heating degree days
 , which hints to the base load of the building types. The loess smoother confirms that no sharp threshold or strong
 curvature is present, which justifies treating HDD as a continuous predictor in
 the Linear Model. A slight levelling off at very high HDD values is visible, and
 the GAM will capture this through its flexible smooth terms.
 
 ## Consumption by Building Type
+
+Houses consume substantially more electricity per day than apartments, with medians
+differing by roughly a factor of two. This gap persists after controlling for
+weather, as the modelling section will confirm. Building type therefore carries
+real structural signal and is included as a predictor in all models.
 
 ```{r eda-building, fig.height=3.5, fig.align='center'}
 heapo %>%
@@ -205,10 +234,6 @@ heapo %>%
   report_theme
 ```
 
-Houses consume substantially more electricity per day than apartments, with medians
-differing by roughly a factor of two. This gap persists after controlling for
-weather, as the modelling section will confirm. Building type therefore carries
-real structural signal and is included as a predictor in all models.
 
 Taken together, the three plots tell a consistent story. Electricity demand is
 primarily a seasonal phenomenon. The portfolio shifts from a low-consumption
@@ -249,7 +274,7 @@ and accuracy.
 
 *Lead: Tharrmeehan Krishnathasan*
 
-```{r import-lm, echo=FALSE, message=FALSE, warning=FALSE}
+```{r import-lm, echo=TRUE, message=FALSE, warning=FALSE}
 heapo_lm <- readRDS("../models/linear_model/heapo_lm.rds")
 
 mlm_simple_path <- "../models/linear_model/heapo_mlm_simple.rds"
@@ -272,9 +297,9 @@ if (file.exists(mlm_simple_path)) {
 
 ### Objective
 
-This section models daily household energy consumption as $\text{log\_kWh\_total}$, the natural logarithm of total daily kilowatt-hour usage. The log transformation is standard for energy data: daily kWh is strictly positive and right-skewed in raw form, and approximately normal on the log scale.
+Can a simple regression explain how much electricity a household uses on a given day? This section fits a multiple linear regression to `log_kWh_total`, the natural logarithm of daily kilowatt-hour usage. The log transformation is standard for energy data: raw daily kWh is strictly positive and right-skewed, and the log scale is approximately normal. Coefficients on the log scale are directly readable as approximate percentage changes in consumption, which matters for communicating load drivers to grid operators and energy suppliers.
 
-Predictors cover weather conditions (heating degree days, sunshine hours, humidity), building characteristics (building type, living area, heat pump type), and household composition (number of residents). Two interaction terms are added to test whether cold-weather sensitivity differs by building type and heat pump technology.
+Predictors cover weather conditions (heating degree days, sunshine hours, humidity), building characteristics (building type, living area, heat pump type), and household composition (number of residents). A simple additive model is estimated first as an interpretable baseline. Two interaction terms are then added: one testing whether cold-weather sensitivity differs between houses and apartments, and one testing whether it differs between heat pump technologies. Both are motivated by domain knowledge: houses lose heat faster through larger surface areas, and ground-source heat pumps maintain higher efficiency in cold weather than air-source systems.
 
 ### Model Setup
 
@@ -286,22 +311,19 @@ $$
 \log(\text{kWh}_i) = \beta_0 + \beta_1\,\text{HDD}_i + \beta_2\,\text{Sunshine}_i + \cdots + \beta_7\,\text{HeatpumpType}_i + \varepsilon_i
 $$
 
-**Extended MLR:** adds two interaction terms motivated by domain knowledge:
+**Extended MLR:** adds two interaction terms:
 
-- $\text{heating\_degree\_days} \times \text{heatpump\_type}$: different heat
-  pump technologies have different efficiencies in cold conditions, so the
-  effect of cold on consumption should vary by pump type.
-- $\text{heating\_degree\_days} \times \text{building\_type}$: well-insulated
-  houses are less sensitive to outdoor temperature than poorly-insulated ones.
+- `heating_degree_days` × `heatpump_type` (cold-weather sensitivity by pump technology)
+- `heating_degree_days` × `building_type` (cold-weather sensitivity by building type)
 
 All coefficients are on the log scale: a coefficient of 0.05 means a 5%
 multiplicative change in kWh for a one-unit increase in the predictor.
 
-The panel structure (multiple observations per household) means the i.i.d. assumption of standard OLS is not fully met; standard errors may be slightly understated due to within-household correlation.
-
 ### Model Results
 
-```{r lm-coef-table, echo=FALSE}
+<details>
+<summary>Show / hide table</summary>
+```{r lm-coef-table, echo=TRUE}
 tidy(heapo_lm) %>%
   filter(term != "(Intercept)") %>%
   mutate(
@@ -316,6 +338,7 @@ tidy(heapo_lm) %>%
   ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 ```
+</details>
 
 All predictors are significant at the 0.001 level except `humidity_avg` (p = 0.165), which adds nothing once the other weather variables are included. Effects on log energy consumption, holding all other variables constant:
 
@@ -325,8 +348,8 @@ All predictors are significant at the 0.001 level except `humidity_avg` (p = 0.1
 consumption by ~1.5%, reflecting lower heating demand on brighter days.
 
 **Number of residents** (β = 0.134, p < 0.001): Each additional resident
-increases consumption by ~14.3% ($e^{0.134} - 1$), the second strongest effect
-after the temperature-building interaction.
+increases consumption by ~14.3% ($e^{0.134} - 1$), the largest per-unit effect
+among continuous predictors in the model.
 
 **Building type — house** (β = 0.220, p < 0.001): Houses consume ~24.6% more than apartments at baseline, before accounting for their greater sensitivity to cold (see interaction below).
 
@@ -343,9 +366,9 @@ temperatures.
 
 ### Visual Evidence
 
-The coefficient plot below summarises the direction and significance of all predictors in the extended model.
+The coefficient plot below shows each predictor's estimated coefficient with 95% confidence intervals. A coefficient to the right of zero increases daily consumption; one to the left reduces it. Grey points whose intervals cross zero are not statistically significant.
 
-```{r lm-coef-plot, echo=FALSE, fig.height=5, fig.width=8, out.width="100%", fig.align="center"}
+```{r lm-coef-plot, echo=TRUE, fig.height=5, fig.width=8, out.width="100%", fig.align="center"}
 cis <- confint(heapo_lm)
 
 coef_df <- tibble(
@@ -378,9 +401,11 @@ ggplot(
   )
 ```
 
-The scatterplot of observed versus fitted values on the log scale illustrates the model's predictive fit. Points near the diagonal indicate accurate predictions.
+`building_typehouse` sits furthest to the right (β = 0.220), confirming the large baseline gap between houses and apartments. `n_residents` follows (β = 0.134), reflecting strong occupancy effects. The HDD-by-house interaction (β = 0.039) sits third, showing that houses also respond more steeply to cold. Ground-source heat pump households are below zero on both the main effect and the interaction, consistent with their efficiency advantage. `humidity_avg` is the only predictor whose interval crosses zero.
 
-```{r lm-obs-vs-fit, echo=FALSE, fig.height=3.5, fig.width=5.5, out.width="70%", fig.align="center"}
+The scatterplot of observed versus fitted values on the log scale shows the model's overall predictive calibration. A perfectly calibrated model would scatter all points along the 1:1 diagonal; systematic deviations above or below the line indicate regions where the model consistently over- or under-predicts.
+
+```{r lm-obs-vs-fit, echo=TRUE, fig.height=3.5, fig.width=5.5, out.width="70%", fig.align="center"}
 fit_df <- tibble(
   fitted = fitted(heapo_lm),
   observed = heapo$log_kWh_total[as.integer(names(fitted(heapo_lm)))]
@@ -404,12 +429,17 @@ ggplot(fit_df, aes(x = fitted, y = observed)) +
 
 ### Model Diagnostics
 
-```{r lm-diagnostics, echo=FALSE, fig.height=6, fig.width=7, fig.align='center'}
+```{r lm-diagnostics, echo=TRUE, fig.height=5, fig.width=7, fig.align='center'}
 aug <- broom::augment(heapo_lm)
 
 p1 <- ggplot(aug, aes(x = .fitted, y = .resid)) +
   geom_point(alpha = 0.1, size = 0.5, color = clr_primary) +
-  geom_smooth(method = "loess", se = FALSE, color = clr_secondary, linewidth = 0.8) +
+  geom_smooth(
+    method = "gam",
+    se = FALSE,
+    color = clr_secondary,
+    linewidth = 0.8
+  ) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
   labs(title = "Residuals vs Fitted", x = "Fitted values", y = "Residuals") +
   report_theme
@@ -417,35 +447,54 @@ p1 <- ggplot(aug, aes(x = .fitted, y = .resid)) +
 p2 <- ggplot(aug, aes(sample = .std.resid)) +
   stat_qq(alpha = 0.2, size = 0.5, color = clr_primary) +
   stat_qq_line(color = clr_secondary, linetype = "dashed") +
-  labs(title = "Normal Q-Q", x = "Theoretical quantiles", y = "Standardised residuals") +
+  labs(
+    title = "Normal Q-Q",
+    x = "Theoretical quantiles",
+    y = "Standardised residuals"
+  ) +
   report_theme
 
 p3 <- ggplot(aug, aes(x = .fitted, y = sqrt(abs(.std.resid)))) +
   geom_point(alpha = 0.1, size = 0.5, color = clr_primary) +
-  geom_smooth(method = "loess", se = FALSE, color = clr_secondary, linewidth = 0.8) +
-  labs(title = "Scale-Location", x = "Fitted values", y = expression(sqrt("|Std. residuals|"))) +
+  geom_smooth(
+    method = "gam",
+    se = FALSE,
+    color = clr_secondary,
+    linewidth = 0.8
+  ) +
+  labs(
+    title = "Scale-Location",
+    x = "Fitted values",
+    y = expression(sqrt("|Std. residuals|"))
+  ) +
   report_theme
 
 p4 <- ggplot(aug, aes(x = .hat, y = .std.resid)) +
   geom_point(alpha = 0.2, size = 0.5, color = clr_primary) +
-  geom_smooth(method = "loess", se = FALSE, color = clr_secondary, linewidth = 0.8) +
+  geom_smooth(
+    method = "gam",
+    se = FALSE,
+    color = clr_secondary,
+    linewidth = 0.8
+  ) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
-  labs(title = "Residuals vs Leverage", x = "Leverage", y = "Standardised residuals") +
+  labs(
+    title = "Residuals vs Leverage",
+    x = "Leverage",
+    y = "Standardised residuals"
+  ) +
   report_theme
 
 gridExtra::grid.arrange(p1, p2, p3, p4, ncol = 2)
 ```
 
-- **Residuals vs Fitted:** Checks linearity. A horizontal band with no
-  systematic pattern is ideal.
-- **Q-Q Plot:** Checks normality of residuals. Points near the diagonal indicate
-  normality; heavy tails would signal departure.
-- **Scale-Location:** Checks homoscedasticity (constant variance). A flat,
-  evenly spread line is ideal.
-- **Residuals vs Leverage:** Identifies high-leverage observations that
-  disproportionately influence the fit.
+The four panels assess the core OLS assumptions. *Residuals vs. Fitted* checks for leftover non-linearity after fitting; a flat smoother near zero indicates no major pattern has been missed. *Normal Q-Q* checks whether residuals are approximately normal, which matters for the validity of p-values. *Scale-Location* checks for heteroscedasticity; a rising smoother would mean larger fitted values have more variable errors. *Residuals vs. Leverage* checks whether any single observation is pulling the estimates far from where the rest of the data would place them.
 
-```{r lm-vif, echo=FALSE}
+One assumption the plots cannot fully address is independence. The dataset contains many observations per household, so residuals from the same household are correlated. Standard errors are consequently understated to some degree, and significance levels should be read with that caveat.
+
+<details>
+<summary>Show / hide table</summary>
+```{r lm-vif, echo=TRUE}
 vif_vals <- vif(heapo_lm)
 data.frame(
   Predictor = names(vif_vals),
@@ -456,12 +505,13 @@ data.frame(
   ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 ```
+</details>
 
 Most predictors have VIF below 3, indicating no problematic multicollinearity.
 The exception is `heating_degree_days` (VIF = 61.55) and its interaction with
-`building_typehouse` (VIF = 61.44). These elevated values are expected for interaction terms and do not invalidate the model or inflate coefficient uncertainty.
+`building_typehouse` (VIF = 61.44). These elevated values are expected when a predictor appears in both a main effect and an interaction, and do not invalidate the model. The coefficients remain highly significant despite the inflated standard errors.
 
-```{r lm-cv, echo=FALSE, cache=TRUE, message=FALSE, warning=FALSE}
+```{r lm-cv, echo=TRUE, cache=TRUE, message=FALSE, warning=FALSE}
 df_lm_cv <- heapo %>%
   select(
     log_kWh_total,
@@ -517,7 +567,9 @@ lm_simple_cv_mae <- mean(sapply(cv_lm, `[[`, "simple_mae"))
 lm_ext_cv_mae <- mean(sapply(cv_lm, `[[`, "ext_mae"))
 ```
 
-```{r lm-model-comparison, echo=FALSE}
+<details>
+<summary>Show / hide table</summary>
+```{r lm-model-comparison, echo=TRUE}
 tibble(
   Model = c("Simple MLR (main effects)", "Extended MLR (+ interactions)"),
   `Adj. R²` = c(
@@ -534,40 +586,29 @@ tibble(
   ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 ```
+</details>
 
-The simple model achieves an adjusted R² of `r round(summary(heapo_mlm_simple)$adj.r.squared, 4)`. Adding the two interaction terms improves this to `r round(summary(heapo_lm)$adj.r.squared, 4)`, a real but modest gain. Five-fold CV MAE is roughly `r round(lm_ext_cv_mae, 1)` kWh/day for the extended model. The interaction terms are meaningful, but overall explanatory power remains limited on this dataset.
+The simple model achieves an adjusted R² of `r round(summary(heapo_mlm_simple)$adj.r.squared, 4)`. Adding the two interaction terms improves this to `r round(summary(heapo_lm)$adj.r.squared, 4)`, and 5-fold cross-validation confirms the pattern holds out-of-sample: MAE drops from `r round(lm_simple_cv_mae, 2)` to `r round(lm_ext_cv_mae, 2)` kWh/day. The gain from allowing cold-weather sensitivity to vary by group is real but small in absolute terms. Overall explanatory power is modest because weather and building characteristics capture only the structural drivers of consumption. Day-to-day variation driven by whether someone is home or what appliances are running is not in the dataset, and represents a natural ceiling for any model of this kind.
 
 ### Key Findings
 
-**Heating degree days is the dominant weather driver:** Cold weather is the primary positive predictor of energy consumption. The interaction term (β = 0.039, p < 0.001) shows that houses are more sensitive to cold than apartments, consistent with lower thermal efficiency.
+**Heating degree days is the dominant weather driver:** Cold weather is the primary positive predictor of energy consumption. Houses start from a higher baseline (β = 0.220) and are more sensitive to cold than apartments (interaction β = 0.039, p < 0.001), consistent with lower thermal efficiency.
 
-**Household size has the strongest marginal effect:** With β = 0.134, each
-additional resident increases daily consumption by ~14.3%, making it the largest
-single-predictor effect in the model after the building type interaction.
-
-**Houses consume substantially more, especially in winter:** Both the baseline offset (β = 0.220, house vs. apartments) and the temperature interaction (β = 0.039) point the same way: houses start higher and get more sensitive to cold as temperatures drop.
+**Household size has the strongest continuous predictor effect:** With β = 0.134, each additional resident increases daily consumption by ~14.3%, the largest per-unit effect among continuous predictors in the model.
 
 **Ground-source heat pumps are more efficient and more stable:** They consume ~13.3% less at baseline and respond less to temperature swings (interaction β = −0.003), consistent with the efficiency advantage of ground-source systems at low outdoor temperatures.
 
 **Humidity is not a useful predictor:** `humidity_avg` is not significant (p = 0.165) once the other weather variables are controlled for.
 
-**Overall explanatory power is limited:** The extended model explains ~`r round(summary(heapo_lm)$adj.r.squared * 100, 1)`% of the variance in log daily consumption (adj. R² = `r round(summary(heapo_lm)$adj.r.squared, 4)`). On the original kWh scale, mean absolute error is `r round(lm_ext_cv_mae, 1)` kWh/day (5-fold CV).
-
-### Conclusion
-
-The linear model identifies the main structural and weather-related drivers of daily household energy consumption. All predictors except humidity are significant, and the interaction terms show that cold weather affects houses and ground-source pump households differently.
-
-However, the model has **limited predictive value**. An adjusted R² of `r round(summary(heapo_lm)$adj.r.squared, 2)` leaves ~`r round((1 - summary(heapo_lm)$adj.r.squared) * 100, 0)`% of the variance unexplained. At the household-day level, predictions are too imprecise for operational use. Household-level heterogeneity is likely the cause: baseline consumption varies substantially across households in ways a cross-sectional model cannot capture.
-
-For inference, the model does its job: it gives directly interpretable coefficient estimates for every predictor. For forecasting, models with household-level random effects would be needed.
+**Overall explanatory power is limited:** The extended model explains ~`r round(summary(heapo_lm)$adj.r.squared * 100, 1)`% of the variance in log daily consumption (adj. R² = `r round(summary(heapo_lm)$adj.r.squared, 4)`). On the original kWh scale, mean absolute error is `r round(lm_ext_cv_mae, 1)` kWh/day (5-fold CV). Household-level heterogeneity is the likely cause; models with household-level random effects would be needed for operational forecasting.
 
 ## GLM – Poisson {#glm-poisson}
 
 *Lead: Raphaël Spagolla*
 
 ```{r import-poisson, echo=FALSE, cache=FALSE}
-dat_count      <- readRDS("../data_processed/poisson/dat_count.rds")
-mod_pois       <- readRDS("../models/poisson_glm/mod_pois.rds")
+dat_count <- readRDS("../data_processed/poisson/dat_count.rds")
+mod_pois <- readRDS("../models/poisson_glm/mod_pois.rds")
 mod_quasi_pois <- readRDS("../models/poisson_glm/mod_quasi.rds")
 ```
 
@@ -586,10 +627,13 @@ model estimates rates, allowing interpretation of results in terms of relative
 changes (rate ratios).
 
 ### Model Setup
-
-```{r poisson-modell, echo=FALSE}
+<details>
+<summary>Show / hide result</summary>
+```{r poisson-modell, echo=TRUE}
 print(formula(mod_pois))
 ```
+</details>
+
 
 The response variable is the number of high-consumption days per household-month
 ($n_{high\ days}$). A day is classified as a high-consumption day if its daily
@@ -604,7 +648,7 @@ observations remain comparable even when exposure differs between months.
 To model these rates, a Poisson GLM with a log-link is fitted:
 
 $$
-\log(\mathbb{E}[Y_i]) = \beta_0 + \beta_1 X_{1i} + \cdots + \beta_p X_{pi} + \log(n\_days_i)
+\log(\mathbb{E}[Y_i]) = \beta_0 + \beta_1 X_{1i} + \cdots + \beta_p X_{pi} + \log(n_{\text{days},i})
 $$
 
 The log-link guarantees positive fitted values and supports a multiplicative
@@ -686,8 +730,11 @@ counts concentrate near zero. The smooth LOESS curve decreases steeply in the
 0–10°C range and flattens at higher temperatures, suggesting diminishing
 marginal effects of warmth once heating demand is already low.
 
-```{r glm-poisson-plots, echo=FALSE, fig.height=4, fig.show='hold', out.width='50%'}
-ggplot(dat_count, aes(x = building_type, y = n_high_days, fill = building_type)) +
+```{r glm-poisson-plots, echo=TRUE, fig.height=4, fig.show='hold', out.width='50%'}
+ggplot(
+  dat_count,
+  aes(x = building_type, y = n_high_days, fill = building_type)
+) +
   geom_boxplot(alpha = 0.7, outlier.size = 0.2) +
   scale_fill_manual(values = clr_builds, guide = "none") +
   labs(
@@ -717,7 +764,7 @@ heating*, *number of residents*, and *living area* show moderate to small
 increases. *Heating degree days* sits right at 1 and is the only non-significant
 predictor (shown in grey).
 
-```{r glm-poisson-rr-plot, echo=FALSE, fig.height=5, fig.width=7, fig.align='center'}
+```{r glm-poisson-rr-plot, echo=TRUE, fig.height=5, fig.width=7, fig.align='center'}
 coef_summary <- coef(summary(mod_pois))
 
 coef_df <- data.frame(
@@ -769,7 +816,7 @@ ggplot(
 
 ### Model Diagnostics
 
-```{r diagnostics, echo=FALSE}
+```{r diagnostics, echo=TRUE}
 s_m_p <- summary(mod_pois)
 disp_pois <- s_m_p$deviance / s_m_p$df.residual
 
@@ -803,7 +850,7 @@ share*, *house vs apartments*) show the largest absolute increase, while those w
 very small SEs (e.g., *living area*, *number of residents*) are inflated by a
 smaller absolute amount but the same factor $\sqrt{\hat{\phi}}$.
 
-```{r quasi-se-plot, echo=FALSE, fig.height=4, fig.align='center'}
+```{r quasi-se-plot, echo=TRUE, fig.height=4, fig.align='center'}
 pois_tidy <- tidy(mod_pois) %>% select(term, estimate, std.error, p.value)
 quasi_tidy <- tidy(mod_quasi_pois) %>% select(term, std.error, p.value)
 
@@ -866,7 +913,9 @@ and report the Root Mean Squared Error (RMSE). The observed-vs-fitted plot is
 rendered as a hexbin to handle overplotting given the large number of
 observations.
 
-```{r goodness-of-fit, echo=FALSE, fig.height=4}
+<details>
+<summary>Show / hide result</summary>
+```{r goodness-of-fit, echo=TRUE, fig.height=4}
 dat_count$fitted_pois <- fitted(mod_pois)
 dat_count$fitted_quasi <- fitted(mod_quasi_pois)
 
@@ -881,11 +930,12 @@ knitr::kable(
   caption = "Root Mean Squared Error for the Poisson model."
 ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
-
 ```
+</details>
+
 The RMSE of `r round(rmse_pois, 3)` days reflects substantial residual spread, partly explained by the high overdispersion ($\hat{\phi}$ = `r round(phi_q, 2)`). Note that the quasi-Poisson model produces identical fitted values and therefore the same RMSE, as it only affects standard errors and inference, not point predictions.
 
-### Conclusion
+### Key Findings
 
 The Poisson GLM provides a clear and interpretable account of the factors
 driving the frequency of high-consumption days. Building type, temperature, and
@@ -910,8 +960,8 @@ hoc correction.
 ### Objective
 
 Can we predict whether a given day will be unusually high-consumption for a
-specific household? This section fits a **Generalised Linear Model with a
-binomial family** to answer exactly that question. The response variable
+specific household? This section fits a Generalised Linear Model with a
+binomial family to answer exactly that question. The response variable
 `high_consumption` is a binary indicator that equals 1 if the household's daily
 `log_kWh_total` exceeds that household's own 75th percentile and 0 otherwise.
 Using a per-household threshold means the model is not distinguishing houses
@@ -1012,12 +1062,13 @@ f1 <- 2 * precision * recall / (precision + recall)
 specificity <- tn / (tn + fp)
 ```
 
-Coefficients from a binomial GLM are expressed as **odds ratios** (OR =
+Coefficients from a binomial GLM are expressed as odds ratios (OR =
 exp(coefficient)). A value above 1 increases the odds that a day falls in the
 top 25% of a household's own consumption, and a value below 1 decreases it,
 relative to the reference category.
-
-```{r glm-binomial-coef-table, echo=FALSE}
+<details>
+<summary>Show / hide table</summary>
+```{r glm-binomial-coef-table, echo=TRUE}
 glm_cs <- coef(summary(model_glm))
 glm_tbl <- data.frame(
   Term = rownames(glm_cs),
@@ -1054,8 +1105,8 @@ knitr::kable(
 ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 ```
-
-A striking result of using the per-household threshold is that structural
+</details>
+The result of using the per-household threshold is that structural
 predictors (building type, heat pump type, living area, and number of residents)
 are all statistically non-significant. This is expected because the threshold
 is set individually for each household, and these characteristics are already
@@ -1170,7 +1221,12 @@ roc_df <- (function(actual, prob) {
 
 ggplot(roc_df, aes(x = fpr, y = tpr)) +
   geom_line(color = clr_primary, linewidth = 1) +
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = clr_neutral) +
+  geom_abline(
+    slope = 1,
+    intercept = 0,
+    linetype = "dashed",
+    color = clr_neutral
+  ) +
   labs(
     title = "GLM Binomial – ROC Curve",
     subtitle = paste0("AUC = ", round(glm_auc_val, 3)),
@@ -1212,8 +1268,14 @@ ggplot(conf_df, aes(x = Actual, y = Predicted, fill = Label)) +
     fontface = "bold",
     color = "white"
   ) +
-scale_fill_manual(values = c("TN" = clr_primary, "TP" = clr_primary,
-                             "FP" = clr_secondary, "FN" = clr_secondary)) +
+  scale_fill_manual(
+    values = c(
+      "TN" = clr_primary,
+      "TP" = clr_primary,
+      "FP" = clr_secondary,
+      "FN" = clr_secondary
+    )
+  ) +
   scale_x_discrete(labels = c("0" = "Low (0)", "1" = "High (1)")) +
   scale_y_discrete(labels = c("0" = "Low (0)", "1" = "High (1)")) +
   labs(
@@ -1265,28 +1327,15 @@ performs well beyond what the modest accuracy gain over the naive baseline sugge
   from January, indicating that some households generate high-consumption days
   in summer as well, likely from cooling or increased hot water use.
 - **Sensitivity of `r round(recall * 100, 1)`%** means the model correctly
-  flags roughly two thirds of actual high-consumption days but also misses one 
-  in three demand spikes 
-  entirely. A client using this model for operational alerting should be aware 
+  flags roughly two thirds of actual high-consumption days but also misses one
+  in three demand spikes
+  entirely. A client using this model for operational alerting should be aware
   of this limitation.
 
-### Conclusion
-
-The GLM Binomial achieves an AUC of `r round(glm_auc_val, 3)` and a sensitivity of
-`r round(recall * 100, 1)`% using a per-household 75th percentile threshold.
-The sensitivity of 63.5% is a known limitation, one in three high-consumption 
-days goes undetected, which should be weighed against the strong AUC of 0.896 
-when deciding whether this model is sufficient for operational use. The
-most important finding is that structural household characteristics (building
-type, heat pump type, size, and number of residents) become non-significant once
-the model
-conditions on each household's own baseline. Day-to-day variation in consumption
-is driven primarily by weekend occupancy and cold weather, not by what kind of
-building or heat pump a household has.
-
-For the client, this means that demand spikes at the household level are
-predictable from calendar and weather information alone, without needing to know
-anything about the household's physical characteristics. The model is
+For the client, demand spikes at the household level are predictable from
+calendar and weather information alone, without needing to know anything about
+the household's physical characteristics — structural variables lose significance
+once the model conditions on each household's own baseline. The model is
 transparent, interpretable, and provides a well-founded baseline for comparison
 with more flexible classification methods.
 
@@ -1300,10 +1349,10 @@ The Linear Model assumes that each predictor affects the response in a straight
 line. For energy consumption, this is often too rigid. The relationship between
 heating demand and electricity use may differ between houses and apartments, and
 between heat pump types, in ways that cannot be captured by fixed linear slopes.
-A **Generalised Additive Model (GAM)** relaxes this assumption by replacing
+A Generalised Additive Model (GAM) relaxes this assumption by replacing
 fixed slopes with flexible smooth functions, while remaining fully interpretable
-through its component plots. Here we model `log_kWh_total` using **exactly the
-same predictors as the extended Linear Model**, namely heating degree days
+through its component plots. Here we model `log_kWh_total` using exactly the
+same predictors as the extended Linear Model, namely heating degree days
 (interacted with building type and heat pump type), sunshine hours, humidity,
 living area, and the number of residents. The GAM replaces the LM's explicit interaction
 terms with `by =` smooths, which allow the shape of the heating-demand curve to
@@ -1377,6 +1426,8 @@ it to a fixed linear slope.
 The table below summarises the estimated degrees of freedom, F-statistic and 
 significance for each smooth term in the model.
 
+<details>
+<summary>Show / hide table</summary>
 ```{r gam-smooth-table}
 s_gam <- summary(model_gam)
 s_tab <- as.data.frame(s_gam$s.table)
@@ -1394,16 +1445,15 @@ knitr::kable(
 ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 ```
-
+</details>
 The smooth terms reveal where non-linearity is present in the data.
 
-- **s(HDD):apartment (edf = 0.8):** The smooth shows a mild positive trend but with a 
-  very wide confidence band, reflecting high uncertainty. The non-significance 
-  (p = 0.316) is due to this uncertainty rather than the effect being absent.
-  For apartments, colder days are associated with higher consumption but the 
-  uncertainty is too large to pin down the exact shape of this relationship. 
-  This likely reflects higher variability in flat consumption patterns rather 
-  than the absence of a heating effect.
+- **s(HDD):apartment (edf = 0.8):** The relationship is approximately linear and 
+non-significant (p = 0.316). The wide confidence band likely reflects the limited 
+number of apartment observations in the dataset rather than genuine ambiguity about 
+the functional form. The data do not provide sufficient evidence to isolate a 
+distinct heating response for apartments beyond the main HDD effect.
+
 - **s(HDD):house (edf = 5.3):** Highly significant (p < 0.001) and strongly
   non-linear. For houses, the response to cold weather is strongly non-linear 
   and highly certain, consumption accelerates disproportionately on the coldest days, 
@@ -1420,18 +1470,13 @@ The smooth terms reveal where non-linearity is present in the data.
   passive solar gain, but the relationship is not a simple straight line. 
   The effect levels off at moderate sunshine hours and rises again at very 
   high values, suggesting that on the sunniest days some households switch their
-  reversible heat pump to cooling mode, increasing electricity consumption.
+  probably reversible heat pump to cooling mode, increasing electricity consumption.
 - **s(humidity_avg) (edf = 5.3):** Non-linear in shape but not significant
   overall (p = 0.118). Humidity may interact with perceived temperature in ways
   not fully captured here. It is retained to enable a direct and controlled 
   comparison between the LM and GAM on identical predictors. Dropping it did
   not meaningfully change the other coefficients.
-- **s(living_area) (edf = 9.0):** Highly significant (p < 0.001) and the most
-  non-linear term. Consumption does not scale proportionally with floor area,
-  medium-sized homes behave differently from small or very large ones.
-  Consumption peaks around 500–600 m² and then declines sharply at very large 
-  living areas, which may reflect more energy-efficient construction in larger 
-  or newer buildings.
+- **s(living_area) (edf = 9.0):** Highly significant (p < 0.001) and the most      non-linear term in the model. Consumption does not scale proportionally with     floor area. The smooth suggests a complex pattern in the small-to-medium range   (100–400 m²) that may partly reflect overfitting given the high edf. The         dominant feature is a clear peak around 500–600 m² followed by a sharp decline   at very large living areas. One possible explanation is more energy-efficient    construction in larger or newer buildings, though this cannot be confirmed from   the data alone.
 
 The parametric terms capture the baseline level shifts between groups and are 
 summarised in the table below.
@@ -1456,13 +1501,13 @@ knitr::kable(
 
 While the `by =` smooths allow the heating-demand curve to differ in shape. Converting
 the parametric estimates with `(exp(coef) - 1) × 100` gives the percentage
-difference relative to the reference level (flat, air-source heat pump).
+difference relative to the reference level (apartment, air-source heat pump).
 
 - **Houses vs. apartments:** The parametric term for `building_typehouse` is
   small and not statistically significant (p = 0.562). Once the model fits a
   separate heating-demand curve per building type, the baseline intercept gap
   disappears. The difference between building types is captured entirely by how
-  they respond to cold weather, not by a flat shift.
+  they respond to cold weather.
 - **Ground-source vs. air-source heat pump:** Ground-source systems consume
   `r round((1 - exp(coef(model_gam)["heatpump_typeground-source"])) * 100, 1)`%
   less electricity per day, all else equal (p < 0.001). This large reduction
@@ -1479,7 +1524,7 @@ The component plots below visualise the estimated smooth function for each
 predictor, showing how each variable contributes to the predicted log consumption 
 independently of the others.
 
-```{r gam-smooth-plots, fig.height=8, fig.width=10, fig.align='center'}
+```{r gam-smooth-plots, fig.height=6, fig.width=9, fig.align='center'}
 gratia::draw(
   model_gam,
   residuals = FALSE,
@@ -1488,9 +1533,11 @@ gratia::draw(
   ci_col = clr_primary
 ) &
   report_theme &
-  theme(text = element_text(size = 9),
-        axis.text = element_text(size = 8),
-        strip.text = element_text(size = 9))
+  theme(
+    text = element_text(size = 9),
+    axis.text = element_text(size = 8),
+    strip.text = element_text(size = 9)
+  )
 ```
 
 The seven panels show the estimated smooth function for each term in the model.
@@ -1601,8 +1648,12 @@ ggplot(
     color = "Heat pump type",
     fill = "Heat pump type"
   ) +
-  scale_colour_manual(values = c("air-source" = clr_primary, "ground-source" = clr_secondary)) +
-  scale_fill_manual(values = c("air-source" = clr_primary, "ground-source" = clr_secondary)) +
+  scale_colour_manual(
+    values = c("air-source" = clr_primary, "ground-source" = clr_secondary)
+  ) +
+  scale_fill_manual(
+    values = c("air-source" = clr_primary, "ground-source" = clr_secondary)
+  ) +
   report_theme
 ```
 
@@ -1619,14 +1670,19 @@ pumps identified above.
 The plots below assess how well the model fits the training data and whether 
 any systematic patterns remain in the residuals.
 
-```{r gam-obs-vs-fitted, echo=FALSE, fig.height=3.5, fig.width=5.5, out.width="70%", fig.align="center"}
+```{r gam-obs-vs-fitted, echo=TRUE, fig.height=3.5, fig.width=5.5, out.width="70%", fig.align="center"}
 fit_df <- data.frame(
   observed = gam_train$log_kWh_total,
   fitted = fitted(model_gam)
 )
 ggplot(fit_df, aes(x = fitted, y = observed)) +
   geom_point(alpha = 0.15, size = 0.8, color = clr_primary) +
-  geom_abline(intercept = 0, slope = 1, color = clr_secondary, linetype = "dashed") +
+  geom_abline(
+    intercept = 0,
+    slope = 1,
+    color = clr_secondary,
+    linetype = "dashed"
+  ) +
   labs(
     title = "GAM – Observed vs. Fitted",
     x = "Fitted log(kWh_total)",
@@ -1654,7 +1710,12 @@ resid_df <- data.frame(
 ggplot(resid_df, aes(x = fitted, y = residuals)) +
   geom_point(alpha = 0.1, size = 0.6, color = clr_primary) +
   geom_hline(yintercept = 0, color = clr_secondary, linetype = "dashed") +
-  geom_smooth(method = "loess", se = FALSE, color = clr_secondary, linewidth = 0.8) +
+  geom_smooth(
+    method = "loess",
+    se = FALSE,
+    color = clr_secondary,
+    linewidth = 0.8
+  ) +
   labs(
     title = "GAM – Residuals vs. Fitted",
     x = "Fitted log(kWh_total)",
@@ -1670,8 +1731,9 @@ The vertical streaks of extreme negative residuals around fitted = 2 correspond
 to the same anomalous near-zero consumption days visible in the observed vs 
 fitted plot. Residual variance is broadly stable across the fitted range with 
 no strong funnel shape, suggesting heteroscedasticity is not a major concern.
-
-```{r gam-performance}
+<details>
+<summary>Show / hide result</summary>
+```{r gam-performance, echo=FALSE}
 pred_gam <- predict(model_gam, newdata = gam_test)
 actual_log <- gam_test$log_kWh_total
 actual_kwh <- exp(actual_log)
@@ -1691,19 +1753,20 @@ cat(sprintf(
   mae_pct
 ))
 ```
+</details>
 
-The most interpretable performance metric here is the **mean absolute error in
-kWh**. On average, the model's daily consumption forecasts are off by
-**`r round(gam_mae_kwh, 1)` kWh**, against a median household consumption of
-**`r round(median_kwh, 1)` kWh/day**. This means a typical prediction error of
-about **`r round(mae_pct, 0)`%** of a household's usual daily consumption.
+The most interpretable performance metric here is the mean absolute error in
+kWh. On average, the model's daily consumption forecasts are off by
+`r round(gam_mae_kwh, 1)` kWh, against a median household consumption of
+`r round(median_kwh, 1)` kWh/day. This means a typical prediction error of
+about `r round(mae_pct, 0)`% of a household's usual daily consumption.
 This is expected for a cross-sectional model of this type. 
 Weather and building characteristics capture the structural drivers of demand, 
 but day-to-day variation driven by individual behaviour, whether someone is 
 home, what appliances they use, is simply not observable from the available 
 predictors and represents a natural ceiling for this modelling approach.
 
-The **R² of `r round(r2_gam * 100, 1)`%** tells the same story from a different
+The R² of `r round(r2_gam * 100, 1)`% tells the same story from a different
 angle. The eight predictors explain roughly a third of the day-to-day variation
 in consumption, and the remaining two-thirds is driven by factors not available
 in this dataset. Compared to the extended Linear Model (R² = 27.4%, MAE =
@@ -1722,8 +1785,9 @@ actionable, and R² communicates model quality in plain percentage terms.
   meaning the LM's linear interaction term understates the acceleration in
   consumption during the coldest days.
 - **HDD for apartments** shows no significant smooth effect (edf = 0.8,
-  p = 0.316). Flat consumption responds to cold weather in a way that is
+  p = 0.316). Apartment consumption responds to cold weather in a way that is
   well described by a straight line once group-specific curves are allowed.
+  The extended LM captures those effects adequately.
 - **Ground-source heat pumps** consume
   `r round((1 - exp(coef(model_gam)["heatpump_typeground-source"])) * 100, 1)`%
   less electricity than air-source systems (p < 0.001).
@@ -1734,20 +1798,9 @@ actionable, and R² communicates model quality in plain percentage terms.
   Consumption does not scale proportionally with floor area.
 - The GAM achieves an R² of `r round(r2_gam * 100, 1)`% and a MAE of
   `r round(gam_mae_kwh, 1)` kWh/day, improving on the extended LM by about 0.4
-  kWh/day.
-
-### Conclusion
-
-The GAM confirms that non-linearity is present in the data, but mostly in how
-houses respond to cold weather during the peak heating season. For apartments
-and both heat pump types, the heating-demand curve is close to linear, meaning
-the extended LM captures those effects adequately. The most actionable findings
-are consistent with the LM. Ground-source heat pumps and lower occupancy reduce
-consumption significantly. The GAM's modest improvement in predictive accuracy
-(MAE of `r round(gam_mae_kwh, 1)` kWh/day versus 10.96 kWh/day for the
-extended LM) does not justify choosing it over the LM when interpretability is
-the priority. The detailed comparison using 5-fold cross-validation is presented
-in the Model Comparison section.
+  kWh/day. This modest gain does not justify choosing the GAM over the LM when
+  interpretability is the priority. The detailed comparison using 5-fold
+  cross-validation is presented in the Model Comparison section.
 
 ## Neural Network (NN) {#nn}
 *Lead: Raphaël Spagolla*
@@ -1794,12 +1847,16 @@ neural networks, as it improves numerical stability and facilitates efficient
 training. The same transformations are then applied to the test set to ensure
 consistency and prevent data leakage.
 
-### Model setup
+### Model Setup
 
+<details>
+<summary>Show / hide result</summary>
 ```{r nn-modell, echo=TRUE}
 cat(deparse(formula(mod_nn)), "\n\n")
 mod_nn$call
 ```
+</details>
+
 
 The neural network is specified with an architecture of (9–25–1), consisting of
 nine input nodes, one hidden layer with 25 neurons, and a single output
@@ -1821,8 +1878,9 @@ performance and model stability, favouring a parsimonious architecture that
 performs reliably on unseen data.
 
 ### Model Results
-
-```{r nn-results, echo=FALSE}
+<details>
+<summary>Show / hide result</summary>
+```{r nn-results, echo=TRUE}
 truth <- test_nn$high_consumption
 pred_class <- factor(
   ifelse(pred_prob_1 >= 0.5, "1", "0"),
@@ -1858,6 +1916,8 @@ knitr::kable(
 ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 ```
+</details>
+
 
 The neural network achieves an accuracy of approximately `r round(acc, 2)`. Because the binary
 target is defined using the 75th-percentile threshold, roughly 75% of observations
@@ -1892,11 +1952,11 @@ concentrated at lower values. However, noticeable overlap in the mid-range
 indicates that some observations cannot be clearly distinguished, which explains
 the presence of classification errors.
 
-```{r nn-pred-prob, echo=FALSE, fig.height=4, fig.width=6, fig.align='center'}
+```{r nn-pred-prob, echo=TRUE, fig.height=4, fig.width=6, fig.align='center'}
 nn_prob_df <- data.frame(
-  index       = seq_along(pred_prob_1),
+  index = seq_along(pred_prob_1),
   probability = as.numeric(pred_prob_1),
-  actual      = as.character(truth)
+  actual = as.character(truth)
 )
 
 ggplot(nn_prob_df, aes(x = index, y = probability, color = actual)) +
@@ -1908,8 +1968,8 @@ ggplot(nn_prob_df, aes(x = index, y = probability, color = actual)) +
   ) +
   labs(
     title = "Neural Network – Predicted Probabilities",
-    x     = "Observation",
-    y     = "Predicted Probability",
+    x = "Observation",
+    y = "Predicted Probability",
     color = NULL
   ) +
   report_theme +
@@ -1921,33 +1981,50 @@ Most observations lie on the diagonal, confirming a high number of correct
 predictions for both classes. Nevertheless, errors occur in both directions,
 highlighting that class separation is not complete.
 
-```{r nn-confmat, echo=FALSE, fig.height=4, fig.width=4.5, fig.align='center'}
+```{r nn-confmat, echo=TRUE, fig.height=4, fig.width=4.5, fig.align='center'}
 nn_df <- data.frame(
   Predicted = factor(c("0", "0", "1", "1"), levels = c("1", "0")),
-  Actual    = factor(c("0", "1", "0", "1"), levels = c("0", "1")),
-  Count     = c(cm["0", "0"],
-                cm["0", "1"],
-                cm["1", "0"],
-                cm["1", "1"]),
-  Label     = c("TN", "FN", "FP", "TP")
+  Actual = factor(c("0", "1", "0", "1"), levels = c("0", "1")),
+  Count = c(cm["0", "0"], cm["0", "1"], cm["1", "0"], cm["1", "1"]),
+  Label = c("TN", "FN", "FP", "TP")
 )
 
-ggplot(nn_df, aes(x = Actual, y = Predicted, fill = Count)) +
+ggplot(nn_df, aes(x = Actual, y = Predicted, fill = Label)) +
   geom_tile(color = "white", linewidth = 1.2) +
-  geom_text(aes(label = paste0(Label, "\n", Count)),
-            size = 5, fontface = "bold", color = "white") +
-  scale_fill_gradient(low = clr_primary, high = clr_secondary) +
+  geom_text(
+    aes(label = paste0(Label, "\n", Count)),
+    size = 5,
+    fontface = "bold",
+    color = "white"
+  ) +
+  scale_fill_manual(
+    values = c(
+      "TN" = clr_primary,
+      "TP" = clr_primary,
+      "FP" = clr_secondary,
+      "FN" = clr_secondary
+    )
+  ) +
   scale_x_discrete(labels = c("0" = "Low (0)", "1" = "High (1)")) +
   scale_y_discrete(labels = c("0" = "Low (0)", "1" = "High (1)")) +
   labs(
     title = "Neural Network – Confusion Matrix",
     subtitle = paste0(
-      "Accuracy = ", round(acc, 3),
-      "  |  F1 = ", round(2 * (tp / (tp + fp)) * (tp / (tp + fn)) /
-                           ((tp / (tp + fp)) + (tp / (tp + fn))), 3),
-      "  |  AUC = ", nn_auc_val
+      "Accuracy = ",
+      round(acc, 3),
+      "  |  F1 = ",
+      round(
+        2 *
+          (tp / (tp + fp)) *
+          (tp / (tp + fn)) /
+          ((tp / (tp + fp)) + (tp / (tp + fn))),
+        3
+      ),
+      "  |  AUC = ",
+      nn_auc_val
     ),
-    x = "Actual class", y = "Predicted class"
+    x = "Actual class",
+    y = "Predicted class"
   ) +
   report_theme +
   theme(legend.position = "none", panel.grid = element_blank())
@@ -1960,7 +2037,7 @@ classification. The steep initial increase suggests that high true positive
 rates can be achieved with relatively low false positive rates, while the
 flattening at higher values reflects diminishing gains.
 
-```{r nn_roc, echo=FALSE, fig.height=4, fig.width=6, fig.align='center'}
+```{r nn_roc, echo=TRUE, fig.height=4, fig.width=6, fig.align='center'}
 roc_df_nn <- data.frame(
   fpr = perf_roc@x.values[[1]],
   tpr = perf_roc@y.values[[1]]
@@ -1968,7 +2045,12 @@ roc_df_nn <- data.frame(
 
 ggplot(roc_df_nn, aes(x = fpr, y = tpr)) +
   geom_line(color = clr_primary, linewidth = 1) +
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = clr_neutral) +
+  geom_abline(
+    slope = 1,
+    intercept = 0,
+    linetype = "dashed",
+    color = clr_neutral
+  ) +
   labs(
     title = "Neural Network – ROC Curve",
     subtitle = paste0("AUC = ", nn_auc_val),
@@ -2014,9 +2096,10 @@ serve as the practical evaluation instead.
 
 ### Key Findings
 
-* The neural network achieves solid predictive performance, with an accuracy of
-  approximately `r round(acc * 100, 1)`%, which should be interpreted against the
-  $\approx 75$% naive baseline arising from the 75/25 class split.
+* The neural network achieves solid predictive performance and successfully
+  captures non-linear relationships in the data. Accuracy is approximately
+  `r round(acc * 100, 1)`%, above the $\approx 75$% naive baseline arising from
+  the 75/25 class split, though the margin is modest.
 
 * The model is more effective at identifying low-consumption days than high-
   consumption days, as reflected in higher specificity compared to sensitivity.
@@ -2032,32 +2115,18 @@ serve as the practical evaluation instead.
   suggesting that performance is primarily constrained by the available features
   rather than the model itself.
 
-### Conclusion
-
-The neural network achieves solid predictive performance and successfully
-captures non-linear relationships in the data. With an accuracy of approximately
-`r round(acc * 100, 1)`%, it demonstrates discriminative ability above the naive
-$\approx 75$% baseline that arises from the 75/25 class split, though the margin
-above that baseline is modest and performance is primarily constrained by the
-available predictors rather than model complexity.
-
-However, the presence of overlap in predicted probabilities indicates that the
-model cannot fully distinguish between the two classes.
-
 From a practical perspective, the model can serve as a useful decision-support
 tool for identifying high-consumption events, although predictions should be
 interpreted with some caution due to remaining classification uncertainty.
-
 Further improvements are more likely to come from enhanced feature engineering
-or the inclusion of additional relevant variables rather than increasing model
-complexity. Cross-validation results for the Neural Network are reported in the
-Model Comparison section.
+or the inclusion of additional relevant variables. Cross-validation results for
+the Neural Network are reported in the Model Comparison section.
 
 ## Support Vector Machine (SVM) {#svm}
 
 *Lead: Tharrmeehan Krishnathasan*
 
-```{r import-svm, echo=FALSE, message=FALSE, warning=FALSE}
+```{r import-svm, echo=TRUE, message=FALSE, warning=FALSE}
 hh_q75_svm <- heapo |>
   group_by(Household_ID) |>
   summarise(
@@ -2152,19 +2221,21 @@ if (file.exists("../models/cv_class_results.rds")) {
 
 ### Objective
 
-This section classifies each household-day as *high consumption* (top 25% of that household's days) or *normal*, a binary problem with practical relevance: knowing which days are likely to be high-load in advance lets grid operators and energy providers plan capacity.
+Can a high-load day be identified before it happens, using only weather conditions and what we already know about the household? This section trains a Support Vector Machine to classify each household-day as *high consumption* (top 25% of that household's own days) or *normal*. The problem has direct operational relevance: a reliable early-warning classifier would let grid operators and energy providers plan capacity without waiting for demand spikes to appear on the meter.
 
-An SVM is used because it can find non-linear decision boundaries via kernel functions without requiring distributional assumptions about the predictors. Performance is evaluated on a held-out test set using accuracy, sensitivity, specificity, and F1 score.
+An SVM is used because consumption peaks may not separate cleanly from normal days along a linear boundary. With a radial basis function (RBF) kernel, the model can find curved decision surfaces in high-dimensional feature space without making distributional assumptions about the predictors. A baseline model with default hyperparameters is compared against a tuned version where the regularisation strength C and kernel bandwidth sigma are selected by 5-fold cross-validation. The same per-household 75th percentile threshold used in the GLM Binomial is applied throughout, so the two classifiers can be compared directly on the same task.
 
 ### Data Preparation
 
-`high_consumption` labels a day as *high* if it falls in the top 25% of that household's own `log_kWh_total` distribution. For each of the `r length(unique(heapo$Household_ID))` households, the 75th percentile is computed separately, so every household contributes exactly 25% high-consumption days by construction.
+`high_consumption` labels a day as *high* if it falls in the top 25% of that household's own `log_kWh_total` distribution. For each of the `r length(unique(heapo$Household_ID))` households, the 75th percentile is computed separately, so every household contributes approximately 25% high-consumption days by construction.
 
-After removing missing values, the dataset has 93,686 observations: 23,440 high-consumption days (25.0%) and 70,246 normal days (75.0%). `log_kWh_total` is excluded to prevent data leakage; the SVM must identify high-load days from weather and household characteristics alone.
+After removing missing values, the dataset has 93,686 observations: 23,514 high-consumption days (25.1%) and 70,172 normal days (74.9%). `log_kWh_total` is excluded to prevent data leakage; the SVM must identify high-load days from weather and household characteristics alone.
 
-The data are split 80/20 into training (74,949 rows) and test (18,737 rows) using stratified sampling to keep the class ratio consistent. All numeric predictors are standardised before training, as SVMs are sensitive to feature scale.
+The data are split 80/20 into training (74,950 rows) and test (18,736 rows) using stratified sampling to keep the class ratio consistent. All numeric predictors are standardised before training, as SVMs are sensitive to feature scale.
 
-```{r svm-class-balance, echo=FALSE}
+<details>
+<summary>Show / hide table</summary>
+```{r svm-class-balance, echo=TRUE}
 prop.table(table(train_data$high_consumption)) %>%
   as.data.frame() %>%
   rename(Class = Var1, Proportion = Freq) %>%
@@ -2174,20 +2245,21 @@ prop.table(table(train_data$high_consumption)) %>%
   ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 ```
+</details>
 
 ### Model Setup
-
-Both models use a radial basis function (RBF) kernel, which maps data into a higher-dimensional space to find non-linear decision boundaries. This suits energy data where weather and household effects interact in ways a linear boundary cannot capture.
 
 **Baseline SVM:** C = 1, sigma estimated from training data. This provides a reference for the tuned model.
 
 **Tuned SVM:** 5-fold cross-validation over a grid of `C` ∈ {1, 10, 100} and `sigma` ∈ {0.01, 0.1, 1/7}. `C` controls the misclassification penalty (higher = tighter fit); `sigma` is the inverse bandwidth of the RBF kernel (higher = more local boundaries). The combination with the highest CV accuracy is selected.
 
-The best parameters were C = 100, sigma = 0.1429 (= 1/7), achieving CV accuracy of 0.8304 (Kappa = 0.4859) across the 3×3 grid.
+The best parameters were C = 100, sigma = 0.1429 (= 1/7), achieving CV accuracy of 0.8530 (Kappa = 0.5747) across the 3×3 grid.
 
 ### Model Results
 
-```{r svm-eval-table, echo=FALSE}
+<details>
+<summary>Show / hide table</summary>
+```{r svm-eval-table, echo=TRUE}
 extract_metrics <- function(cm, model_name) {
   tibble(
     Model = model_name,
@@ -2210,8 +2282,10 @@ bind_rows(
   ) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 ```
-
-```{r svm-cv-table, echo=FALSE}
+</details>
+<details>
+<summary>Show / hide table</summary>
+```{r svm-cv-table, echo=TRUE}
 if (!is.na(svm_cv_auc)) {
   knitr::kable(
     data.frame(
@@ -2222,21 +2296,22 @@ if (!is.na(svm_cv_auc)) {
     ),
     caption = "Tuned SVM — 5-fold cross-validation performance (per-household 75th percentile threshold)"
   ) %>%
-  kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 } else {
   cat(
     "*CV results not available. Run R/04_model_comparison_cv_classification.R first.*"
   )
 }
 ```
+</details>
 
-The tuned SVM achieves a five-fold CV AUC of **`r round(svm_cv_auc, 3)`** and accuracy of **`r round(svm_cv_acc * 100, 1)`%**. The 80/20 split below adds sensitivity, specificity, and F1.
+The tuned SVM achieves a five-fold CV AUC of **`r round(svm_cv_auc, 3)`** and accuracy of **`r round(svm_cv_acc * 100, 1)`%**. The test-set evaluation below reports sensitivity, specificity, and F1.
 
 The tuned SVM (C = `r best_C`, sigma = `r best_sigma`) reaches **`r round(cm_best$overall["Accuracy"] * 100, 1)`%** accuracy, compared to `r round(cm_baseline$overall["Accuracy"] * 100, 1)`% for the baseline. The improvement is modest: a naive all-*normal* classifier would already score `r round(table(test_y)["normal"] / length(test_y) * 100, 1)`%, leaving a true gain of only `r round((cm_best$overall["Accuracy"] - table(test_y)["normal"] / length(test_y)) * 100, 0)` percentage points.
 
 The more informative metrics are:
 
-**Sensitivity (`r round(cm_best$byClass["Sensitivity"], 4)`):** the model correctly identifies `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% of actual high-consumption days. Over half are missed, a meaningful limitation in early-warning contexts where false negatives are costly.
+**Sensitivity (`r round(cm_best$byClass["Sensitivity"], 4)`):** the model correctly identifies `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% of actual high-consumption days. Over 40% are still missed, a meaningful limitation in early-warning contexts where false negatives are costly.
 
 **Specificity (`r round(cm_best$byClass["Specificity"], 4)`):** normal days are classified correctly `r round(cm_best$byClass["Specificity"] * 100, 1)`% of the time. The model is conservative, flagging fewer high-consumption days than actually occur (`r sum(cm_best$table["high", ])` predicted high vs. `r sum(cm_best$table[, "high"])` actual high in the test set).
 
@@ -2246,46 +2321,69 @@ The more informative metrics are:
 
 ### Visual Evidence
 
-The confusion matrix heatmap shows the distribution of predictions versus actual labels. Correct predictions fall on the diagonal; off-diagonal cells are misclassifications.
+The confusion matrix heatmap shows the full breakdown of test-set predictions against actual labels. Blue cells on the diagonal are correct predictions; red cells off the diagonal are errors. Reading column-wise gives the recall for each class; reading row-wise gives precision.
 
-```{r svm-conf-matrix-plot, echo=FALSE, fig.height=4, fig.width=4.5, fig.align='center'}
+```{r svm-conf-matrix-plot, echo=TRUE, fig.height=4, fig.width=4.5, fig.align='center'}
 cm_mat <- cm_best$table
 
 svm_df <- data.frame(
-  Predicted = factor(c("normal", "normal", "high", "high"),
-                     levels = c("high", "normal")),
-  Actual    = factor(c("normal", "high",   "normal", "high"),
-                     levels = c("normal", "high")),
-  Count     = c(cm_mat["normal", "normal"],
-                cm_mat["normal", "high"],
-                cm_mat["high",   "normal"],
-                cm_mat["high",   "high"]),
-  Label     = c("TN", "FN", "FP", "TP")
+  Predicted = factor(
+    c("normal", "normal", "high", "high"),
+    levels = c("high", "normal")
+  ),
+  Actual = factor(
+    c("normal", "high", "normal", "high"),
+    levels = c("normal", "high")
+  ),
+  Count = c(
+    cm_mat["normal", "normal"],
+    cm_mat["normal", "high"],
+    cm_mat["high", "normal"],
+    cm_mat["high", "high"]
+  ),
+  Label = c("TN", "FN", "FP", "TP")
 )
 
-ggplot(svm_df, aes(x = Actual, y = Predicted, fill = Count)) +
+ggplot(svm_df, aes(x = Actual, y = Predicted, fill = Label)) +
   geom_tile(color = "white", linewidth = 1.2) +
-  geom_text(aes(label = paste0(Label, "\n", Count)),
-            size = 5, fontface = "bold", color = "white") +
-  scale_fill_gradient(low = clr_primary, high = clr_secondary) +
+  geom_text(
+    aes(label = paste0(Label, "\n", Count)),
+    size = 5,
+    fontface = "bold",
+    color = "white"
+  ) +
+  scale_fill_manual(
+    values = c(
+      "TN" = clr_primary,
+      "TP" = clr_primary,
+      "FP" = clr_secondary,
+      "FN" = clr_secondary
+    )
+  ) +
   scale_x_discrete(labels = c("normal" = "Low (0)", "high" = "High (1)")) +
   scale_y_discrete(labels = c("normal" = "Low (0)", "high" = "High (1)")) +
   labs(
     title = "SVM – Confusion Matrix",
     subtitle = paste0(
-      "Accuracy = ", round(cm_best$overall["Accuracy"], 3),
-      "  |  F1 = ", round(cm_best$byClass["F1"], 3),
-      "  |  AUC = ", round(svm_cv_auc, 3)
+      "Accuracy = ",
+      round(cm_best$overall["Accuracy"], 3),
+      "  |  F1 = ",
+      round(cm_best$byClass["F1"], 3),
+      "  |  AUC = ",
+      round(svm_cv_auc, 3)
     ),
-    x = "Actual class", y = "Predicted class"
+    x = "Actual class",
+    y = "Predicted class"
   ) +
   report_theme +
   theme(legend.position = "none", panel.grid = element_blank())
 ```
 
-The bar chart compares sensitivity and specificity for the baseline and tuned models, showing how tuning shifts the balance between detecting high-consumption days and avoiding false alarms.
+The matrix makes the model's asymmetry concrete. The large TN count shows the SVM seldom raises false alarms on genuinely normal days, explaining the high specificity. The FN count (1,927) shows that over 40% of actual high-consumption days are silently missed. This conservative bias is a direct consequence of the 75/25 class split: on ambiguous days, the model defaults to the majority class.
 
-```{r svm-metric-comparison, echo=FALSE, fig.height=3.5, fig.width=5, out.width="48%", fig.show="hold", fig.align='center'}
+The bar chart puts the sensitivity-specificity trade-off for both models side by side. Tuning from default parameters to C = `r best_C`, sigma = `r best_sigma` pushes sensitivity up from `r round(cm_baseline$byClass["Sensitivity"] * 100, 1)`% to `r round(cm_best$byClass["Sensitivity"] * 100, 1)`%, recovering more true high-consumption days at the cost of a small drop in specificity. The gain is consistent but modest, pointing to the predictor set rather than hyperparameter choice as the main constraint.
+
+```{r svm-metric-comparison, echo=TRUE, fig.height=3.5, fig.width=5, out.width="48%", fig.show="hold", fig.align='center'}
 metrics_df <- bind_rows(
   extract_metrics(cm_baseline, "Baseline"),
   extract_metrics(cm_best, "Tuned")
@@ -2299,7 +2397,9 @@ metrics_df <- bind_rows(
 
 ggplot(metrics_df, aes(x = Metric, y = Value, fill = Model)) +
   geom_col(position = "dodge") +
-  scale_fill_manual(values = c("Baseline" = clr_neutral, "Tuned" = clr_primary)) +
+  scale_fill_manual(
+    values = c("Baseline" = clr_neutral, "Tuned" = clr_primary)
+  ) +
   scale_y_continuous(limits = c(0, 1)) +
   report_theme +
   labs(
@@ -2314,35 +2414,19 @@ ggplot(metrics_df, aes(x = Metric, y = Value, fill = Model)) +
 
 Unlike regression models, SVM diagnostics focus on generalisation performance and modelling choices rather than distributional assumptions.
 
-**CV tuning results:** Across all 9 combinations, CV accuracy ranged from 0.8071 (C=10, sigma=0.01) to 0.8304 (C=100, sigma=0.1429). The top four combinations all involve sigma ≥ 0.1, suggesting a moderately local kernel works best. The gain from increasing C from 10 to 100 at sigma=0.1429 is small (0.8268 → 0.8304), with diminishing returns beyond that.
+**CV tuning results:** Across all 9 combinations, CV accuracy ranged from 0.8488 (C=1, sigma=0.01) to 0.8530 (C=100, sigma=0.1429). The top four combinations all involve sigma ≥ 0.1, suggesting a moderately local kernel works best. The gain from C=10 to C=100 at sigma=0.1429 is small (0.8525 → 0.8530), pointing to the predictor set as the limiting factor rather than model configuration.
 
-**Class separability:** Sensitivity of `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% shows that the available predictors (weather conditions and household characteristics) do not reliably separate the two classes. Many high-consumption days fall in the same feature space as normal days, an overlap that no kernel choice can resolve.
-
-**Tuning stability:** The best combination (C=`r best_C`, sigma=`r best_sigma`) sits at the top-right corner of the grid. Given the small step from C=10 to C=100 and genuine class overlap in the data, further tuning is unlikely to produce meaningful sensitivity gains.
-
-**Comparison with baseline:** The tuned model improves accuracy (`r round(cm_baseline$overall["Accuracy"] * 100, 1)`% → `r round(cm_best$overall["Accuracy"] * 100, 1)`%) and sensitivity (`r round(cm_baseline$byClass["Sensitivity"] * 100, 1)`% → `r round(cm_best$byClass["Sensitivity"] * 100, 1)`%) over the default parameters. The improvement is real but modest, pointing to the predictor set as the limiting factor rather than model configuration.
+**Class separability:** The available predictors do not reliably separate the two classes. High and normal consumption days share substantial overlap in the feature space, which no kernel choice can resolve.
 
 ### Key Findings
 
-**The SVM achieves reasonable accuracy but low sensitivity:** At `r round(cm_best$overall["Accuracy"] * 100, 1)`% accuracy, the model outperforms always predicting the majority class (`r round(table(test_y)["normal"] / length(test_y) * 100, 1)`%). Sensitivity of `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% is the bigger concern: more than half of actual high-consumption days are missed.
-
-**High specificity reflects a conservative classifier:** Specificity of `r round(cm_best$byClass["Specificity"] * 100, 1)`% means the model rarely raises false alarms on normal days, but this comes at the cost of missing many genuine high-load events.
+**The SVM achieves reasonable accuracy but low sensitivity:** At `r round(cm_best$overall["Accuracy"] * 100, 1)`% accuracy, the model scores roughly 10 percentage points above the naive majority-class baseline (`r round(table(test_y)["normal"] / length(test_y) * 100, 1)`%). Sensitivity of `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% is the bigger concern: over 40% of actual high-consumption days are missed, while specificity of `r round(cm_best$byClass["Specificity"] * 100, 1)`% shows the model rarely raises false alarms on normal days. This makes it too conservative on its own for capacity planning or demand-response triggering.
 
 **Tuning yields real but limited improvement:** Moving from default parameters to C=`r best_C`, sigma=`r best_sigma` improves sensitivity from `r round(cm_baseline$byClass["Sensitivity"] * 100, 1)`% to `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% and accuracy from `r round(cm_baseline$overall["Accuracy"] * 100, 1)`% to `r round(cm_best$overall["Accuracy"] * 100, 1)`%. The gains are consistent but small; further tuning will not resolve the core problem.
 
-**The predictor set is the bottleneck:** Weather conditions and static household characteristics capture only part of what drives high-consumption days. Day-to-day within-household variation is not well explained by the available features.
+**The predictor set is the bottleneck:** Weather conditions and static household characteristics capture only part of what drives high-consumption days. High and normal consumption days overlap substantially in the feature space, and no kernel or regularisation choice can separate what is genuinely mixed in the data. Richer features would help: lagged consumption, occupancy patterns, or appliance-level data.
 
-**Data leakage is avoided:** By excluding `log_kWh_total`, all results reflect genuine out-of-sample discriminative ability from operationally observable inputs.
-
-### Conclusion
-
-Weather conditions and household characteristics carry real signal for classifying high-consumption days: the SVM scores roughly 8 percentage points above the naive majority-class baseline.
-
-At `r round(cm_best$byClass["Sensitivity"] * 100, 1)`% sensitivity, however, the model misses more than half of all actual high-load days. For capacity planning or demand-response triggering, that miss rate is too high for the model to be useful on its own.
-
-The limiting factor is not the model but the available features. High and normal consumption days overlap substantially in the weather-and-household feature space, and no kernel or regularisation choice can separate what is genuinely mixed in the data. Richer features would help: lagged consumption, occupancy patterns, or appliance-level data.
-
-Lowering the flagging threshold would recover more true positives at the cost of more false alarms, which may be acceptable in a probabilistic forecasting pipeline. At the default threshold, the model should not be the sole basis for high-consumption day decisions.
+**Threshold adjustment is a practical alternative:** Lowering the flagging threshold would recover more true positives at the cost of more false alarms, which may be acceptable in a probabilistic forecasting pipeline. At the default threshold, the model should not be the sole basis for high-consumption day decisions.
 
 # Model Comparison {#comparison}
 
@@ -2380,7 +2464,7 @@ if (!is.null(reg_summary)) {
       "MAE is on the kWh scale; R² is on the log scale."
     )
   ) %>%
-  kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 } else {
   cat("*Table not available. Run R/04_model_comparison_cv.R first.*")
 }
@@ -2462,7 +2546,7 @@ if (!is.null(class_summary)) {
       "All models: 5-fold CV, per-household 75th percentile threshold."
     )
   ) %>%
-  kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE)
 } else {
   cat(
     "*CV table not available. Run R/04_model_comparison_cv_classification.R then R/3.5_neural_network.R first.*"
@@ -2484,6 +2568,7 @@ if (!is.null(class_summary)) {
       scale_fill_manual(values = c(clr_primary, clr_neutral, clr_secondary)) +
       facet_wrap(~Metric, scales = "free_y") +
       report_theme +
+      theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
       labs(
         title = "Classification model comparison",
         subtitle = "All models: per-household 75th percentile threshold",
@@ -2512,32 +2597,32 @@ cv_form <- as.formula(
   env = baseenv()
 )
 
-n          <- nrow(dat_count)
-folds      <- sample(rep(1:5, length.out = n))
+n <- nrow(dat_count)
+folds <- sample(rep(1:5, length.out = n))
 rmse_folds <- numeric(5)
 
 for (k in 1:5) {
   train_k <- dat_count[folds != k, ]
-  test_k  <- dat_count[folds == k, ]
+  test_k <- dat_count[folds == k, ]
 
   fit_k <- glm(
     cv_form,
     family = poisson(link = "log"),
     offset = log(n_days),
-    data   = train_k,
-    model  = FALSE,
-    x      = FALSE,
-    y      = FALSE
+    data = train_k,
+    model = FALSE,
+    x = FALSE,
+    y = FALSE
   )
 
-  pred_k        <- predict(fit_k, newdata = test_k, type = "response")
+  pred_k <- predict(fit_k, newdata = test_k, type = "response")
   rmse_folds[k] <- sqrt(mean((test_k$n_high_days - pred_k)^2))
   rm(fit_k, train_k, test_k)
   gc()
 }
 
 pois_cv_rmse <- round(mean(rmse_folds), 3)
-pois_cv_sd   <- round(sd(rmse_folds),   3)
+pois_cv_sd <- round(sd(rmse_folds), 3)
 ```
 
 The five-fold CV RMSE is `r pois_cv_rmse` days (SD = `r pois_cv_sd`).
@@ -2552,8 +2637,7 @@ Across all six models, interpretability and predictive performance trade
 off consistently. The LM, GAMs, and GLM Poisson offer transparent,
 coefficient-based explanations but leave more variance unexplained. The
 SVM and Neural Network improve accuracy but are effectively black boxes.
-The GLM Binomial sits in between — log-odds coefficients remain
-interpretable while classification performance is competitive. The right
+The GLM Binomial offers a middle ground, with interpretable log-odds coefficients and competitive classification performance. The right
 choice depends on whether the use case demands explainability or accuracy.
 
 # Conclusions {#conclusions}
@@ -2593,15 +2677,25 @@ achieving an AUC of
 `r round(class_summary[grepl("GLM", class_summary$Model), "CV AUC"], 3)`
 and accuracy of
 `r round(class_summary[grepl("GLM", class_summary$Model), "CV Accuracy"] * 100, 1)`%
-while remaining fully interpretable.
+while remaining fully interpretable and maintainable since less parameters are needed.
 
 The practical implication for energy suppliers and grid operators is to target
 demand management programmes at larger households with air-source systems during
 cold weather peaks, where high occupancy and less efficient heating combine to
 produce the sharpest load spikes. Weekend time-of-use tariffs or demand response
-incentives offer an additional lever for flattening the load peaks that drive
-balancing energy costs.
+incentives offer an additional lever for flattening these peaks and reducing
+balancing energy costs. Since the model can flag high-demand days in advance,
+proactive communication to at-risk households before cold snaps represents a
+low-cost first step. At the grid level, aggregating flexibility across many heat
+pump households into a virtual power plant would allow suppliers to collectively
+shift or pause demand during price spikes. The findings here provide a basis
+for identifying which households offer the most relevant flexibility. For
+households currently considering a heat pump installation, ground-source systems
+show consistently lower consumption and should be recommended where feasible.
+Promoting energy storage and load-shifting solutions could further reduce reliance
+on the spot market, though further research is needed to quantify the long-term
+financial benefit across all these approaches.
 
 # Use of Generative AI {#ai}
 
-Generative AI tools — primarily Claude (Anthropic) and GitHub Copilot — were used throughout this project to support code generation, debugging, and text drafting. AI assistance proved effective for producing boilerplate R code for data preprocessing, visualisation, and model-fitting wrappers, as well as for generating first drafts of methodological prose describing model outputs and statistical concepts. Human oversight was essential for tasks requiring analytical judgement, including the selection of modelling thresholds, cross-validation architecture, and the interpretation of model coefficients, where AI-generated suggestions occasionally contained subtle errors or overstated certainty. All AI-generated code was reviewed and tested prior to integration, and all interpretive text was verified against actual model output before inclusion in this report.
+Generative AI tools, primarily Claude (Anthropic) and GitHub Copilot, were used throughout this project to support code generation, debugging, and text drafting. AI assistance proved effective for producing boilerplate R code for data preprocessing, visualisation, and model-fitting wrappers, as well as for generating first drafts of methodological prose describing model outputs and statistical concepts. Human oversight was essential for tasks requiring analytical judgement, including the selection of modelling thresholds, cross-validation architecture, and the interpretation of model coefficients, where AI-generated suggestions occasionally contained subtle errors or overstated certainty. All AI-generated code was reviewed and tested prior to integration, and all interpretive text was verified against actual model output before inclusion in this report.
